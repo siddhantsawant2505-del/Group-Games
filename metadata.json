@@ -1,0 +1,6 @@
+{
+  "name": "Party Games",
+  "description": "Mobile-first real-time party and social deduction game engine with phone-as-controller lobby, live room synchronization, and extensible round-phase architecture.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

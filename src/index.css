@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+:root {
+  --font-display: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Player Identity Colors */
+  --player-1: #FF5A5F;
+  --player-2: #3AA0FF;
+  --player-3: #FFC93C;
+  --player-4: #4CD787;
+  --player-5: #9B6DFF;
+  --player-6: #FF6FB0;
+
+  /* Theme Tokens - Light Mode Default */
+  --bg-app: #FAFAF7;
+  --surface-card: #FFFFFF;
+  --surface-card-subtle: #F4F4F0;
+  --text-primary: #1A1B1E;
+  --text-secondary: #6B6D73;
+  --border-subtle: rgba(26, 27, 30, 0.08);
+
+  /* Semantic */
+  --color-success: #22C55E;
+  --color-danger: #EF4444;
+  --color-special-role: #3D2C4E;
+
+  /* Radii */
+  --radius-card: 20px;
+  --radius-button: 18px;
+  --radius-pill: 9999px;
+}
+
+/* System dark mode */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-app: #16171A;
+    --surface-card: #212226;
+    --surface-card-subtle: #2C2D33;
+    --text-primary: #F2F2F0;
+    --text-secondary: #A0A2A8;
+    --border-subtle: rgba(242, 242, 240, 0.1);
+  }
+}
+
+/* Explicit data-theme overrides */
+:root[data-theme="dark"] {
+  --bg-app: #16171A;
+  --surface-card: #212226;
+  --surface-card-subtle: #2C2D33;
+  --text-primary: #F2F2F0;
+  --text-secondary: #A0A2A8;
+  --border-subtle: rgba(242, 242, 240, 0.1);
+}
+
+:root[data-theme="light"] {
+  --bg-app: #FAFAF7;
+  --surface-card: #FFFFFF;
+  --surface-card-subtle: #F4F4F0;
+  --text-primary: #1A1B1E;
+  --text-secondary: #6B6D73;
+  --border-subtle: rgba(26, 27, 30, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--font-body);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  user-select: none;
+}
+
+/* Smooth transition for theme switches */
+body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom phone-screen container helper */
+.mobile-app-shell {
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-color: var(--bg-app);
+}
+
+/* Card utility */
+.party-card {
+  background-color: var(--surface-card);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+/* Filled icons helper */
+.filled-icon {
+  fill: currentColor;
+}
