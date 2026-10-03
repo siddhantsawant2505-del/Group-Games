@@ -4,67 +4,122 @@ A mobile-first, real-time party and social deduction game engine built with Reac
 
 ---
 
-## Current Build Status
+## Project Documentation
+
+| Document | Purpose |
+|---|---|
+| [README.md](README.md) | This file: overview, quickstart, features, architecture, development guide |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Deep architecture reference: Socket.IO model, room lifecycle, phase state machine, data model, anti-cheat, scaling, hosting |
+| [docs/GAME_rules.md](docs/GAME_rules.md) | Current game rules, accepted system rules, phase rules, architecture notes, hardening recommendations |
+| [docs/party-game-ideas.md](docs/party-game-ideas.md) | Reference list of fun multiplayer party games for friends: social deduction, word/clue, communication, trivia, and role games |
+| [docs/tech-stack.md](docs/tech-stack.md) | Technology stack breakdown, dependency roles, tooling, and environment variables |
+
+---
+
+## Quickstart
+
+```bash
+npm install
+npm run dev          # Dev server on http://localhost:3000 (Express + Socket.IO + Vite)
+npm run lint         # TypeScript type checking (tsc --noEmit)
+npm run build        # Build client + bundle server to dist/server.cjs
+npm run start        # Run production build (NODE_ENV=production)
+```
+
+---
+
+## What "Party Games" is
+
+**Party Games** is a mobile-first, real-time multiplayer **party / social-deduction game engine**.
+
+- All players join from their own phones; there is no shared monitor or TV.
+- The server is **authoritative**: it owns the full room state, secret roles, hidden words,
+  submitted answers, and the phase state machine.
+- Players receive a **masked public** state for the room and a **targeted private** state for
+  themselves, so secret roles and hidden words cannot be snooped through dev tools or the network
+  inspector.
+- A 4-character room code + QR code are used for joining.
+- A "next-round" loop lets a host replay a new round with a fresh role assignment.
+
+The flagship game currently implemented is **Impostor**, with additional game ideas documented for
+future expansion.
+
+---
+
+## Features
+
+- **Mobile-first UI** — max-width `480px`, touch targets ≥ 48px, spring animations, dark/light/system theme.
+- **Real-time sync** — Socket.IO with WebSocket and HTTP long-polling fallback.
+- **Server-authoritative state** — room/phase/session state, timers, role assignment, and votes live on the server.
+- **Public / private state separation** — `room:update` broadcasts safe public state; `player:private-state` sends targeted secrets.
+- **QR + room-code join** — scan a phone camera to open the exact room.
+- **Session reconnect** — reconnect by previous name or session token.
+- **Host controls** — game selection, phase advancement, skip timers, and bot injection for solo testing.
+- **Six built-in games** — Impostor, Avoid the Word, Mafia, Guess the Link, Top 100, Reverse Categories.
+- **100-word wordlist** — difficulty-stratified thematic nouns for the Impostor game.
+- **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, discussion, vote, results, next-round.
+
+---
+
+## Deployed / continuous integration checks
 
 | Metric | Status | Details |
 |---|---|---|
-| **TypeScript / TypeCheck** | `PASSING` | `tsc --noEmit` exits with 0 errors (`npm run lint`) |
-| **Vite Client Build** | `PASSING` | React 19 SPA bundled to `dist/` with Tailwind CSS v4 |
-| **Server Build** | `PASSING` | Bundled into standalone CommonJS executable `dist/server.cjs` via `esbuild` |
-| **Dev Runtime** | `OPERATIONAL` | Integrated Vite middleware via Express on `0.0.0.0:3000` (`npm run dev`) |
-| **Production Runtime** | `OPERATIONAL` | Serves compiled static SPA + Socket.IO server (`npm run start`) |
-| **Port & Networking** | `PORT 3000` | Binds to `0.0.0.0:3000` behind reverse-proxy layer |
+| TypeScript / TypeCheck | `PASSING` | `npm run lint` exits with 0 errors |
+| Vite Client Build | `PASSING` | React 19 SPA bundled to `dist/` with Tailwind CSS v4 |
+| Server Build | `PASSING` | Bundled into standalone CommonJS executable `dist/server.cjs` via esbuild |
+| Dev Runtime | `OPERATIONAL` | Express + Socket.IO + Vite middleware on `0.0.0.0:3000` |
+| Production Runtime | `OPERATIONAL` | Serves compiled SPA + Socket.IO server |
+| Port & Networking | `PORT 3000` | Binds to `0.0.0.0:3000` |
 
 ---
 
-## Key Architecture & Components
+## Core architecture
 
 ### 1. Dual Development / Production Server (`server.ts`)
-- **Development Mode (`NODE_ENV !== 'production'`)**:
-  - Express boots Vite programmatically in `middlewareMode: true` with `appType: 'spa'`.
-  - Enables instant hot code evaluation without needing separate terminal processes for frontend and backend.
-- **Production Mode (`NODE_ENV === 'production'`)**:
-  - Express serves compiled assets statically from `dist/` with a wildcard fallback to `dist/index.html`.
-  - Backend logic is compiled by `esbuild` to `dist/server.cjs`, resolving all Node module boundaries cleanly.
+
+- **Development Mode (`NODE_ENV !== 'production'`)**: Express boots Vite programmatically in
+  `middlewareMode: true` with `appType: 'spa'`.
+- **Production Mode (`NODE_ENV === 'production'`)**: Express serves compiled assets statically
+  from `dist/` with a wildcard fallback to `dist/index.html`.
+- **Backend entry**: `server.ts` starts the HTTP server, Socket.IO, health endpoint, and Vite/static
+  middleware.
 
 ### 2. Real-Time State Synchronization (`Socket.IO` & `roomManager.ts`)
+
 - **Public vs. Private State Separation**:
-  - The server maintains full room state (`InternalRoom`) containing secret roles, hidden words, and submitted answers.
-  - Clients receive masked public state (`room:update`) while individual players receive targeted private state (`player:private-state`), ensuring secret roles (e.g., Impostor vs. Innocent) cannot be snooped via browser dev tools or network inspects.
-- **Session Reconnection**:
-  - Each player receives a persistent `sessionToken` upon joining.
-  - If a player's browser disconnects or refreshes, the client attempts immediate automatic reconnection by token and previous player name.
-- **Solo Testing & Bot Injection**:
-  - Hosts can click **"Add Bot"** in preview or development.
-  - Bots automatically simulate random word clues, dynamic fallbacks, and realistic voting distributions, enabling single-developer testing.
+  - The server maintains full room state (`InternalRoom`) containing secret roles, hidden words,
+    and submitted answers.
+  - Clients receive masked public state (`room:update`) while individual players receive targeted
+    private state (`player:private-state`), ensuring secret roles cannot be snooped.
+- **Session Reconnection**: Each player receives a persistent `sessionToken` upon joining.
+- **Solo Testing & Bot Injection**: Hosts can click **"+ Add Bot"** in preview or development.
 
-### 3. Wordlist & Thematic Dictionary (`data/wordlist.json`)
-- Includes 100 curated, non-commercial, brand-free thematic nouns.
-- Categorized into three tiers:
-  - **Easy (35 words)**: Common nouns (e.g., *Backpack, Bicycle, Campfire, Telescope, Waterfall*).
-  - **Medium (35 words)**: Scientific & historical objects (e.g., *Catapult, Periscope, Monorail, Kaleidoscope, Trebuchet*).
-  - **Hard (30 words)**: Specialized antiquities & instruments (e.g., *Astrolabe, Seismograph, Orrery, Armillary, Bathyscaphe*).
-- Imported with `"resolveJsonModule": true` into both client and server word utilities (`src/data/impostorWords.ts`).
+### 3. Game Phase State Machine
 
-### 4. Game Phase State Machine
-Games follow an extensible phase progression managed by the server:
-1. **`lobby`**: Players join via room code / QR code; host configures bots and launches the session.
-2. **`game-select`**: Host chooses which party game to play (e.g., *The Impostor*).
-3. **`reveal`**: Private role assignment. Innocents receive the secret noun; the Impostor receives only a thematic hint.
-4. **`input`**: Players submit their single-word subtle clues.
-5. **`reveal-answers`**: Clues are revealed simultaneously to all players in an animated presentation.
-6. **`discussion`**: Timed debate to cross-examine suspects and deliberate over suspicious clues.
-7. **`vote`**: Secret ballot where all players cast their vote for the suspected Impostor.
-8. **`results`**: Tally reveal, Impostor identity exposure, winner announcement, and option to play again or return to lobby.
+1. **`lobby`** — players join via room code/QR; host configures bots and launches.
+2. **`game-select`** — host chooses a party game.
+3. **`reveal`** — private role assignment.
+4. **`input`** — players submit one-word clues.
+5. **`reveal-answers`** — clues revealed simultaneously.
+6. **`discussion`** — timed debate.
+7. **`vote`** — secret ballot.
+8. **`results`** — tally reveal, impostor exposure, winner, next-round option.
+9. **`next-round`** — new round with a new secret assignment.
 
 ---
 
-## Directory Structure
+## Directory structure
 
 ```text
 /
 ├── data/
 │   └── wordlist.json          # 100-word difficulty-stratified dictionary
+├── docs/                      # Project documentation
+│   ├── ARCHITECTURE.md        # Architecture reference
+│   ├── GAME_rules.md          # Game rules & system rules
+│   ├── party-game-ideas.md    # Party game ideas for future expansion
+│   └── tech-stack.md          # Stack breakdown & environment
 ├── server/
 │   ├── games/
 │   │   └── impostor.ts        # Impostor game rules, clue validator, bot logic
@@ -74,25 +129,29 @@ Games follow an extensible phase progression managed by the server:
 │   ├── components/            # UI components (QR modal, header, player badges)
 │   ├── data/
 │   │   ├── games.ts           # Game catalog definitions
-│   │   └── impostorWords.ts   # Client-side word helpers and type bindings
-│   ├── screens/               # Phase screen components (Lobby, Reveal, Vote, etc.)
+│   │   └── impostorWords.ts   # Client-side word helpers
+│   ├── screens/               # Phase screen components
 │   ├── services/
-│   │   └── socket.ts          # Client-side Socket.IO singleton and event hooks
+│   │   ├── socket.ts          # Client-side Socket.IO singleton
+│   │   └── sound.ts           # Web audio notifications & haptics
 │   ├── theme/
-│   │   └── tokens.ts          # Color tokens, player avatar palettes, animations
-│   ├── types.ts               # Shared TypeScript interfaces & phase types
+│   │   ├── tokens.ts          # Color tokens, player palettes, animations
+│   │   └── ThemeProvider.tsx  # Theme mode provider
+│   ├── types.ts               # Shared TypeScript interfaces
 │   ├── App.tsx                # Client root & phase routing
-│   ├── main.tsx               # React DOM entry point
-│   └── index.css              # Tailwind CSS v4 styling entry point
-├── metadata.json              # Platform application manifest & capabilities
-├── package.json               # Dependencies and build scripts
-├── tsconfig.json              # TypeScript configuration with JSON module support
-└── vite.config.ts             # Vite bundler configuration
+│   ├── main.tsx               # React DOM entry
+│   └── index.css              # Tailwind CSS v4 styling
+├── index.html
+├── metadata.json
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── bun.lock
 ```
 
 ---
 
-## Available Commands
+## Available commands
 
 ```bash
 # Start full-stack development server (Express + Socket.IO + Vite middleware)
@@ -113,8 +172,52 @@ npm run clean
 
 ---
 
-## Technical Stack
+## Technical stack
 
-- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Motion (v12), Lucide React, Canvas Confetti, QRCode.
+- **Frontend**: React 19, TypeScript, Tailwind CSS v4, Motion, Lucide React, QRCode, Canvas Confetti.
 - **Backend**: Node.js, Express 4, Socket.IO 4, `tsx` (dev runtime), `esbuild` (production bundle).
-- **Environment**: Single port 3000 for both HTTP and WebSocket traffic.
+- **Bundler**: Vite 8.
+- **Package manager**: `bun.lock` is bundled; `package.json` scripts target `npm`-style commands.
+
+---
+
+## Environment
+
+| Variable | Purpose | Required |
+|---|---|---|
+| `NODE_ENV` | `development` vs `production` | Yes |
+| `PORT` | HTTP/WS port (default `3000`) | No |
+| `GEMINI_API_KEY` | Gemini API key for server-side AI calls (if enabled) | No |
+| `APP_URL` | Public URL for self-referential links, OAuth callbacks, API endpoints | No |
+
+> **Note:** The repository currently contains placeholder values in `.env`
+> (`GEMINI_API_KEY="MY_GEMINI_API_KEY"`, `APP_URL="MY_APP_URL"`). Treat these as examples —
+> replace them with real values before deploying to production.
+
+---
+
+## Security & anti-cheat
+
+- Server-authoritative state means clients cannot read hidden roles or words from the network.
+- The server validates transitions, phase changes, and input before applying state.
+- Players receive private state only for their own session (`player:private-state`).
+- Reconnection is by session token or name; the server updates `connected` flags and may reassign
+  the host if the host disconnects.
+
+---
+
+## Development notes
+
+- Use `tsx server.ts` for local development (TypeScript runtime).
+- Use `npm run build` before deploying to production.
+- The server is currently an in-memory only store — rooms do not persist across restarts.
+- For production-ready scaling, add a database-backed room store and a Socket.IO adapter (see
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
+
+---
+
+## Project metadata
+
+- **Name:** Party Games
+- **Description:** Mobile-first real-time party and social deduction game engine.
+- **Major capability:** Server-side game engine with real-time multiplayer.
