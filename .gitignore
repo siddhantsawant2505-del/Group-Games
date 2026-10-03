@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+bun.lockb/
+pnpm-lock.yaml
+yarn.lock
+
+# Build outputs
+dist/
+dist-server/
+server.js
+server.cjs
+*.map
+
+# Environment / secrets (deploy first, then inject)
+.env
+.env.local
+.env.*.local
+
+# OS / editor files
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.log
+
+# Test / coverage
+coverage/
+.nyc_output
+
+# Temporary / generated
+.next/
+.cache/
+*.tmp
+*.temp
