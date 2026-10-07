@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { MessageSquare, Vote, HelpCircle } from 'lucide-react';
-import { RoomPublicState, Player } from '../types';
+import { RoomPublicState, Player } from '@shared/types';
 import { Timer } from '../components/Timer';
 import { ActionButton } from '../components/ActionButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';

@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSocket, saveSession, loadSession, clearSession } from './services/socket';
 import { playNotificationSound, triggerHaptic } from './services/sound';
-import { RoomPublicState, Player, PlayerPrivateState, GamePhase } from './types';
+import { RoomPublicState, Player, PlayerPrivateState, GamePhase } from '@shared/types';
 import { Header } from './components/Header';
 import { JoinScreen } from './screens/JoinScreen';
 import { LobbyScreen } from './screens/LobbyScreen';

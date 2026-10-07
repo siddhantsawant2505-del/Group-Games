@@ -1,4 +1,4 @@
-import { GameMetadata } from '../types';
+import { GameMetadata } from '@shared/types';
 
 interface GameIconProps {
   icon: GameMetadata['icon'];

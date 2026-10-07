@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { THEME_COLORS } from '../theme/tokens';
+import { THEME_COLORS } from '@shared/theme/tokens';
 import { playNotificationSound, triggerHaptic } from '../services/sound';
 
 interface TimerProps {

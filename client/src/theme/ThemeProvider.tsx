@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { DESIGN_TOKENS, PLAYER_COLORS } from './tokens';
+import { DESIGN_TOKENS, PLAYER_COLORS } from '@shared/theme/tokens';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 

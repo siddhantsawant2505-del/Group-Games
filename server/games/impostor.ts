@@ -4,9 +4,9 @@
  * randomized reveal, voting verification, and +1 scoring rules.
  */
 
-import { getRandomImpostorWord, ImpostorWord } from '../../src/data/impostorWords';
+import { getRandomImpostorWord, ImpostorWord } from '../../shared/data/impostorWords';
 import { InternalRoom, InternalPlayer } from '../roomManager';
-import { RoleRevealInfo, PlayerResultStanding, VoteBreakdownItem, RevealedAnswer } from '../../src/types';
+import { RoleRevealInfo, PlayerResultStanding, VoteBreakdownItem, RevealedAnswer } from '../../shared/types';
 
 export interface ImpostorRoundState {
   currentWord: ImpostorWord;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Users, Copy, Check, Play, UserPlus, Share2, QrCode } from 'lucide-react';
-import { RoomPublicState, Player } from '../types';
+import { RoomPublicState, Player } from '@shared/types';
 import { PlayerChip } from '../components/PlayerChip';
 import { ActionButton } from '../components/ActionButton';
 import { RoomQRCodeModal, InlineRoomQR } from '../components/RoomQRCode';

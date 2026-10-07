@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Sparkles, ArrowRight, RotateCcw, Smartphone, QrCode } from 'lucide-react';
 import { ActionButton } from '../components/ActionButton';
-import { PLAYER_COLORS } from '../theme/tokens';
+import { PLAYER_COLORS } from '@shared/theme/tokens';
 
 interface JoinScreenProps {
   onCreateRoom: (hostName: string) => void;

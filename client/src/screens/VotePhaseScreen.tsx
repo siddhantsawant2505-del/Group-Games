@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle2, Lock } from 'lucide-react';
-import { RoomPublicState, Player, PlayerPrivateState } from '../types';
+import { RoomPublicState, Player, PlayerPrivateState } from '@shared/types';
 import { Timer } from '../components/Timer';
 import { PlayerChip } from '../components/PlayerChip';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { ActionButton } from '../components/ActionButton';
-import { getPlayerColor } from '../theme/tokens';
+import { getPlayerColor } from '@shared/theme/tokens';
 
 interface VotePhaseScreenProps {
   room: RoomPublicState;

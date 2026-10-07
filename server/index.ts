@@ -1,14 +1,18 @@
 import express from 'express';
 import http from 'http';
+import os from 'os';
 import path from 'path';
 import { Server as SocketIOServer } from 'socket.io';
 import { createServer as createViteServer } from 'vite';
-import { roomManager } from './server/roomManager.ts';
+import { roomManager } from './roomManager.ts';
+
+const projectRoot = process.cwd();
 
 async function startServer() {
   const app = express();
   const server = http.createServer(app);
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
+  const HOST = process.env.HOST || '0.0.0.0';
 
   app.use(express.json());
 
@@ -315,20 +319,39 @@ async function startServer() {
   // Vite middleware in development vs static files in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
+      configFile: path.resolve(projectRoot, 'vite.config.ts'),
+      root: path.resolve(projectRoot, 'client'),
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const distPath = path.resolve(projectRoot, 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Party Games Server running on http://0.0.0.0:${PORT}`);
+  server.listen(PORT, HOST, () => {
+    console.log(`\n🎉 Party Games Server running at:`);
+    console.log(`  ➜  Local:   http://localhost:${PORT}/`);
+
+    // Discover LAN IPv4 address for mobile players
+    try {
+      const interfaces = os.networkInterfaces();
+      for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name] || []) {
+          if (iface.family === 'IPv4' && !iface.internal) {
+            console.log(`  ➜  Network: http://${iface.address}:${PORT}/ (for mobile players)`);
+            break;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    console.log('');
   });
 }
 

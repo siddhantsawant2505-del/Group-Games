@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { Users, Check } from 'lucide-react';
-import { GameMetadata } from '../types';
+import { GameMetadata } from '@shared/types';
 import { GameIcon } from './GameIcon';
 
 interface GameCardProps {

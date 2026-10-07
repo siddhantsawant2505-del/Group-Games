@@ -17,7 +17,7 @@ role, and describes how the stack is organized for development and production.
 | Backend | Node.js + Express 4 | HTTP server, static/asset serving, middleware |
 | Real-time | Socket.IO 4 | WebSocket + polling transport and room-based events |
 | Build | Vite 8 | Frontend bundling, HMR, production build |
-| Server bundle | esbuild | Bundles `server.ts` to standalone CommonJS |
+| Server bundle | esbuild | Bundles `server/index.ts` to standalone CommonJS |
 | Runtime (dev) | tsx | Runs TypeScript server directly during development |
 | QR codes | qrcode | Generates phone-join QR codes |
 | Confetti | canvas-confetti | Results/celebration effects |
@@ -85,10 +85,10 @@ role, and describes how the stack is organized for development and production.
 ### Build & tooling
 
 - **esbuild** (`^0.25.0`)
-  - Fast JavaScript bundler used to bundle `server.ts` into `dist/server.cjs`.
+  - Fast JavaScript bundler used to bundle `server/index.ts` into `dist/server.cjs`.
 
 - **tsx** (`^4.21.0`)
-  - TypeScript execution for development (`tsx server.ts`).
+  - TypeScript execution for development (`tsx server/index.ts`).
 
 - **typescript** (`^7.0.2`)
   - Type checker and compiler.
@@ -106,18 +106,18 @@ role, and describes how the stack is organized for development and production.
 | File | Purpose |
 |---|---|
 | `tsconfig.json` | TypeScript compiler options: `JSX: react-jsx`, `resolveJsonModule: true`, bundled module resolution, `noEmit: true` |
-| `vite.config.ts` | Vite plugins (`react`, `tailwindcss`), alias `@` → project root, dev server HMR/watch behavior |
+| `vite.config.ts` | Vite plugins (`react`, `tailwindcss`), `root: client`, aliases `@` → `client/` and `@shared` → `shared/`, dev server HMR/watch behavior |
 | `package.json` | Scripts (`dev`, `build`, `start`, `preview`, `clean`, `lint`), dependency versions |
 | `bun.lock` | Lockfile for dependency resolution |
-| `index.html` | HTML entry, meta tags, fonts, and `<script type="module" src="/src/main.tsx">` |
+| `client/index.html` | HTML entry, meta tags, fonts, and `<script type="module" src="/src/main.tsx">` (resolved relative to Vite's `client/` root) |
 
 ---
 
 ## Scripts
 
 ```bash
-npm run dev      # tsx server.ts: dev server with Vite middleware
-npm run build    # vite build + esbuild server.ts -> dist/server.cjs
+npm run dev      # tsx server/index.ts: dev server with Vite middleware
+npm run build    # vite build + esbuild server/index.ts -> dist/server.cjs
 npm run start    # node dist/server.cjs: production runtime
 npm run preview  # vite preview: local static preview
 npm run clean    # remove dist/server.cjs
@@ -128,7 +128,7 @@ npm run lint     # tsc --noEmit: TypeScript type check
 
 ## Development tooling
 
-- **tsx**: Run `server.ts` directly in dev without a separate build step.
+- **tsx**: Run `server/index.ts` directly in dev without a separate build step.
 - **Vite + @vitejs/plugin-react**: Hot module replacement for React components.
 - **TypeScript**: `tsc --noEmit` checks client and server types from one `tsconfig.json`.
 - **Express + Socket.IO**: Single-port development and production server.
@@ -139,7 +139,7 @@ npm run lint     # tsc --noEmit: TypeScript type check
 
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `3000` | HTTP and WebSocket port (see `server.ts`) |
+| `PORT` | `3000` | HTTP and WebSocket port (see `server/index.ts`) |
 | `NODE_ENV` | `development` | `production` enables static `dist/` serving |
 | `GEMINI_API_KEY` | — | Gemini API key for server-side AI features |
 | `APP_URL` | — | Public app URL for links, callbacks, and reverse-proxy routes |

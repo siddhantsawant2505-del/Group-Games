@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Crown, WifiOff } from 'lucide-react';
-import { getPlayerColor } from '../theme/tokens';
+import { getPlayerColor } from '@shared/theme/tokens';
 
 export interface PlayerAvatarProps {
   name?: string;

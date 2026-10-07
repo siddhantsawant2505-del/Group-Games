@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Send, CheckCircle2 } from 'lucide-react';
-import { RoomPublicState, Player, PlayerPrivateState } from '../types';
+import { RoomPublicState, Player, PlayerPrivateState } from '@shared/types';
 import { Timer } from '../components/Timer';
 import { ActionButton } from '../components/ActionButton';
 import { PlayerChip } from '../components/PlayerChip';
-import { getPlayerColor } from '../theme/tokens';
+import { getPlayerColor } from '@shared/theme/tokens';
 
 interface InputPhaseScreenProps {
   room: RoomPublicState;

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Play, Sparkles } from 'lucide-react';
-import { RoomPublicState, Player } from '../types';
-import { PARTY_GAMES } from '../data/games';
+import { RoomPublicState, Player } from '@shared/types';
+import { PARTY_GAMES } from '@shared/data/games';
 import { GameCard } from '../components/GameCard';
 import { ActionButton } from '../components/ActionButton';
 

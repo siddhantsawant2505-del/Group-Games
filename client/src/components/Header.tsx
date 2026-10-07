@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, Moon, Sun, Copy, Check, LogOut, Volume2, VolumeX } from 'lucide-react';
-import { Player } from '../types';
-import { getPlayerColor } from '../theme/tokens';
+import { Player } from '@shared/types';
+import { getPlayerColor } from '@shared/theme/tokens';
 import { isSoundEnabled, toggleSound, subscribeSoundChange } from '../services/sound';
 import { PlayerAvatar } from './PlayerAvatar';
 

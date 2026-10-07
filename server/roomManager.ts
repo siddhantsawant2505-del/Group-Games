@@ -13,10 +13,10 @@ import {
   RevealedAnswer,
   RoleRevealInfo,
   PlayerResultStanding,
-} from '../src/types';
-import { PLAYER_COLORS } from '../src/theme/tokens';
-import { PARTY_GAMES } from '../src/data/games';
-import { getRandomImpostorWord } from '../src/data/impostorWords';
+} from '../shared/types';
+import { PLAYER_COLORS } from '../shared/theme/tokens';
+import { PARTY_GAMES } from '../shared/data/games';
+import { getRandomImpostorWord } from '../shared/data/impostorWords';
 import {
   setupImpostorRound,
   recordPlayerClue,

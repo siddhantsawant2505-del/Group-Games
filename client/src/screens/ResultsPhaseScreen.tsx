@@ -2,10 +2,10 @@ import { useEffect } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Trophy, ArrowRight, RotateCcw, Award } from 'lucide-react';
-import { RoomPublicState, Player } from '../types';
+import { RoomPublicState, Player } from '@shared/types';
 import { ActionButton } from '../components/ActionButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';
-import { getPlayerColor } from '../theme/tokens';
+import { getPlayerColor } from '@shared/theme/tokens';
 
 interface ResultsPhaseScreenProps {
   room: RoomPublicState;

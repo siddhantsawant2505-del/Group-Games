@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Loader2 } from 'lucide-react';
-import { getPlayerColor } from '../theme/tokens';
+import { getPlayerColor } from '@shared/theme/tokens';
 
 interface ActionButtonProps {
   children: React.ReactNode;

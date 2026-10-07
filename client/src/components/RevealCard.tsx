@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { Eye, EyeOff } from 'lucide-react';
-import { getPlayerColor } from '../theme/tokens';
+import { getPlayerColor } from '@shared/theme/tokens';
 
 interface RevealCardProps {
   playerName: string;

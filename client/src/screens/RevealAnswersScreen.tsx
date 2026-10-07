@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
-import { RoomPublicState, Player } from '../types';
+import { RoomPublicState, Player } from '@shared/types';
 import { Timer } from '../components/Timer';
 import { RevealCard } from '../components/RevealCard';
 import { ActionButton } from '../components/ActionButton';

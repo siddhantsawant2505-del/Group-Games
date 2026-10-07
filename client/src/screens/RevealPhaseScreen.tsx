@@ -1,10 +1,10 @@
 import { motion } from 'motion/react';
 import { ShieldAlert, Eye, Lock, ArrowRight } from 'lucide-react';
-import { RoomPublicState, Player, PlayerPrivateState } from '../types';
+import { RoomPublicState, Player, PlayerPrivateState } from '@shared/types';
 import { Timer } from '../components/Timer';
 import { ActionButton } from '../components/ActionButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';
-import { THEME_COLORS } from '../theme/tokens';
+import { THEME_COLORS } from '@shared/theme/tokens';
 
 interface RevealPhaseScreenProps {
   room: RoomPublicState;
