@@ -12,6 +12,7 @@ interface ResultsPhaseScreenProps {
   myPlayer: Player;
   onNextRound: () => void;
   onReturnToLobby: () => void;
+  onEndSession: () => void;
 }
 
 export function ResultsPhaseScreen({
@@ -19,6 +20,7 @@ export function ResultsPhaseScreen({
   myPlayer,
   onNextRound,
   onReturnToLobby,
+  onEndSession,
 }: ResultsPhaseScreenProps) {
   const isHost = myPlayer.isHost;
   const results = room.results;
@@ -297,6 +299,15 @@ export function ResultsPhaseScreen({
               icon={<RotateCcw className="w-4 h-4" />}
             >
               Return to Lobby
+            </ActionButton>
+
+            <ActionButton
+              variant="subtle"
+              onClick={onEndSession}
+              icon={<Trophy className="w-4 h-4 text-amber-500" />}
+              subtext="View final standings and conclude session"
+            >
+              End Session
             </ActionButton>
           </>
         ) : (

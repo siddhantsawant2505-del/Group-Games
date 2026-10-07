@@ -83,18 +83,27 @@ export class RoomManager {
    */
   public createRoom(
     hostName: string,
-    socketId: string
+    socketId: string,
+    preferredColorIndex?: number
   ): { room: InternalRoom; host: InternalPlayer } {
     const code = this.generateRoomCode();
     const hostId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const sessionToken = `token_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
+    const colorIndex =
+      typeof preferredColorIndex === 'number' &&
+      preferredColorIndex >= 0 &&
+      preferredColorIndex < PLAYER_COLORS.length
+        ? preferredColorIndex
+        : 0;
+    const colorToken = PLAYER_COLORS[colorIndex];
+
     const host: InternalPlayer = {
       id: hostId,
       name: hostName.trim() || 'Host',
-      colorIndex: 0,
-      colorHex: PLAYER_COLORS[0].hex,
-      colorName: PLAYER_COLORS[0].label,
+      colorIndex,
+      colorHex: colorToken.hex,
+      colorName: colorToken.label,
       isHost: true,
       connected: true,
       score: 0,
@@ -137,7 +146,8 @@ export class RoomManager {
     code: string,
     playerName: string,
     sessionToken: string | null,
-    socketId: string
+    socketId: string,
+    preferredColorIndex?: number
   ): {
     success: boolean;
     error?: string;
@@ -199,7 +209,12 @@ export class RoomManager {
 
     const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newSessionToken = `token_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const colorIndex = room.players.length % PLAYER_COLORS.length;
+    const colorIndex =
+      typeof preferredColorIndex === 'number' &&
+      preferredColorIndex >= 0 &&
+      preferredColorIndex < PLAYER_COLORS.length
+        ? preferredColorIndex
+        : room.players.length % PLAYER_COLORS.length;
     const colorToken = PLAYER_COLORS[colorIndex];
 
     const newPlayer: InternalPlayer = {
@@ -491,6 +506,13 @@ export class RoomManager {
         this.transitionToPhase(room, 'reveal', broadcastState);
         return;
       }
+
+      case 'post-game': {
+        room.phasePrompt = 'Game Over';
+        room.phaseSubprompt = 'Final Session Leaderboard';
+        this.clearPhaseTimer(room);
+        break;
+      }
     }
 
     broadcastState();
@@ -640,6 +662,14 @@ export class RoomManager {
   ) {
     if (room.phase !== 'vote') return;
 
+    // Guard: no player may vote for themselves
+    if (voterId === targetPlayerId) return;
+
+    // Guard: the impostor may not vote for themselves
+    // (redundant with the above but explicit for clarity)
+    const voterIsImpostor = Boolean(room.privateData[voterId]?.isSpecialRole);
+    if (voterIsImpostor && targetPlayerId === voterId) return;
+
     // Register or update vote
     const prevTarget = room.playerVotes[voterId];
     if (prevTarget && room.voteTallies[prevTarget]) {
@@ -704,8 +734,16 @@ export class RoomManager {
       const isImpostor = room.privateData[player.id]?.isSpecialRole;
 
       if (impostorCaught) {
-        if (!isImpostor) points = 100;
+        // Crew members only score if they personally voted for the impostor
+        if (!isImpostor) {
+          const votedFor = room.playerVotes[player.id];
+          if (votedFor === specialRolePlayer?.id) {
+            points = 100;
+          }
+        }
+        // Impostor gets 0 points when caught — no change needed (points stays 0)
       } else {
+        // Impostor successfully escaped — they score
         if (isImpostor) points = 250;
       }
 

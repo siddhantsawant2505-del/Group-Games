@@ -33,7 +33,32 @@ const STORAGE_KEYS = {
   PLAYER_ID: 'party_game_player_id',
   SESSION_TOKEN: 'party_game_session_token',
   PLAYER_NAME: 'party_game_player_name',
+  PLAYER_COLOR: 'party_game_player_color_idx',
 };
+
+export function saveUserProfile(name: string, colorIndex: number) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.PLAYER_NAME, name.trim());
+    localStorage.setItem(STORAGE_KEYS.PLAYER_COLOR, colorIndex.toString());
+  } catch (e) {
+    console.error('Failed to save user profile to localStorage', e);
+  }
+}
+
+export function loadUserProfile(): { name: string; colorIndex: number } | null {
+  try {
+    const name = localStorage.getItem(STORAGE_KEYS.PLAYER_NAME);
+    const colorStr = localStorage.getItem(STORAGE_KEYS.PLAYER_COLOR);
+    if (!name || !name.trim()) return null;
+    const colorIndex = colorStr !== null ? parseInt(colorStr, 10) : 0;
+    return {
+      name: name.trim(),
+      colorIndex: isNaN(colorIndex) ? 0 : colorIndex,
+    };
+  } catch (e) {
+    return null;
+  }
+}
 
 export function saveSession(
   roomCode: string,
@@ -74,7 +99,7 @@ export function clearSession() {
     localStorage.removeItem(STORAGE_KEYS.ROOM_CODE);
     localStorage.removeItem(STORAGE_KEYS.PLAYER_ID);
     localStorage.removeItem(STORAGE_KEYS.SESSION_TOKEN);
-    // keep playerName for convenience
+    // keep playerName and color for convenience
   } catch (e) {
     // ignore
   }

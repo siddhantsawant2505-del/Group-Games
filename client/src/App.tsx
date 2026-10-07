@@ -4,11 +4,21 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { getSocket, saveSession, loadSession, clearSession } from './services/socket';
+import {
+  getSocket,
+  saveSession,
+  loadSession,
+  clearSession,
+  loadUserProfile,
+} from './services/socket';
 import { playNotificationSound, triggerHaptic } from './services/sound';
 import { RoomPublicState, Player, PlayerPrivateState, GamePhase } from '@shared/types';
 import { Header } from './components/Header';
-import { JoinScreen } from './screens/JoinScreen';
+import { LoadingScreen } from './screens/LoadingScreen';
+import { NameEntryScreen } from './screens/NameEntryScreen';
+import { HomeScreen } from './screens/HomeScreen';
+import { JoinRoomScreen } from './screens/JoinRoomScreen';
+import { PostGameScreen } from './screens/PostGameScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
 import { GameSelectScreen } from './screens/GameSelectScreen';
 import { RevealPhaseScreen } from './screens/RevealPhaseScreen';
@@ -18,7 +28,15 @@ import { DiscussionPhaseScreen } from './screens/DiscussionPhaseScreen';
 import { VotePhaseScreen } from './screens/VotePhaseScreen';
 import { ResultsPhaseScreen } from './screens/ResultsPhaseScreen';
 
+type PreRoomScreen = 'loading' | 'name-entry' | 'home' | 'join-room';
+
 export default function App() {
+  const [preRoomScreen, setPreRoomScreen] = useState<PreRoomScreen>('loading');
+  const [userProfile, setUserProfile] = useState<{
+    name: string;
+    colorIndex: number;
+  } | null>(loadUserProfile());
+
   const [room, setRoom] = useState<RoomPublicState | null>(null);
   const [myPlayer, setMyPlayer] = useState<Player | null>(null);
   const [privateState, setPrivateState] = useState<PlayerPrivateState>({});
@@ -114,43 +132,13 @@ export default function App() {
   }, [room]);
 
   // Host creates a new room
-  const handleCreateRoom = useCallback((hostName: string) => {
-    setLoading(true);
-    setErrorMessage(null);
-    const socket = getSocket();
+  const handleCreateRoom = useCallback(
+    (hostName: string, colorIndex?: number) => {
+      setLoading(true);
+      setErrorMessage(null);
+      const socket = getSocket();
 
-    socket.emit('create-room', { hostName }, (res: any) => {
-      setLoading(false);
-      if (res?.success) {
-        setRoom(res.room);
-        setMyPlayer(res.player);
-        if (res.privateState) setPrivateState(res.privateState);
-        saveSession(
-          res.room.roomCode,
-          res.player.id,
-          res.player.sessionToken,
-          res.player.name
-        );
-      } else {
-        setErrorMessage(res?.error || 'Failed to create room. Please retry.');
-      }
-    });
-  }, []);
-
-  // Player joins room
-  const handleJoinRoom = useCallback((roomCode: string, playerName: string) => {
-    setLoading(true);
-    setErrorMessage(null);
-    const socket = getSocket();
-
-    socket.emit(
-      'join-room',
-      {
-        roomCode,
-        playerName,
-        sessionToken: null,
-      },
-      (res: any) => {
+      socket.emit('create-room', { hostName, colorIndex }, (res: any) => {
         setLoading(false);
         if (res?.success) {
           setRoom(res.room);
@@ -163,11 +151,48 @@ export default function App() {
             res.player.name
           );
         } else {
-          setErrorMessage(res?.error || 'Could not join room.');
+          setErrorMessage(res?.error || 'Failed to create room. Please retry.');
         }
-      }
-    );
-  }, []);
+      });
+    },
+    []
+  );
+
+  // Player joins room
+  const handleJoinRoom = useCallback(
+    (roomCode: string, playerName: string, colorIndex?: number) => {
+      setLoading(true);
+      setErrorMessage(null);
+      const socket = getSocket();
+
+      socket.emit(
+        'join-room',
+        {
+          roomCode,
+          playerName,
+          sessionToken: null,
+          colorIndex,
+        },
+        (res: any) => {
+          setLoading(false);
+          if (res?.success) {
+            setRoom(res.room);
+            setMyPlayer(res.player);
+            if (res.privateState) setPrivateState(res.privateState);
+            saveSession(
+              res.room.roomCode,
+              res.player.id,
+              res.player.sessionToken,
+              res.player.name
+            );
+          } else {
+            setErrorMessage(res?.error || 'Could not join room. Please check the code.');
+          }
+        }
+      );
+    },
+    []
+  );
 
   // Reconnect using saved session
   const handleReconnect = useCallback((roomCode: string, sessionToken: string) => {
@@ -179,8 +204,9 @@ export default function App() {
       'join-room',
       {
         roomCode,
-        playerName: savedSession?.playerName || '',
+        playerName: savedSession?.playerName || userProfile?.name || '',
         sessionToken,
+        colorIndex: userProfile?.colorIndex,
       },
       (res: any) => {
         setLoading(false);
@@ -195,7 +221,7 @@ export default function App() {
         }
       }
     );
-  }, [savedSession]);
+  }, [savedSession, userProfile]);
 
   // Host adds a test player / bot for preview testing
   const handleAddBot = useCallback(() => {
@@ -281,28 +307,116 @@ export default function App() {
     setRoom(null);
     setMyPlayer(null);
     setPrivateState({});
+    setPreRoomScreen('home');
   }, []);
+
+  // Pre-Room flow handlers
+  const handleLoadingComplete = useCallback(() => {
+    const profile = loadUserProfile();
+    setUserProfile(profile);
+
+    const searchParams =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search)
+        : null;
+    const urlCode = searchParams?.get('room') || searchParams?.get('code');
+
+    if (profile && profile.name.trim()) {
+      if (urlCode && urlCode.trim().length === 4) {
+        setPreRoomScreen('join-room');
+      } else {
+        setPreRoomScreen('home');
+      }
+    } else {
+      setPreRoomScreen('name-entry');
+    }
+  }, []);
+
+  const handleNameEntryContinue = useCallback(
+    (name: string, colorIndex: number) => {
+      setUserProfile({ name, colorIndex });
+      const searchParams =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search)
+          : null;
+      const urlCode = searchParams?.get('room') || searchParams?.get('code');
+
+      if (urlCode && urlCode.trim().length === 4) {
+        setPreRoomScreen('join-room');
+      } else {
+        setPreRoomScreen('home');
+      }
+    },
+    []
+  );
+
+  const handleCreateRoomFromHome = useCallback(() => {
+    if (!userProfile) {
+      setPreRoomScreen('name-entry');
+      return;
+    }
+    handleCreateRoom(userProfile.name, userProfile.colorIndex);
+  }, [userProfile, handleCreateRoom]);
+
+  const handleJoinFromJoinScreen = useCallback(
+    (roomCode: string) => {
+      if (!userProfile) {
+        setPreRoomScreen('name-entry');
+        return;
+      }
+      handleJoinRoom(roomCode, userProfile.name, userProfile.colorIndex);
+    },
+    [userProfile, handleJoinRoom]
+  );
 
   return (
     <div className="mobile-app-shell">
-      {/* Top Header */}
-      <Header
-        roomCode={room?.roomCode}
-        myPlayer={myPlayer}
-        connected={connected}
-        onLeaveRoom={room ? handleLeaveRoom : undefined}
-      />
-
-      {/* Screen Router based on current Room and Phase */}
-      {!room || !myPlayer ? (
-        <JoinScreen
-          onCreateRoom={handleCreateRoom}
-          onJoinRoom={handleJoinRoom}
-          onReconnect={handleReconnect}
-          savedSession={savedSession}
-          loading={loading}
-          errorMessage={errorMessage}
+      {/* Top Header shown during active room sessions */}
+      {room && myPlayer && (
+        <Header
+          roomCode={room.roomCode}
+          myPlayer={myPlayer}
+          connected={connected}
+          onLeaveRoom={handleLeaveRoom}
         />
+      )}
+
+      {/* Screen Router based on current Room, Phase, or Pre-Room state */}
+      {!room || !myPlayer ? (
+        preRoomScreen === 'loading' ? (
+          <LoadingScreen onComplete={handleLoadingComplete} />
+        ) : preRoomScreen === 'name-entry' ? (
+          <NameEntryScreen
+            initialName={userProfile?.name || ''}
+            initialColorIndex={userProfile?.colorIndex ?? 0}
+            onContinue={handleNameEntryContinue}
+            isEditing={Boolean(userProfile)}
+          />
+        ) : preRoomScreen === 'join-room' ? (
+          <JoinRoomScreen
+            onJoinRoom={handleJoinFromJoinScreen}
+            onBack={() => {
+              setErrorMessage(null);
+              setPreRoomScreen('home');
+            }}
+            loading={loading}
+            errorMessage={errorMessage}
+          />
+        ) : (
+          <HomeScreen
+            playerName={userProfile?.name || 'Player'}
+            playerColorIndex={userProfile?.colorIndex ?? 0}
+            onCreateRoom={handleCreateRoomFromHome}
+            onNavigateToJoin={() => {
+              setErrorMessage(null);
+              setPreRoomScreen('join-room');
+            }}
+            onEditProfile={() => setPreRoomScreen('name-entry')}
+            onReconnect={handleReconnect}
+            savedSession={savedSession}
+            loading={loading}
+          />
+        )
       ) : room.phase === 'lobby' ? (
         <LobbyScreen
           room={room}
@@ -358,6 +472,15 @@ export default function App() {
           myPlayer={myPlayer}
           onNextRound={() => handleAdvancePhase('next-round')}
           onReturnToLobby={handleReturnToLobby}
+          onEndSession={() => handleAdvancePhase('post-game')}
+        />
+      ) : room.phase === 'post-game' ? (
+        <PostGameScreen
+          room={room}
+          myPlayer={myPlayer}
+          onPlayAgain={() => handleAdvancePhase('reveal')}
+          onChooseNewGame={() => handleAdvancePhase('game-select')}
+          onLeaveRoom={handleLeaveRoom}
         />
       ) : (
         <LobbyScreen

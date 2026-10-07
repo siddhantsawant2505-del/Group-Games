@@ -47,30 +47,40 @@ async function startServer() {
   // Socket.IO Connection and Event Handlers
   io.on('connection', (socket) => {
     // 1. Host creates a new room
-    socket.on('create-room', ({ hostName }: { hostName: string }, callback) => {
-      try {
-        const { room, host } = roomManager.createRoom(hostName, socket.id);
-        socket.join(room.code);
+    socket.on(
+      'create-room',
+      (
+        { hostName, colorIndex }: { hostName: string; colorIndex?: number },
+        callback
+      ) => {
+        try {
+          const { room, host } = roomManager.createRoom(
+            hostName,
+            socket.id,
+            colorIndex
+          );
+          socket.join(room.code);
 
-        const publicState = roomManager.getPublicRoomState(room);
-        const privateState = roomManager.getPlayerPrivateState(room, host.id);
+          const publicState = roomManager.getPublicRoomState(room);
+          const privateState = roomManager.getPlayerPrivateState(room, host.id);
 
-        if (typeof callback === 'function') {
-          callback({
-            success: true,
-            room: publicState,
-            player: host,
-            privateState,
-          });
-        }
+          if (typeof callback === 'function') {
+            callback({
+              success: true,
+              room: publicState,
+              player: host,
+              privateState,
+            });
+          }
 
-        broadcastRoom(room.code);
-      } catch (err: any) {
-        if (typeof callback === 'function') {
-          callback({ success: false, error: err?.message || 'Failed to create room' });
+          broadcastRoom(room.code);
+        } catch (err: any) {
+          if (typeof callback === 'function') {
+            callback({ success: false, error: err?.message || 'Failed to create room' });
+          }
         }
       }
-    });
+    );
 
     // 2. Player joins room (or reconnects)
     socket.on(
@@ -80,10 +90,12 @@ async function startServer() {
           roomCode,
           playerName,
           sessionToken,
+          colorIndex,
         }: {
           roomCode: string;
           playerName: string;
           sessionToken: string | null;
+          colorIndex?: number;
         },
         callback
       ) => {
@@ -93,7 +105,8 @@ async function startServer() {
             upperCode,
             playerName,
             sessionToken,
-            socket.id
+            socket.id,
+            colorIndex
           );
 
           if (!result.success || !result.room || !result.player) {

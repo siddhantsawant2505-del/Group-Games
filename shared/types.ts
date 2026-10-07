@@ -24,7 +24,8 @@ export type GamePhase =
   | 'discussion'
   | 'vote'
   | 'results'
-  | 'next-round';
+  | 'next-round'
+  | 'post-game';
 
 export interface GameMetadata {
   id: string;
