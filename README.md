@@ -43,8 +43,8 @@ npm run clean        # Clean build artifacts (dist/ directory)
 - A 4-character room code + QR code are used for joining.
 - A "next-round" loop lets a host replay a new round with a fresh role assignment.
 
-Three games ship dedicated server engines — **Impostor**, **Avoid the Word**, and **Mafia** — with
-additional game ideas documented for future expansion.
+Four games ship dedicated server engines — **Impostor**, **Avoid the Word**, **Mafia**, and
+**Guess the Link** — with additional game ideas documented for future expansion.
 
 ---
 
@@ -62,7 +62,8 @@ additional game ideas documented for future expansion.
 - **40 taboo cards** — original subjects with 3 forbidden trap words each for Avoid the Word.
 - **Live describing turns** — Avoid the Word runs one describer at a time with buzz confirmation.
 - **Dedicated Mafia engine** — privately dealt roles, timed night actions, day eliminations, win-condition checks, and scoring.
-- **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, discussion, vote, atw-describe, night, day, results, next-round.
+- **Dedicated Guess the Link engine** — one hidden concept, a different private hint angle per player, a shuffled link board, and simultaneous concept guessing with per-correct points.
+- **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, guess, discussion, vote, atw-describe, night, day, results, next-round.
 
 ---
 
@@ -81,14 +82,14 @@ additional game ideas documented for future expansion.
 
 ## Games collection, rules & working state
 
-Party Games features a collection of six multiplayer party games designed for phone controllers. **Impostor**, **Avoid the Word**, and **Mafia** are 100% operational with dedicated server game engines, while the remaining three games are integrated into the selection UI and execute on the generic round framework.
+Party Games features a collection of six multiplayer party games designed for phone controllers. **Impostor**, **Avoid the Word**, **Mafia**, and **Guess the Link** are 100% operational with dedicated server game engines, while the remaining two games are integrated into the selection UI and execute on the generic round framework.
 
 | Game | Players | Category | Icon | Current Working State |
 |---|---|---|---|---|
 | **Impostor** | 3–12 | Social Deduction | Mask | 🟢 **Fully Working & Playable** — Dedicated engine with clue sanitizer, bot AI, and scoring |
 | **Avoid the Word** | 3–10 | Taboo / Communication | Ban | 🟢 **Fully Working & Playable** — Dedicated taboo engine with live 45s describing turns, buzz confirmation, bot simulation, and scoring |
 | **Mafia** | 4–16 | Social Deduction | Detective | 🟢 **Fully Working & Playable** — Dedicated engine with private role deal, timed night actions, day eliminations, and win-condition scoring |
-| **Guess the Link** | 3–8 | Word Association | Link | 🟡 **Selectable & Framework-Ready** — Generic clue/vote phase; central connection guessing planned |
+| **Guess the Link** | 3–8 | Word Association | Link | 🟢 **Fully Working & Playable** — Dedicated engine with one hidden concept, per-player private hint angles, shuffled board, simultaneous guessing, and scoring |
 | **Top 100** | 3–10 | Ranking / Spectrum | List-Ordered | 🟡 **Selectable & Framework-Ready** — Generic clue/vote phase; drag-and-drop ranking UI planned |
 | **Reverse Categories** | 3–8 | Trivia / Creative | Shuffle | 🟡 **Selectable & Framework-Ready** — Generic clue/vote phase; 3-item prompt generation planned |
 
@@ -195,18 +196,36 @@ Party Games features a collection of six multiplayer party games designed for ph
 
 ---
 
-### 4. Catalog Games (🟡 Framework-Integrated & Selectable)
+### 4. Guess the Link — Dedicated Link Engine (🟢 Fully Operational)
 
-The remaining three games are fully registered in `@shared/data/games.ts` and can be selected by the host in the `game-select` screen. They currently run through the generic phase state machine (`server/roomManager.ts`) with dedicated game rule modules planned:
+**Guess the Link** ships a fully custom server engine (`server/games/guessTheLink.ts`) with its own phase chain (`reveal → input → reveal-answers → guess → results`), server-side concept hiding, private per-player hint dealing, a shuffled response board, and simultaneous concept guessing. Concepts and their hint angles live in 44 original entries (`shared/data/guessTheLinkPrompts.ts`).
 
-#### Guess the Link (Lateral Word Association)
-- **Min/Max Players**: 3–8 | **Icon**: `link`
-- **Tagline**: Connect the mysterious clues!
-- **Rules**:
-  - Each player receives a unique angle or hint pointing toward an invisible central concept.
-  - Every player submits one response that matches their private hint.
-  - All revealed answers are displayed together; players collaborate to deduce the secret connection tying them all together.
-- **Current State**: Selectable in game menu; utilizes generic prompt/reveal pipeline; central puzzle-matching interface planned.
+- **Objective**: Every player holds a different angle on the same hidden concept. Write a response from your angle, read everyone else's, then name the concept.
+
+- **Game Rules & Mechanics**:
+  1. **Player Requirements**: 3 to 8 players (solo testing supported via "+ Add Bot").
+  2. **Hint Reveal (`reveal` phase, 10s)**:
+     - The server picks one hidden concept and deals every player a **different hint angle** (six distinct angles per concept; larger rooms reuse them).
+     - Each player sees **only their own angle**, plus the concept's broad category, its word count, and which angle number they hold. The concept itself never leaves the server.
+  3. **Response Submission (`input` phase, 30s)**:
+     - Each player privately writes **one word or a short phrase** inspired by their own angle. The server sanitizes it to a maximum of **3 words / 24 characters** and holds it privately.
+     - Responses are only ever exposed on the link board — never alongside their author's angle during guessing.
+  4. **The Link Board (`reveal-answers` phase, 15s)**:
+     - Every response is shown together in **Fisher-Yates shuffled order** (never join order), with each player's own angle kept in view.
+  5. **Simultaneous Guessing (`guess` phase, 30s)**:
+     - Everyone privately locks in a guess at the hidden concept at the same time, exactly like a secret ballot; the room can see **who** has locked in but never **what** they guessed.
+     - The phase closes as soon as every player has locked in, or when the timer expires. The host can reveal early.
+  6. **Results (`results` phase)**:
+     - The hidden concept is revealed along with every angle that was dealt and everyone's guess.
+     - **+1 point** for each player who names the concept correctly (exact answers, plural-insensitive spellings, shipped aliases, and answers that clearly contain the concept all count).
+     - A heuristic **"biggest giveaway"** callout names the response that pointed hardest at the concept; it is omitted when nothing resembles it.
+  7. **Next Round Loop (`next-round`)**: a fresh concept with new angles, avoiding concepts already played in the room, with cumulative scores preserved.
+
+---
+
+### 5. Catalog Games (🟡 Framework-Integrated & Selectable)
+
+The remaining two games are fully registered in `@shared/data/games.ts` and can be selected by the host in the `game-select` screen. They currently run through the generic phase state machine (`server/roomManager.ts`) with dedicated game rule modules planned:
 
 #### Top 100 (Spectrum Ranking)
 - **Min/Max Players**: 3–10 | **Icon**: `list-ordered`
@@ -253,16 +272,17 @@ The remaining three games are fully registered in `@shared/data/games.ts` and ca
 
 1. **`lobby`** — players join via room code/QR; host configures bots and launches.
 2. **`game-select`** — host chooses a party game.
-3. **`reveal`** — private assignment (impostor role, taboo cards, or Mafia roles).
-4. **`input`** — players submit one-word clues (Impostor).
-5. **`reveal-answers`** — clues revealed simultaneously (Impostor).
-6. **`discussion`** — timed debate (Impostor; Mafia day phase).
-7. **`vote`** — secret ballot (Impostor; Mafia exile vote).
-8. **`atw-describe`** — Avoid the Word's live describing turns.
-9. **`night`** — Mafia and Detective act privately (Mafia).
-10. **`day`** — overnight elimination announced, then discussion and vote (Mafia).
-11. **`results`** — tally reveal, role exposure, winner, next-round option.
-12. **`next-round`** — new round with a fresh secret assignment.
+3. **`reveal`** — private assignment (impostor role, taboo cards, Mafia roles, or a Guess the Link hint angle).
+4. **`input`** — players submit clues (Impostor) or responses (Guess the Link).
+5. **`reveal-answers`** — clues revealed simultaneously (Impostor) or the shuffled link board (Guess the Link).
+6. **`guess`** — simultaneous guessing at the hidden concept (Guess the Link).
+7. **`discussion`** — timed debate (Impostor; Mafia day phase).
+8. **`vote`** — secret ballot (Impostor; Mafia exile vote).
+9. **`atw-describe`** — Avoid the Word's live describing turns.
+10. **`night`** — Mafia and Detective act privately (Mafia).
+11. **`day`** — overnight elimination announced, then discussion and vote (Mafia).
+12. **`results`** — tally reveal, role exposure, winner, next-round option.
+13. **`next-round`** — new round with a fresh secret assignment.
 
 ---
 
@@ -331,7 +351,7 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   ├── index.html             # Client HTML entry point
 │   └── src/
 │       ├── components/        # UI components (QR modal, header, player badges)
-│       ├── screens/           # Phase screens (incl. Atw* and MafiaReveal/NightAction/TownSleeps/Morning/Results)
+│       ├── screens/           # Phase screens (incl. Atw*, Mafia*, and GtlHintReveal/Input/ResponseReveal/Guess/Results)
 │       ├── services/
 │       │   ├── socket.ts      # Client-side Socket.IO singleton
 │       │   └── sound.ts       # Web audio notifications & haptics
@@ -350,14 +370,16 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   ├── games/
 │   │   ├── impostor.ts        # Impostor game rules, clue validator, bot logic
 │   │   ├── avoidTheWord.ts    # Taboo engine: turns, buzz verification, scoring, bot logic
-│   │   └── mafia.ts           # Mafia engine: roles, night actions, win conditions, scoring, bot logic
+│   │   ├── mafia.ts           # Mafia engine: roles, night actions, win conditions, scoring, bot logic
+│   │   └── guessTheLink.ts    # Link engine: concept hiding, hint dealing, guessing, scoring, bot logic
 │   ├── roomManager.ts         # In-memory room manager, sessions, & state masks
 │   └── index.ts               # Server entry point with Vite middleware / static serving
 ├── shared/                    # Code imported by BOTH client and server (@shared/*)
 │   ├── data/
 │   │   ├── games.ts           # Game catalog definitions
 │   │   ├── impostorWords.ts   # Word list helpers (server-side word selection)
-│   │   └── avoidTheWordPrompts.ts  # 40 subjects × 3 forbidden trap words
+│   │   ├── avoidTheWordPrompts.ts  # 40 subjects × 3 forbidden trap words
+│   │   └── guessTheLinkPrompts.ts  # 44 concepts × 6 hint angles each
 │   ├── theme/
 │   │   └── tokens.ts          # Player color tokens & palette
 │   └── types.ts               # Shared TypeScript models and interfaces
@@ -395,7 +417,7 @@ npm run start
 # Preview Vite production build locally
 npm run preview
 
-# Clean build artifacts (dist/ directory)
+# Cgit lean build artifacts (dist/ directory)
 npm run clean
 ```
 
