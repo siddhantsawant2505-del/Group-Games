@@ -26,9 +26,10 @@ export const PARTY_GAMES: GameMetadata[] = [
     description:
       'Describe secret topics to your friends without accidentally saying any of the forbidden trap words on your card.',
     rules: [
-      'Each player is given a target subject and 3 forbidden taboo words.',
-      'Give clues in under 30 seconds without saying the forbidden words.',
-      'Other players buzz or vote if a taboo word is uttered!',
+      'Each player privately receives a target subject and 3 forbidden taboo words.',
+      'Describers rotate one at a time and get 45 seconds to talk their subject through.',
+      'Everyone else listens and buzzes if a taboo word slips — a majority confirms it.',
+      'Score points for clean describes and for buzzes your group confirms.',
     ],
   },
   {
@@ -56,9 +57,10 @@ export const PARTY_GAMES: GameMetadata[] = [
     description:
       'Every player writes an associated clue to an invisible hidden prompt. Uncover the secret thread tying all answers together.',
     rules: [
-      'Each player receives a unique angle or hint.',
-      'Submit one response that fits your hint.',
-      'Synthesize everyone’s revealed responses to crack the central connection.',
+      'One hidden concept is picked server-side and every player privately receives a different hint angle on it.',
+      'Each player writes a one-word or short-phrase response inspired by their own angle.',
+      'All responses are revealed together in shuffled order.',
+      'Everyone guesses the hidden concept at the same time — +1 point for every correct guess.',
     ],
   },
   {

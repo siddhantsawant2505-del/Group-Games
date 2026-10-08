@@ -20,7 +20,11 @@ export type GamePhase =
   | 'game-select'
   | 'reveal'
   | 'input'
+  | 'atw-describe'
+  | 'night'
+  | 'day'
   | 'reveal-answers'
+  | 'guess'
   | 'discussion'
   | 'vote'
   | 'results'
@@ -83,6 +87,103 @@ export interface VoteBreakdownItem {
   isCorrect: boolean;
 }
 
+export interface AtwTurnResult {
+  playerId: string;
+  playerName: string;
+  playerColor: string;
+  colorIndex: number;
+  subject: string;
+  forbidden: [string, string, string];
+  success: boolean; // true = timer ran out without confirmed buzz; false = buzzed out
+  buzzCount: number;
+  pointsAdded: number;
+  buzzedByNames?: string[]; // players whose buzzes were confirmed
+}
+
+export interface AtwPublicState {
+  describerIndex: number;        // index into room.players of current describer
+  describerPlayerId: string;     // empty string when the round has no turns left
+  turnResults: AtwTurnResult[];  // completed turns this round
+  buzzedPlayerIds: string[];     // who has buzzed this turn (cleared per turn)
+  buzzConfirmed: boolean;        // majority or host override confirmed the buzz
+  totalTurns: number;            // number of players who will describe this round
+  turnNumber: number;            // 1-based index of the active turn
+  requiredBuzzes: number;        // buzzes needed to auto-confirm the active turn
+  turnActive: boolean;           // a describing turn is currently running
+  turnSeconds: number;           // seconds each describer gets on their turn
+}
+
+export interface GtlGuessResult {
+  playerId: string;
+  playerName: string;
+  playerColor: string;
+  colorIndex: number;
+  hint: string;          // the angle this player was dealt
+  guessText: string;     // what they thought the hidden concept was
+  correct: boolean;
+  pointsAdded: number;
+}
+
+export interface GtlHintShare {
+  playerId: string;
+  playerName: string;
+  colorIndex: number;
+  hint: string;
+}
+
+export interface GtlPublicState {
+  category: string;            // broad category of the hidden concept
+  conceptWordCount: number;    // how many words the concept has (a fair nudge)
+  hintsDealt: number;          // distinct hint angles dealt this round
+  totalPlayers: number;
+  responsesReady: boolean;     // every response has been compiled for the reveal
+  guessesSubmitted: string[];  // playerIds who locked in a guess
+  guessSeconds: number;
+  revealed: boolean;           // concept is public (results only)
+  concept: string | null;      // null until revealed
+  correctPlayerIds: string[];  // empty until revealed
+}
+
+export type MafiaRole = 'mafia' | 'detective' | 'townsperson';
+export type MafiaSide = 'mafia' | 'town';
+
+export interface MafiaTeamSelection {
+  playerName: string;
+  targetName: string | null; // null until that teammate locks in a victim
+}
+
+export interface MafiaInvestigation {
+  night: number;
+  targetName: string;
+  isMafia: boolean;
+}
+
+export interface MafiaElimination {
+  playerId: string;
+  playerName: string;
+  night: number;
+  cause: 'night-kill' | 'exile';
+}
+
+export interface MafiaPublicState {
+  nightNumber: number;        // 1-based night currently running (or last resolved)
+  dayNumber: number;          // 1-based day currently running (or last resolved)
+  mafiaCount: number;         // how many Mafia were dealt this game (public rule info)
+  hasDetective: boolean;      // whether a Detective is in play
+  alivePlayerIds: string[];
+  eliminatedIds: string[];    // everyone out, in timeline order
+  eliminations: MafiaElimination[];
+  lastNightVictimId: string | null;
+  lastNightVictimName: string | null;
+  lastExiledId: string | null;
+  lastExiledName: string | null;
+  pendingNightActions: number; // night actors who still owe a target
+  nightSeconds: number;
+  daySeconds: number;
+  winningSide: MafiaSide | null;
+  gameOver: boolean;
+}
+
 export interface PhaseResultsData {
   summary: string;
   secretWord?: string;
@@ -97,6 +198,21 @@ export interface PhaseResultsData {
   roleReveals?: RoleRevealInfo[];
   standings: PlayerResultStanding[];
   winnerTitle?: string;
+  // ATW-specific
+  atwTurnResults?: AtwTurnResult[];
+  // Guess the Link-specific
+  gtlConcept?: string;
+  gtlCategory?: string;
+  gtlGuesses?: GtlGuessResult[];
+  gtlHints?: GtlHintShare[];
+  gtlCorrectPlayerIds?: string[];
+  gtlGiveawayName?: string;
+  gtlGiveawayResponse?: string;
+  gtlGiveawayNote?: string;
+  // Mafia-specific
+  mafiaWinningSide?: MafiaSide;
+  mafiaLog?: string[];
+  mafiaEliminations?: MafiaElimination[];
 }
 
 export interface RoomPublicState {
@@ -115,6 +231,9 @@ export interface RoomPublicState {
   revealedAnswers: RevealedAnswer[];
   voteTallies: Record<string, number>; // targetPlayerId -> count
   results: PhaseResultsData | null;
+  atwState: AtwPublicState | null; // Avoid the Word game state
+  mafiaState: MafiaPublicState | null; // Mafia game state
+  gtlState: GtlPublicState | null; // Guess the Link game state
 }
 
 export interface PlayerPrivateState {
@@ -129,6 +248,37 @@ export interface PlayerPrivateState {
   submittedAnswer?: string;
   voteSubmitted?: boolean;
   votedForPlayerId?: string;
+  // Avoid the Word
+  atwSubject?: string;
+  atwForbidden?: [string, string, string];
+  atwCategory?: string;
+  atwIsDescriber?: boolean;
+  atwBuzzed?: boolean;
+  atwRoundPoints?: number;
+  // Mafia
+  mafiaRole?: MafiaRole;
+  mafiaRoleLabel?: string;
+  mafiaIsAlive?: boolean;
+  mafiaTeammateNames?: string[];
+  mafiaTeammateIds?: string[];
+  mafiaTeamSelections?: MafiaTeamSelection[];
+  mafiaCanAct?: boolean;
+  mafiaActionLabel?: string;
+  mafiaActionSubmitted?: boolean;
+  mafiaActionTargetName?: string | null;
+  mafiaInvestigations?: MafiaInvestigation[];
+  // Guess the Link
+  gtlHint?: string;             // this player's own angle on the hidden concept
+  gtlHintIndex?: number;        // 1-based position of their hint in the round's deal
+  gtlHintCount?: number;        // how many distinct hint angles exist
+  gtlCategory?: string;
+  gtlConcept?: string;          // only present for the owner once results land
+  gtlResponseSubmitted?: boolean;
+  gtlResponseText?: string;
+  gtlGuessSubmitted?: boolean;
+  gtlGuessText?: string;
+  gtlGuessCorrect?: boolean;
+  gtlPointsAwarded?: number;
 }
 
 export interface RoomStateUpdatePayload {

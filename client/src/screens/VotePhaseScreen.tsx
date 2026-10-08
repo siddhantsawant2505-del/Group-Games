@@ -14,6 +14,8 @@ interface VotePhaseScreenProps {
   privateState: PlayerPrivateState;
   onCastVote: (targetPlayerId: string) => void;
   onHostSkip?: () => void;
+  /** When set, only these players may be accused (Mafia day ballots exclude the dead). */
+  eligiblePlayerIds?: string[];
 }
 
 export function VotePhaseScreen({
@@ -22,6 +24,7 @@ export function VotePhaseScreen({
   privateState,
   onCastVote,
   onHostSkip,
+  eligiblePlayerIds,
 }: VotePhaseScreenProps) {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(
     privateState.votedForPlayerId || null
@@ -33,6 +36,11 @@ export function VotePhaseScreen({
   );
 
   const playerColor = getPlayerColor(myPlayer.colorIndex);
+
+  // Mafia ballots only list players still in the game, so a vote always counts.
+  const votePool = eligiblePlayerIds
+    ? room.players.filter((p) => eligiblePlayerIds.includes(p.id))
+    : room.players;
 
   const handleVoteSubmit = () => {
     if (!selectedTargetId || isPending) return;
@@ -67,7 +75,7 @@ export function VotePhaseScreen({
             Vote for Suspect
           </h2>
           <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-            {room.hasVoted.length} of {room.players.length} votes locked in
+            {room.hasVoted.length} of {votePool.length} votes locked in
           </p>
         </div>
 
@@ -97,7 +105,7 @@ export function VotePhaseScreen({
 
         {/* Player options to vote for with their submitted clues */}
         <div className="grid grid-cols-1 gap-2.5">
-          {room.players.map((p) => {
+          {votePool.map((p) => {
             const isMe = p.id === myPlayer.id;
             const isSelected = selectedTargetId === p.id;
             const targetColor = getPlayerColor(p.colorIndex);

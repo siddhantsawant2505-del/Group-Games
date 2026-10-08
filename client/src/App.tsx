@@ -27,6 +27,25 @@ import { RevealAnswersScreen } from './screens/RevealAnswersScreen';
 import { DiscussionPhaseScreen } from './screens/DiscussionPhaseScreen';
 import { VotePhaseScreen } from './screens/VotePhaseScreen';
 import { ResultsPhaseScreen } from './screens/ResultsPhaseScreen';
+import { AtwRevealScreen } from './screens/AtwRevealScreen';
+import { AtwDescriberScreen } from './screens/AtwDescriberScreen';
+import { AtwListenerScreen } from './screens/AtwListenerScreen';
+import { AtwResultsScreen } from './screens/AtwResultsScreen';
+import { MafiaRevealScreen } from './screens/MafiaRevealScreen';
+import { MafiaNightActionScreen } from './screens/MafiaNightActionScreen';
+import { MafiaTownSleepsScreen } from './screens/MafiaTownSleepsScreen';
+import { MafiaMorningScreen } from './screens/MafiaMorningScreen';
+import { MafiaResultsScreen } from './screens/MafiaResultsScreen';
+import { GtlHintRevealScreen } from './screens/GtlHintRevealScreen';
+import { GtlInputScreen } from './screens/GtlInputScreen';
+import { GtlResponseRevealScreen } from './screens/GtlResponseRevealScreen';
+import { GtlGuessScreen } from './screens/GtlGuessScreen';
+import { GtlResultsScreen } from './screens/GtlResultsScreen';
+
+/** Games that ship with a dedicated server-side rules module. */
+const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
+const MAFIA_GAME_ID = 'mafia';
+const GUESS_THE_LINK_GAME_ID = 'guess-the-link';
 
 type PreRoomScreen = 'loading' | 'name-entry' | 'home' | 'join-room';
 
@@ -280,6 +299,46 @@ export default function App() {
     });
   }, [room, myPlayer]);
 
+  // Avoid the Word: toggle a buzz on the active describer
+  const handleAtwBuzz = useCallback(() => {
+    if (!room || !myPlayer) return;
+    playNotificationSound('timer-warning');
+    triggerHaptic('heavy');
+    const socket = getSocket();
+    socket.emit('atw-buzz', {
+      roomCode: room.roomCode,
+      playerId: myPlayer.id,
+    });
+  }, [room, myPlayer]);
+
+  // Avoid the Word: host confirms (ends the turn) or dismisses a pending buzz
+  const handleAtwResolveBuzz = useCallback(
+    (confirm: boolean) => {
+      if (!room || !myPlayer) return;
+      playNotificationSound(confirm ? 'submit-lock' : 'tick');
+      triggerHaptic(confirm ? 'medium' : 'light');
+      const socket = getSocket();
+      socket.emit('atw-resolve-buzz', {
+        roomCode: room.roomCode,
+        playerId: myPlayer.id,
+        confirm,
+      });
+    },
+    [room, myPlayer]
+  );
+
+  // Avoid the Word: describer (or host) hands the turn over early
+  const handleAtwEndTurn = useCallback(() => {
+    if (!room || !myPlayer) return;
+    playNotificationSound('success');
+    triggerHaptic('success');
+    const socket = getSocket();
+    socket.emit('atw-end-turn', {
+      roomCode: room.roomCode,
+      playerId: myPlayer.id,
+    });
+  }, [room, myPlayer]);
+
   // Player casts vote
   const handleCastVote = useCallback((targetPlayerId: string) => {
     if (!room || !myPlayer) return;
@@ -290,6 +349,62 @@ export default function App() {
       roomCode: room.roomCode,
       voterId: myPlayer.id,
       targetPlayerId,
+    });
+  }, [room, myPlayer]);
+
+  // Mafia: a night actor (Mafia/Detective) locks in a target
+  const handleMafiaNightAction = useCallback(
+    (targetPlayerId: string) => {
+      if (!room || !myPlayer) return;
+      playNotificationSound('submit-lock');
+      triggerHaptic('heavy');
+      const socket = getSocket();
+      socket.emit('mafia-night-action', {
+        roomCode: room.roomCode,
+        playerId: myPlayer.id,
+        targetPlayerId,
+      });
+    },
+    [room, myPlayer]
+  );
+
+  // Mafia: host skip that resolves the night early
+  const handleMafiaResolveNight = useCallback(() => {
+    if (!room || !myPlayer) return;
+    playNotificationSound('phase-change');
+    triggerHaptic('medium');
+    const socket = getSocket();
+    socket.emit('mafia-resolve-night', {
+      roomCode: room.roomCode,
+      playerId: myPlayer.id,
+    });
+  }, [room, myPlayer]);
+
+  // Guess the Link: a player locks in their guess at the hidden concept
+  const handleGtlGuess = useCallback(
+    (guess: string) => {
+      if (!room || !myPlayer) return;
+      playNotificationSound('submit-lock');
+      triggerHaptic('heavy');
+      const socket = getSocket();
+      socket.emit('gtl-guess', {
+        roomCode: room.roomCode,
+        playerId: myPlayer.id,
+        guess,
+      });
+    },
+    [room, myPlayer]
+  );
+
+  // Mafia: host skip that resolves the exile trial early
+  const handleMafiaResolveTrial = useCallback(() => {
+    if (!room || !myPlayer) return;
+    playNotificationSound('phase-change');
+    triggerHaptic('medium');
+    const socket = getSocket();
+    socket.emit('mafia-resolve-vote', {
+      roomCode: room.roomCode,
+      playerId: myPlayer.id,
     });
   }, [room, myPlayer]);
 
@@ -369,6 +484,14 @@ export default function App() {
     [userProfile, handleJoinRoom]
   );
 
+  // Avoid the Word and Mafia run on their own phase chains and dedicated screens
+  const isAvoidTheWord = room?.selectedGame?.id === AVOID_THE_WORD_GAME_ID;
+  const isMafia = room?.selectedGame?.id === MAFIA_GAME_ID;
+  const isGuessTheLink = room?.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
+  const isAtwDescriber = Boolean(
+    privateState.atwIsDescriber || room?.atwState?.describerPlayerId === myPlayer?.id
+  );
+
   return (
     <div className="mobile-app-shell">
       {/* Top Header shown during active room sessions */}
@@ -432,25 +555,114 @@ export default function App() {
           onConfirmAndStart={handleConfirmAndStartRound}
         />
       ) : room.phase === 'reveal' ? (
-        <RevealPhaseScreen
-          room={room}
-          myPlayer={myPlayer}
-          privateState={privateState}
-          onAdvance={() => handleAdvancePhase('input')}
-        />
-      ) : room.phase === 'input' ? (
-        <InputPhaseScreen
-          room={room}
-          myPlayer={myPlayer}
-          privateState={privateState}
-          onSubmitAnswer={handleSubmitAnswer}
-          onHostSkip={() => handleAdvancePhase('reveal-answers')}
-        />
-      ) : room.phase === 'reveal-answers' ? (
-        <RevealAnswersScreen
+        isAvoidTheWord ? (
+          <AtwRevealScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onAdvance={() => handleAdvancePhase('atw-describe')}
+          />
+        ) : isMafia ? (
+          <MafiaRevealScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onAdvance={() => handleAdvancePhase('night')}
+          />
+        ) : isGuessTheLink ? (
+          <GtlHintRevealScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onAdvance={() => handleAdvancePhase('input')}
+          />
+        ) : (
+          <RevealPhaseScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onAdvance={() => handleAdvancePhase('input')}
+          />
+        )
+      ) : room.phase === 'atw-describe' ? (
+        isAtwDescriber ? (
+          <AtwDescriberScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onEndTurn={handleAtwEndTurn}
+            onResolveBuzz={handleAtwResolveBuzz}
+          />
+        ) : (
+          <AtwListenerScreen
+            room={room}
+            myPlayer={myPlayer}
+            onBuzz={handleAtwBuzz}
+            onResolveBuzz={handleAtwResolveBuzz}
+          />
+        )
+      ) : room.phase === 'night' ? (
+        privateState.mafiaCanAct ? (
+          <MafiaNightActionScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onSelectTarget={handleMafiaNightAction}
+            onHostResolveNight={handleMafiaResolveNight}
+          />
+        ) : (
+          <MafiaTownSleepsScreen
+            room={room}
+            myPlayer={myPlayer}
+            onHostResolveNight={handleMafiaResolveNight}
+          />
+        )
+      ) : room.phase === 'day' ? (
+        <MafiaMorningScreen
           room={room}
           myPlayer={myPlayer}
           onAdvance={() => handleAdvancePhase('discussion')}
+        />
+      ) : room.phase === 'input' ? (
+        isGuessTheLink ? (
+          <GtlInputScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onSubmitAnswer={handleSubmitAnswer}
+            onHostSkip={() => handleAdvancePhase('reveal-answers')}
+          />
+        ) : (
+          <InputPhaseScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onSubmitAnswer={handleSubmitAnswer}
+            onHostSkip={() => handleAdvancePhase('reveal-answers')}
+          />
+        )
+      ) : room.phase === 'reveal-answers' ? (
+        isGuessTheLink ? (
+          <GtlResponseRevealScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onAdvance={() => handleAdvancePhase('guess')}
+          />
+        ) : (
+          <RevealAnswersScreen
+            room={room}
+            myPlayer={myPlayer}
+            onAdvance={() => handleAdvancePhase('discussion')}
+          />
+        )
+      ) : room.phase === 'guess' ? (
+        <GtlGuessScreen
+          room={room}
+          myPlayer={myPlayer}
+          privateState={privateState}
+          onGuess={handleGtlGuess}
+          onHostSkip={() => handleAdvancePhase('results')}
         />
       ) : room.phase === 'discussion' ? (
         <DiscussionPhaseScreen
@@ -464,16 +676,45 @@ export default function App() {
           myPlayer={myPlayer}
           privateState={privateState}
           onCastVote={handleCastVote}
-          onHostSkip={() => handleAdvancePhase('results')}
+          eligiblePlayerIds={isMafia ? room.mafiaState?.alivePlayerIds : undefined}
+          onHostSkip={() =>
+            isMafia ? handleMafiaResolveTrial() : handleAdvancePhase('results')
+          }
         />
       ) : room.phase === 'results' ? (
-        <ResultsPhaseScreen
-          room={room}
-          myPlayer={myPlayer}
-          onNextRound={() => handleAdvancePhase('next-round')}
-          onReturnToLobby={handleReturnToLobby}
-          onEndSession={() => handleAdvancePhase('post-game')}
-        />
+        isAvoidTheWord ? (
+          <AtwResultsScreen
+            room={room}
+            myPlayer={myPlayer}
+            onNextRound={() => handleAdvancePhase('next-round')}
+            onReturnToLobby={handleReturnToLobby}
+            onEndSession={() => handleAdvancePhase('post-game')}
+          />
+        ) : isMafia ? (
+          <MafiaResultsScreen
+            room={room}
+            myPlayer={myPlayer}
+            onNextRound={() => handleAdvancePhase('next-round')}
+            onReturnToLobby={handleReturnToLobby}
+            onEndSession={() => handleAdvancePhase('post-game')}
+          />
+        ) : isGuessTheLink ? (
+          <GtlResultsScreen
+            room={room}
+            myPlayer={myPlayer}
+            onNextRound={() => handleAdvancePhase('next-round')}
+            onReturnToLobby={handleReturnToLobby}
+            onEndSession={() => handleAdvancePhase('post-game')}
+          />
+        ) : (
+          <ResultsPhaseScreen
+            room={room}
+            myPlayer={myPlayer}
+            onNextRound={() => handleAdvancePhase('next-round')}
+            onReturnToLobby={handleReturnToLobby}
+            onEndSession={() => handleAdvancePhase('post-game')}
+          />
+        )
       ) : room.phase === 'post-game' ? (
         <PostGameScreen
           room={room}

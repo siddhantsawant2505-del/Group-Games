@@ -309,7 +309,7 @@ For a mobile-first real-time engine, the best next games to add are:
 
 When adding any new game, the engine should keep a consistent contract:
 
-- **Games catalog** in `src/data/games.ts` with `id`, `title`, `minPlayers`, `maxPlayers`, `icon`, `description`, `rules`.
+- **Games catalog** in `shared/data/games.ts` with `id`, `title`, `minPlayers`, `maxPlayers`, `icon`, `description`, `rules`.
 - **Server phase logic** in `server/games/` keyed by `gameId`.
 - **Public/private state split** unchanged so hidden roles and words are never leaked.
 - **Timers** remain server-driven and phase-local.

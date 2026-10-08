@@ -240,17 +240,25 @@ async function startServer() {
 
         let nextPhase = targetPhase;
         if (!nextPhase) {
-          const phases = [
-            'lobby',
-            'game-select',
-            'reveal',
-            'input',
-            'reveal-answers',
-            'discussion',
-            'vote',
-            'results',
-          ] as const;
-          const currentIdx = phases.indexOf(room.phase as any);
+          // Games with a dedicated engine follow their own phase chain.
+          const phases: string[] =
+            room.selectedGame?.id === 'avoid-the-word'
+              ? ['lobby', 'game-select', 'reveal', 'atw-describe', 'results']
+              : room.selectedGame?.id === 'mafia'
+              ? ['lobby', 'game-select', 'reveal', 'night', 'day', 'discussion', 'vote', 'results']
+              : room.selectedGame?.id === 'guess-the-link'
+              ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'guess', 'results']
+              : [
+                  'lobby',
+                  'game-select',
+                  'reveal',
+                  'input',
+                  'reveal-answers',
+                  'discussion',
+                  'vote',
+                  'results',
+                ];
+          const currentIdx = phases.indexOf(room.phase);
           nextPhase = currentIdx >= 0 && currentIdx < phases.length - 1
             ? phases[currentIdx + 1]
             : 'game-select';
@@ -304,7 +312,119 @@ async function startServer() {
       }
     );
 
-    // 8. Reset room back to lobby
+    // 8. Avoid the Word: listener toggles a buzz on the active describer
+    socket.on(
+      'atw-buzz',
+      ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.submitAtwBuzz(room, playerId, () => broadcastRoom(upperCode));
+      }
+    );
+
+    // 9. Avoid the Word: host confirms (ends the turn) or dismisses a pending buzz
+    socket.on(
+      'atw-resolve-buzz',
+      ({
+        roomCode,
+        playerId,
+        confirm,
+      }: {
+        roomCode: string;
+        playerId: string;
+        confirm: boolean;
+      }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.resolveAtwBuzz(room, playerId, Boolean(confirm), () =>
+          broadcastRoom(upperCode)
+        );
+      }
+    );
+
+    // 10. Avoid the Word: describer (or host) ends the active turn early
+    socket.on(
+      'atw-end-turn',
+      ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.endAtwTurn(room, playerId, () => broadcastRoom(upperCode));
+      }
+    );
+
+    // 11. Mafia: a night actor (Mafia/Detective) locks in a target
+    socket.on(
+      'mafia-night-action',
+      ({
+        roomCode,
+        playerId,
+        targetPlayerId,
+      }: {
+        roomCode: string;
+        playerId: string;
+        targetPlayerId: string;
+      }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.submitMafiaNightTarget(room, playerId, targetPlayerId, () =>
+          broadcastRoom(upperCode)
+        );
+      }
+    );
+
+    // 12. Mafia: host resolves the night early
+    socket.on(
+      'mafia-resolve-night',
+      ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.hostResolveMafiaNight(room, playerId, () => broadcastRoom(upperCode));
+      }
+    );
+
+    // 13. Mafia: host resolves the exile trial early
+    socket.on(
+      'mafia-resolve-vote',
+      ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.hostResolveMafiaTrial(room, playerId, () => broadcastRoom(upperCode));
+      }
+    );
+
+    // 14. Guess the Link: a player locks in a guess at the hidden concept
+    socket.on(
+      'gtl-guess',
+      ({
+        roomCode,
+        playerId,
+        guess,
+      }: {
+        roomCode: string;
+        playerId: string;
+        guess: string;
+      }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.submitGtlGuess(room, playerId, guess, () => broadcastRoom(upperCode));
+      }
+    );
+
+    // 15. Reset room back to lobby
     socket.on('reset-to-lobby', ({ roomCode }: { roomCode: string }) => {
       const upperCode = (roomCode || '').toUpperCase().trim();
       const room = roomManager.getRoom(upperCode);
@@ -315,7 +435,7 @@ async function startServer() {
       );
     });
 
-    // 9. Handle socket disconnect
+    // 16. Handle socket disconnect
     socket.on('disconnect', () => {
       const { room } = roomManager.handleDisconnect(socket.id);
       if (room) {

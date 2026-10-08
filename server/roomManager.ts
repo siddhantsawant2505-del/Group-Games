@@ -13,6 +13,9 @@ import {
   RevealedAnswer,
   RoleRevealInfo,
   PlayerResultStanding,
+  AtwPublicState,
+  MafiaPublicState,
+  GtlPublicState,
 } from '../shared/types';
 import { PLAYER_COLORS } from '../shared/theme/tokens';
 import { PARTY_GAMES } from '../shared/data/games';
@@ -25,6 +28,61 @@ import {
   calculateImpostorResults,
   cleanupImpostorRound,
 } from './games/impostor';
+import {
+  ATW_TURN_SECONDS,
+  setupAvoidTheWordRound,
+  beginAtwTurn,
+  toggleAtwBuzz,
+  resolveAtwBuzz,
+  completeAtwTurn,
+  hasMoreAtwTurns,
+  simulateAtwBotBuzzes,
+  decideAtwBotDescribeOutcome,
+  calculateAtwResults,
+  cleanupAvoidTheWordRound,
+  AtwTurnOutcome,
+} from './games/avoidTheWord';
+import {
+  MAFIA_DAY_SECONDS,
+  MAFIA_NIGHT_SECONDS,
+  setupMafiaRound,
+  beginMafiaNight,
+  submitMafiaNightAction,
+  simulateMafiaBotNightActions,
+  resolveMafiaNight,
+  nightActionsPending,
+  beginMafiaDay,
+  resolveMafiaExile,
+  checkMafiaWin,
+  setMafiaWinningSide,
+  simulateMafiaBotVotes,
+  calculateMafiaResults,
+  cleanupMafiaRound,
+  getLivingPlayerIds,
+  isPlayerAlive,
+} from './games/mafia';
+import {
+  GTL_INPUT_SECONDS,
+  GTL_REVEAL_SECONDS,
+  GTL_GUESS_SECONDS,
+  setupGtlRound,
+  recordGtlResponse,
+  simulateGtlBotResponses,
+  finalizeGtlReveal,
+  beginGtlGuessing,
+  recordGtlGuess,
+  simulateGtlBotGuesses,
+  finalizeGtlGuesses,
+  pendingGtlGuessers,
+  calculateGtlResults,
+  cleanupGtlRound,
+} from './games/guessTheLink';
+
+/** Game ids that ship with a dedicated server-side rules module. */
+const IMPOSTOR_GAME_ID = 'impostor';
+const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
+const MAFIA_GAME_ID = 'mafia';
+const GUESS_THE_LINK_GAME_ID = 'guess-the-link';
 
 export interface InternalPlayer extends Player {
   socketId: string | null;
@@ -50,6 +108,10 @@ export interface InternalRoom {
   playerVotes: Record<string, string>; // voterPlayerId -> targetPlayerId
   privateData: Record<string, PlayerPrivateState>;
   results: RoomPublicState['results'];
+  atwState: AtwPublicState | null; // Avoid the Word turn state
+  mafiaState: MafiaPublicState | null; // Mafia night/day state
+  gtlState: GtlPublicState | null; // Guess the Link round state
+  botTimeouts: NodeJS.Timeout[]; // pending simulated-bot actions
   createdAt: number;
   lastActivityAt: number;
 }
@@ -131,6 +193,10 @@ export class RoomManager {
       playerVotes: {},
       privateData: {},
       results: null,
+      atwState: null,
+      mafiaState: null,
+      gtlState: null,
+      botTimeouts: [],
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
     };
@@ -365,6 +431,28 @@ export class RoomManager {
       room.timerIntervalId = null;
     }
     room.timer = null;
+    this.clearBotTimeouts(room);
+  }
+
+  /**
+   * Cancels every pending simulated-bot action for a room
+   */
+  private clearBotTimeouts(room: InternalRoom) {
+    room.botTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+    room.botTimeouts = [];
+  }
+
+  /**
+   * Queues a delayed simulated-bot action, tracked so it can be cancelled
+   * whenever the room changes phase.
+   */
+  private scheduleBotAction(room: InternalRoom, delayMs: number, action: () => void) {
+    const timeoutId = setTimeout(() => {
+      room.botTimeouts = room.botTimeouts.filter((id) => id !== timeoutId);
+      action();
+    }, delayMs);
+
+    room.botTimeouts.push(timeoutId);
   }
 
   /**
@@ -389,6 +477,12 @@ export class RoomManager {
         room.playerVotes = {};
         room.privateData = {};
         room.results = null;
+        room.atwState = null;
+        room.mafiaState = null;
+        room.gtlState = null;
+        cleanupAvoidTheWordRound(room.code);
+        cleanupMafiaRound(room.code);
+        cleanupGtlRound(room.code);
         break;
       }
 
@@ -400,8 +494,14 @@ export class RoomManager {
 
       case 'reveal': {
         // Prepare private roles/words based on selected game
-        if (room.selectedGame?.id === 'impostor') {
+        if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
           setupImpostorRound(room);
+        } else if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) {
+          setupAvoidTheWordRound(room);
+        } else if (room.selectedGame?.id === MAFIA_GAME_ID) {
+          setupMafiaRound(room);
+        } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
+          setupGtlRound(room);
         } else {
           this.setupPhaseReveal(room);
         }
@@ -411,30 +511,102 @@ export class RoomManager {
           room,
           10,
           () => broadcastState(),
-          () => this.transitionToPhase(room, 'input', broadcastState)
+          () => this.transitionToPhase(room, this.phaseAfterReveal(room), broadcastState)
         );
         break;
       }
 
+      case 'night': {
+        // Mafia-specific: the Mafia pick a victim and the Detective investigates
+        // while everybody else waits out the night.
+        if (room.selectedGame?.id !== MAFIA_GAME_ID) {
+          this.transitionToPhase(room, 'input', broadcastState);
+          return;
+        }
+
+        beginMafiaNight(room);
+        room.hasVoted.clear();
+        room.voteTallies = {};
+        room.playerVotes = {};
+        simulateMafiaBotNightActions(room);
+
+        room.phasePrompt = 'The Town Sleeps';
+        room.phaseSubprompt = 'Mafia and the Detective are making their moves...';
+
+        this.startPhaseTimer(
+          room,
+          MAFIA_NIGHT_SECONDS,
+          () => broadcastState(),
+          () => this.finishMafiaNight(room, broadcastState)
+        );
+
+        // All night actions already locked in (bot-driven): give the table a beat
+        // on the sleeps screen before the sun comes up.
+        if (nightActionsPending(room) === 0) {
+          this.scheduleBotAction(room, 1800, () => {
+            if (room.phase === 'night') this.finishMafiaNight(room, broadcastState);
+          });
+        }
+        break;
+      }
+
+      case 'day': {
+        // Mafia-specific: morning report of the overnight elimination.
+        if (room.selectedGame?.id !== MAFIA_GAME_ID) {
+          this.transitionToPhase(room, 'discussion', broadcastState);
+          return;
+        }
+
+        beginMafiaDay(room);
+        room.phasePrompt = 'Morning Report';
+        room.phaseSubprompt = 'The town wakes up to last night’s news';
+
+        this.startPhaseTimer(
+          room,
+          MAFIA_DAY_SECONDS,
+          () => broadcastState(),
+          () => this.transitionToPhase(room, 'discussion', broadcastState)
+        );
+        break;
+      }
+
+      case 'atw-describe': {
+        // Avoid the Word replaces the single-shot input phase with a rotation of
+        // live describing turns (one describer at a time, everyone else listens).
+        if (room.selectedGame?.id !== AVOID_THE_WORD_GAME_ID) {
+          this.transitionToPhase(room, 'input', broadcastState);
+          return;
+        }
+        this.runAtwTurn(room, broadcastState);
+        return; // runAtwTurn performs its own broadcast
+      }
+
       case 'input': {
-        room.phasePrompt = 'Submit Your Clue';
-        room.phaseSubprompt = 'Enter a one-word clue before the timer expires';
+        const inputIsGtl = room.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
+        room.phasePrompt = inputIsGtl ? 'Write Your Response' : 'Submit Your Clue';
+        room.phaseSubprompt = inputIsGtl
+          ? 'One word or a short phrase inspired by your private hint'
+          : 'Enter a one-word clue before the timer expires';
         room.hasSubmittedInput.clear();
 
         // Auto-populate bot answers if any bots are in room
-        if (room.selectedGame?.id === 'impostor') {
+        if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
           simulateImpostorBotClues(room);
+        } else if (inputIsGtl) {
+          simulateGtlBotResponses(room);
         } else {
           this.simulateBotInputs(room);
         }
 
         this.startPhaseTimer(
           room,
-          20,
+          inputIsGtl ? GTL_INPUT_SECONDS : 20,
           () => broadcastState(),
           () => {
-            if (room.selectedGame?.id === 'impostor') {
+            if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
               finalizeImpostorReveal(room);
+            } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
+              finalizeGtlReveal(room);
             }
             this.transitionToPhase(room, 'reveal-answers', broadcastState);
           }
@@ -443,19 +615,52 @@ export class RoomManager {
       }
 
       case 'reveal-answers': {
-        room.phasePrompt = 'Simultaneous Reveal';
-        room.phaseSubprompt = 'Review every player’s clue in randomized order';
+        const revealIsGtl = room.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
+        room.phasePrompt = revealIsGtl ? 'The Link Board' : 'Simultaneous Reveal';
+        room.phaseSubprompt = revealIsGtl
+          ? 'Every response, shuffled — what single concept ties them together?'
+          : 'Review every player’s clue in randomized order';
         if (room.selectedGame?.id === 'impostor') {
           finalizeImpostorReveal(room);
+        } else if (revealIsGtl) {
+          finalizeGtlReveal(room);
         } else {
           this.prepareRevealedAnswers(room);
         }
         this.startPhaseTimer(
           room,
-          15,
+          revealIsGtl ? GTL_REVEAL_SECONDS : 15,
           () => broadcastState(),
-          () => this.transitionToPhase(room, 'discussion', broadcastState)
+          () => this.transitionToPhase(room, revealIsGtl ? 'guess' : 'discussion', broadcastState)
         );
+        break;
+      }
+
+      case 'guess': {
+        // Guess the Link: everyone locks in a guess at the hidden concept at the
+        // same time, so simultaneous guessing works exactly like voting.
+        if (room.selectedGame?.id !== GUESS_THE_LINK_GAME_ID) {
+          this.transitionToPhase(room, 'results', broadcastState);
+          return;
+        }
+
+        room.phasePrompt = 'Guess the Concept';
+        room.phaseSubprompt = 'Lock in the link that ties every response together';
+        beginGtlGuessing(room);
+        simulateGtlBotGuesses(room);
+
+        this.startPhaseTimer(
+          room,
+          GTL_GUESS_SECONDS,
+          () => broadcastState(),
+          () => this.finishGtlGuessing(room, broadcastState)
+        );
+
+        // A room where only bots still owe a guess can resolve immediately.
+        if (pendingGtlGuessers(room).length === 0) {
+          this.finishGtlGuessing(room, broadcastState);
+          return;
+        }
         break;
       }
 
@@ -479,20 +684,42 @@ export class RoomManager {
         room.playerVotes = {};
 
         // Auto-cast bot votes
-        this.simulateBotVotes(room);
+        if (room.selectedGame?.id === MAFIA_GAME_ID) {
+          simulateMafiaBotVotes(room);
+        } else {
+          this.simulateBotVotes(room);
+        }
 
         this.startPhaseTimer(
           room,
           25,
           () => broadcastState(),
-          () => this.transitionToPhase(room, 'results', broadcastState)
+          () =>
+            room.selectedGame?.id === MAFIA_GAME_ID
+              ? this.finishMafiaTrial(room, broadcastState)
+              : this.transitionToPhase(room, 'results', broadcastState)
         );
+
+        // Mafia: if only bots are left to vote, the trial can resolve right away.
+        if (
+          room.selectedGame?.id === MAFIA_GAME_ID &&
+          getLivingPlayerIds(room).every((id) => room.hasVoted.has(id))
+        ) {
+          this.finishMafiaTrial(room, broadcastState);
+          return;
+        }
         break;
       }
 
       case 'results': {
-        if (room.selectedGame?.id === 'impostor') {
+        if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
           calculateImpostorResults(room);
+        } else if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) {
+          calculateAtwResults(room);
+        } else if (room.selectedGame?.id === MAFIA_GAME_ID) {
+          calculateMafiaResults(room);
+        } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
+          calculateGtlResults(room);
         } else {
           this.calculateResults(room);
         }
@@ -516,6 +743,153 @@ export class RoomManager {
     }
 
     broadcastState();
+  }
+
+  /**
+   * Games with a dedicated engine leave the reveal phase into their own phase.
+   */
+  private phaseAfterReveal(room: InternalRoom): GamePhase {
+    if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) return 'atw-describe';
+    if (room.selectedGame?.id === MAFIA_GAME_ID) return 'night';
+    return 'input';
+  }
+
+  /**
+   * Mafia: scores the night, then either ends the game or wakes the town up.
+   */
+  private finishMafiaNight(room: InternalRoom, broadcastState: () => void) {
+    if (room.phase !== 'night') return;
+    if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
+
+    this.clearBotTimeouts(room);
+    resolveMafiaNight(room);
+
+    const winningSide = checkMafiaWin(room);
+    if (winningSide) {
+      setMafiaWinningSide(room, winningSide);
+      this.transitionToPhase(room, 'results', broadcastState);
+      return;
+    }
+
+    this.transitionToPhase(room, 'day', broadcastState);
+  }
+
+  /**
+   * Mafia: resolves the day's exile trial, then either ends the game or
+   * loops the room back into another night.
+   */
+  private finishMafiaTrial(room: InternalRoom, broadcastState: () => void) {
+    if (room.phase !== 'vote') return;
+    if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
+
+    resolveMafiaExile(room);
+
+    const winningSide = checkMafiaWin(room);
+    if (winningSide) {
+      setMafiaWinningSide(room, winningSide);
+      this.transitionToPhase(room, 'results', broadcastState);
+      return;
+    }
+
+    this.transitionToPhase(room, 'night', broadcastState);
+  }
+
+  /**
+   * Guess the Link: closes guessing once every player has locked in (or the
+   * timer runs out) and moves straight to the concept reveal.
+   */
+  private finishGtlGuessing(room: InternalRoom, broadcastState: () => void) {
+    if (room.phase !== 'guess') return;
+    if (room.selectedGame?.id !== GUESS_THE_LINK_GAME_ID) return;
+
+    this.clearBotTimeouts(room);
+    finalizeGtlGuesses(room);
+    this.transitionToPhase(room, 'results', broadcastState);
+  }
+
+  /**
+   * Avoid the Word: runs the current describing turn and arms the turn timer.
+   * Bots are simulated because they cannot actually talk out loud.
+   */
+  private runAtwTurn(room: InternalRoom, broadcastState: () => void) {
+    const info = beginAtwTurn(room);
+    if (!info) {
+      this.transitionToPhase(room, 'results', broadcastState);
+      return;
+    }
+
+    room.phasePrompt = `${info.describerName} is Describing`;
+    room.phaseSubprompt = `Turn ${info.turnNumber} of ${info.totalTurns} — buzz the second a taboo word slips!`;
+
+    this.startPhaseTimer(
+      room,
+      ATW_TURN_SECONDS,
+      () => broadcastState(),
+      () => this.finishAtwTurn(room, 'timeout', broadcastState)
+    );
+
+    const describer = room.players.find((p) => p.id === info.describerId);
+
+    if (describer?.isBot) {
+      // A bot turn resolves itself after a short beat so the room can follow along.
+      this.scheduleBotAction(room, 4000, () => {
+        if (!this.isActiveAtwTurn(room, info.describerId, info.turnNumber)) return;
+        const outcome = decideAtwBotDescribeOutcome();
+        if (outcome === 'buzzed') {
+          simulateAtwBotBuzzes(room, true);
+        }
+        this.finishAtwTurn(room, outcome, broadcastState);
+      });
+    } else {
+      // Bot listeners may call out a slip partway through a human turn.
+      this.scheduleBotAction(room, 12000, () => {
+        if (!this.isActiveAtwTurn(room, info.describerId, info.turnNumber)) return;
+        const buzzes = simulateAtwBotBuzzes(room);
+        if (buzzes === 0) return;
+        if (room.atwState?.buzzConfirmed) {
+          this.finishAtwTurn(room, 'buzzed', broadcastState);
+          return;
+        }
+        broadcastState();
+      });
+    }
+
+    broadcastState();
+  }
+
+  /**
+   * Avoid the Word: scores the active turn and moves on to the next describer.
+   */
+  private finishAtwTurn(
+    room: InternalRoom,
+    outcome: AtwTurnOutcome,
+    broadcastState: () => void
+  ) {
+    if (room.phase !== 'atw-describe') return;
+
+    this.clearBotTimeouts(room);
+    completeAtwTurn(room, outcome);
+
+    if (hasMoreAtwTurns(room)) {
+      this.runAtwTurn(room, broadcastState);
+    } else {
+      this.transitionToPhase(room, 'results', broadcastState);
+    }
+  }
+
+  /**
+   * Guards late bot actions so they never fire against a later turn.
+   */
+  private isActiveAtwTurn(
+    room: InternalRoom,
+    describerId: string,
+    turnNumber: number
+  ): boolean {
+    return (
+      room.phase === 'atw-describe' &&
+      room.atwState?.describerPlayerId === describerId &&
+      room.atwState?.turnNumber === turnNumber
+    );
   }
 
   /**
@@ -630,6 +1004,8 @@ export class RoomManager {
 
     if (room.selectedGame?.id === 'impostor') {
       recordPlayerClue(room, playerId, answer);
+    } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
+      recordGtlResponse(room, playerId, answer);
     } else {
       room.hasSubmittedInput.add(playerId);
       if (!room.privateData[playerId]) {
@@ -644,6 +1020,8 @@ export class RoomManager {
     if (room.hasSubmittedInput.size >= activeCount) {
       if (room.selectedGame?.id === 'impostor') {
         finalizeImpostorReveal(room);
+      } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
+        finalizeGtlReveal(room);
       }
       this.transitionToPhase(room, 'reveal-answers', broadcastState);
     } else {
@@ -665,6 +1043,12 @@ export class RoomManager {
     // Guard: no player may vote for themselves
     if (voterId === targetPlayerId) return;
 
+    // Mafia: the dead neither vote nor get exiled.
+    if (room.selectedGame?.id === MAFIA_GAME_ID) {
+      if (!isPlayerAlive(room, voterId)) return;
+      if (!isPlayerAlive(room, targetPlayerId)) return;
+    }
+
     // Guard: the impostor may not vote for themselves
     // (redundant with the above but explicit for clarity)
     const voterIsImpostor = Boolean(room.privateData[voterId]?.isSpecialRole);
@@ -684,13 +1068,142 @@ export class RoomManager {
     room.privateData[voterId].voteSubmitted = true;
     room.privateData[voterId].votedForPlayerId = targetPlayerId;
 
-    // Check if all active players voted
-    const activeCount = room.players.filter((p) => p.connected).length;
-    if (room.hasVoted.size >= activeCount) {
-      this.transitionToPhase(room, 'results', broadcastState);
+    // Check if all active players voted (Mafia: only the living hold a vote)
+    const voterPool =
+      room.selectedGame?.id === MAFIA_GAME_ID
+        ? getLivingPlayerIds(room)
+        : room.players.filter((p) => p.connected).map((p) => p.id);
+
+    if (voterPool.every((id) => room.hasVoted.has(id))) {
+      if (room.selectedGame?.id === MAFIA_GAME_ID) {
+        this.finishMafiaTrial(room, broadcastState);
+      } else {
+        this.transitionToPhase(room, 'results', broadcastState);
+      }
     } else {
       broadcastState();
     }
+  }
+
+  /**
+   * Mafia: a night actor locks in a target. The night resolves once every
+   * Mafia member and the Detective are done.
+   */
+  public submitMafiaNightTarget(
+    room: InternalRoom,
+    playerId: string,
+    targetPlayerId: string,
+    broadcastState: () => void
+  ) {
+    if (room.phase !== 'night') return;
+
+    const outcome = submitMafiaNightAction(room, playerId, targetPlayerId);
+    if (!outcome.accepted) return;
+
+    if (outcome.complete) {
+      this.finishMafiaNight(room, broadcastState);
+      return;
+    }
+
+    broadcastState();
+  }
+
+  /**
+   * Mafia: host skip that resolves the night early.
+   */
+  public hostResolveMafiaNight(room: InternalRoom, playerId: string, broadcastState: () => void) {
+    if (room.phase !== 'night') return;
+    if (playerId !== room.hostId) return;
+
+    this.finishMafiaNight(room, broadcastState);
+  }
+
+  /**
+   * Mafia: host skip that resolves the exile trial early.
+   */
+  public hostResolveMafiaTrial(room: InternalRoom, playerId: string, broadcastState: () => void) {
+    if (room.phase !== 'vote') return;
+    if (playerId !== room.hostId) return;
+
+    this.finishMafiaTrial(room, broadcastState);
+  }
+
+  /**
+   * Avoid the Word: toggles a listener's buzz on the active describer.
+   * A strict majority auto-confirms and ends the turn immediately.
+   */
+  public submitAtwBuzz(room: InternalRoom, playerId: string, broadcastState: () => void) {
+    if (room.phase !== 'atw-describe') return;
+
+    const outcome = toggleAtwBuzz(room, playerId);
+    if (!outcome.accepted) return;
+
+    if (outcome.confirmed) {
+      this.finishAtwTurn(room, 'buzzed', broadcastState);
+      return;
+    }
+
+    broadcastState();
+  }
+
+  /**
+   * Avoid the Word: host override on a pending buzz.
+   * confirm=true ends the turn as a failure, confirm=false dismisses the buzzes.
+   */
+  public resolveAtwBuzz(
+    room: InternalRoom,
+    playerId: string,
+    confirm: boolean,
+    broadcastState: () => void
+  ) {
+    if (room.phase !== 'atw-describe') return;
+    if (playerId !== room.hostId) return;
+
+    const endsTurn = resolveAtwBuzz(room, confirm);
+    if (endsTurn) {
+      this.finishAtwTurn(room, 'buzzed', broadcastState);
+      return;
+    }
+
+    broadcastState();
+  }
+
+  /**
+   * Avoid the Word: the describer (or host) ends the active turn early.
+   */
+  public endAtwTurn(room: InternalRoom, playerId: string, broadcastState: () => void) {
+    if (room.phase !== 'atw-describe') return;
+
+    const describerId = room.atwState?.describerPlayerId;
+    const isDescriber = Boolean(describerId) && playerId === describerId;
+    if (!isDescriber && playerId !== room.hostId) return;
+
+    // A confirmed buzz still fails the turn; an early stop otherwise counts as done.
+    this.finishAtwTurn(room, room.atwState?.buzzConfirmed ? 'buzzed' : 'timeout', broadcastState);
+  }
+
+  /**
+   * Guess the Link: a player locks in their guess at the hidden concept.
+   * The guess stays private until results.
+   */
+  public submitGtlGuess(
+    room: InternalRoom,
+    playerId: string,
+    guess: string,
+    broadcastState: () => void
+  ) {
+    if (room.phase !== 'guess') return;
+    if (room.selectedGame?.id !== GUESS_THE_LINK_GAME_ID) return;
+
+    const outcome = recordGtlGuess(room, playerId, guess);
+    if (!outcome.accepted) return;
+
+    if (outcome.pendingPlayerIds.length === 0) {
+      this.finishGtlGuessing(room, broadcastState);
+      return;
+    }
+
+    broadcastState();
   }
 
   /**
@@ -804,6 +1317,9 @@ export class RoomManager {
       revealedAnswers: room.revealedAnswers,
       voteTallies: room.voteTallies,
       results: room.results,
+      atwState: room.atwState,
+      mafiaState: room.mafiaState,
+      gtlState: room.gtlState,
     };
   }
 
