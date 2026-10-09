@@ -308,3 +308,94 @@ export function dealGtlHints(
 export function gtlConceptWordCount(prompt: GuessTheLinkPrompt): number {
   return prompt.concept.trim().split(/\s+/).length;
 }
+
+/* ------------------------------------------------------------------ *
+ * Host-authored rounds
+ * A host may write their own concept plus up to six hint angles. The
+ * validators below are shared so the client can show the same limits
+ * the server enforces (the server is always the source of truth).
+ * ------------------------------------------------------------------ */
+
+/** Caps keep every guess typeable (guesses max out at 24 characters too). */
+export const GTL_MAX_CONCEPT_CHARS = 24;
+export const GTL_MAX_CONCEPT_WORDS = 4;
+export const GTL_MAX_HINT_CHARS = 32;
+export const GTL_MAX_CATEGORY_CHARS = 24;
+
+/** Angles per round: six supports a full table; three is the playable floor. */
+export const GTL_MAX_HINTS = 6;
+export const GTL_MIN_CUSTOM_HINTS = 3;
+
+export interface GtlCustomPromptInput {
+  concept: string;
+  category?: string;
+  hints?: string[];
+}
+
+export type GtlCustomPromptResult =
+  | { ok: true; prompt: GuessTheLinkPrompt }
+  | { ok: false; error: string };
+
+function cleanGtlField(raw: string): string {
+  return (raw || '').replace(/\s+/g, ' ').trim();
+}
+
+/** Loose key for duplicate detection: lower-case letters and digits only. */
+function gtlKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+/** True when the host filled in nothing at all (means "use the deck"). */
+export function isBlankGtlCustomPrompt(input: GtlCustomPromptInput): boolean {
+  return (
+    !cleanGtlField(input.concept) &&
+    (input.hints || []).every((hint) => !cleanGtlField(hint))
+  );
+}
+
+/**
+ * Validates and normalizes a host-authored concept + hint angles.
+ * Rejects a hint that repeats the concept itself (instant giveaway) and
+ * silently dedupes repeated angles, keeping the first of each.
+ */
+export function buildGtlCustomPrompt(input: GtlCustomPromptInput): GtlCustomPromptResult {
+  const concept = cleanGtlField(input.concept);
+  if (!concept) {
+    return { ok: false, error: 'Give the hidden concept a name.' };
+  }
+  if (concept.length > GTL_MAX_CONCEPT_CHARS) {
+    return {
+      ok: false,
+      error: `Concepts are capped at ${GTL_MAX_CONCEPT_CHARS} characters so everyone can type their guess.`,
+    };
+  }
+  if (concept.split(' ').length > GTL_MAX_CONCEPT_WORDS) {
+    return {
+      ok: false,
+      error: `Keep the concept to ${GTL_MAX_CONCEPT_WORDS} words or fewer.`,
+    };
+  }
+
+  const category = cleanGtlField(input.category || '').slice(0, GTL_MAX_CATEGORY_CHARS) || 'Custom Round';
+
+  const seen = new Set<string>([gtlKey(concept)]);
+  const hints: string[] = [];
+  for (const raw of input.hints || []) {
+    const hint = cleanGtlField(raw).slice(0, GTL_MAX_HINT_CHARS);
+    if (!hint) continue;
+    const key = gtlKey(hint);
+    if (seen.has(key)) continue; // also drops hints identical to the concept
+    seen.add(key);
+    hints.push(hint);
+    if (hints.length >= GTL_MAX_HINTS) break;
+  }
+
+  if (hints.length < GTL_MIN_CUSTOM_HINTS) {
+    return {
+      ok: false,
+      error: `Add at least ${GTL_MIN_CUSTOM_HINTS} different hint angles (up to ${GTL_MAX_HINTS}).`,
+    };
+  }
+
+  return { ok: true, prompt: { concept, category, hints } };
+}

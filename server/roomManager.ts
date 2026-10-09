@@ -19,6 +19,12 @@ import {
 } from '../shared/types';
 import { PLAYER_COLORS } from '../shared/theme/tokens';
 import { PARTY_GAMES } from '../shared/data/games';
+import {
+  GtlCustomPromptInput,
+  GuessTheLinkPrompt,
+  buildGtlCustomPrompt,
+  isBlankGtlCustomPrompt,
+} from '../shared/data/guessTheLinkPrompts';
 import { getRandomImpostorWord } from '../shared/data/impostorWords';
 import {
   setupImpostorRound,
@@ -111,6 +117,9 @@ export interface InternalRoom {
   atwState: AtwPublicState | null; // Avoid the Word turn state
   mafiaState: MafiaPublicState | null; // Mafia night/day state
   gtlState: GtlPublicState | null; // Guess the Link round state
+  /** Host-authored Guess the Link prompt, consumed by the next round.
+   *  Kept off public state so the concept never leaks before results. */
+  gtlCustomPrompt: GuessTheLinkPrompt | null;
   botTimeouts: NodeJS.Timeout[]; // pending simulated-bot actions
   createdAt: number;
   lastActivityAt: number;
@@ -196,6 +205,7 @@ export class RoomManager {
       atwState: null,
       mafiaState: null,
       gtlState: null,
+      gtlCustomPrompt: null,
       botTimeouts: [],
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
@@ -379,7 +389,48 @@ export class RoomManager {
     const game = PARTY_GAMES.find((g) => g.id === gameId);
     if (!game) return false;
     room.selectedGame = game;
+    // A queued custom concept belongs to Guess the Link only — dropping it
+    // when the host switches away stops it surprising a later round.
+    if (gameId !== GUESS_THE_LINK_GAME_ID) {
+      room.gtlCustomPrompt = null;
+    }
     return true;
+  }
+
+  /**
+   * Guess the Link: the host queues a custom concept + hint angles for the
+   * next round. The concept lives on the room only (never in public state)
+   * and is consumed when the round is set up. An all-blank payload clears
+   * it so the shipped 44-concept deck takes over.
+   */
+  public setGtlCustomPrompt(
+    code: string,
+    playerId: string,
+    input: GtlCustomPromptInput
+  ): { success: boolean; error?: string; prompt?: GuessTheLinkPrompt | null } {
+    const room = this.getRoom(code);
+    if (!room) return { success: false, error: 'Room not found.' };
+    if (playerId !== room.hostId) {
+      return { success: false, error: 'Only the host can set the concept.' };
+    }
+    if (room.phase !== 'game-select') {
+      return { success: false, error: 'Set this before launching the round.' };
+    }
+    if (room.selectedGame?.id !== GUESS_THE_LINK_GAME_ID) {
+      return { success: false, error: 'Select Guess the Link first.' };
+    }
+
+    if (isBlankGtlCustomPrompt(input)) {
+      room.gtlCustomPrompt = null;
+      return { success: true, prompt: null };
+    }
+
+    const result = buildGtlCustomPrompt(input);
+    if (!result.ok) return { success: false, error: result.error };
+
+    room.gtlCustomPrompt = result.prompt;
+    // Echoed only to the host's own callback — the concept never broadcasts.
+    return { success: true, prompt: result.prompt };
   }
 
   /**
@@ -480,6 +531,7 @@ export class RoomManager {
         room.atwState = null;
         room.mafiaState = null;
         room.gtlState = null;
+        room.gtlCustomPrompt = null;
         cleanupAvoidTheWordRound(room.code);
         cleanupMafiaRound(room.code);
         cleanupGtlRound(room.code);
@@ -1320,6 +1372,7 @@ export class RoomManager {
       atwState: room.atwState,
       mafiaState: room.mafiaState,
       gtlState: room.gtlState,
+      gtlCustomReady: Boolean(room.gtlCustomPrompt),
     };
   }
 

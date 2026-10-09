@@ -424,6 +424,41 @@ async function startServer() {
       }
     );
 
+    // 14b. Guess the Link: host authors a custom concept + hint angles
+    socket.on(
+      'gtl-set-prompt',
+      (
+        {
+          roomCode,
+          playerId,
+          concept,
+          category,
+          hints,
+        }: {
+          roomCode: string;
+          playerId: string;
+          concept: string;
+          category?: string;
+          hints?: string[];
+        },
+        callback
+      ) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const result = roomManager.setGtlCustomPrompt(upperCode, playerId, {
+          concept,
+          category,
+          hints,
+        });
+
+        if (typeof callback === 'function') {
+          callback(result);
+        }
+        if (result.success) {
+          broadcastRoom(upperCode);
+        }
+      }
+    );
+
     // 15. Reset room back to lobby
     socket.on('reset-to-lobby', ({ roomCode }: { roomCode: string }) => {
       const upperCode = (roomCode || '').toUpperCase().trim();

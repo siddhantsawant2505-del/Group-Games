@@ -234,6 +234,9 @@ export interface RoomPublicState {
   atwState: AtwPublicState | null; // Avoid the Word game state
   mafiaState: MafiaPublicState | null; // Mafia game state
   gtlState: GtlPublicState | null; // Guess the Link game state
+  /** True while a host-authored concept is queued for the next GTL round.
+   *  Never carries the concept itself — only that a custom round is loaded. */
+  gtlCustomReady?: boolean;
 }
 
 export interface PlayerPrivateState {

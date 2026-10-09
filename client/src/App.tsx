@@ -256,6 +256,29 @@ export default function App() {
     socket.emit('select-game', { roomCode: room.roomCode, gameId });
   }, [room]);
 
+  // Guess the Link: host queues a custom concept + hint angles for the next round
+  const handleSaveGtlPrompt = useCallback(
+    (
+      input: { concept: string; category?: string; hints?: string[] },
+      callback: (res: any) => void
+    ) => {
+      if (!room || !myPlayer) return;
+      const socket = getSocket();
+      socket.emit(
+        'gtl-set-prompt',
+        {
+          roomCode: room.roomCode,
+          playerId: myPlayer.id,
+          concept: input.concept,
+          category: input.category,
+          hints: input.hints,
+        },
+        callback
+      );
+    },
+    [room, myPlayer]
+  );
+
   // Host moves to game-select phase
   const handleGoToGameSelect = useCallback(() => {
     if (!room) return;
@@ -553,6 +576,7 @@ export default function App() {
           myPlayer={myPlayer}
           onSelectGame={handleSelectGame}
           onConfirmAndStart={handleConfirmAndStartRound}
+          onSaveGtlPrompt={handleSaveGtlPrompt}
         />
       ) : room.phase === 'reveal' ? (
         isAvoidTheWord ? (

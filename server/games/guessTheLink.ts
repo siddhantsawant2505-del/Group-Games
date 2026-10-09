@@ -178,7 +178,11 @@ export function setupGtlRound(room: InternalRoom): void {
   const previous = activeRounds.get(room.code);
   const usedConcepts = previous?.usedConcepts || [];
 
-  const prompt = getRandomGtlPrompt(usedConcepts);
+  // A host-authored concept is consumed for exactly one round; afterwards
+  // the shipped deck (filtered by what this room has already seen) takes over.
+  const custom = room.gtlCustomPrompt;
+  const prompt = custom || getRandomGtlPrompt(usedConcepts);
+  if (custom) room.gtlCustomPrompt = null;
   const playerIds = room.players.map((p) => p.id);
   const hints = dealGtlHints(prompt, playerIds, room.roundNumber - 1);
 
