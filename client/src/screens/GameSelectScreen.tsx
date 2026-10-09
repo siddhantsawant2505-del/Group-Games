@@ -143,7 +143,9 @@ export function GameSelectScreen({
   return (
     <div className="flex-1 flex flex-col justify-between p-5 max-w-md mx-auto w-full">
       {/* Header */}
-      <div>
+      {/* pb keeps the last controls scrollable clear of the sticky Launch bar,
+          so its tap target can never be covered by it on short screens. */}
+      <div className="pb-28">
         <div className="mb-4 text-center">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-xs font-bold text-neutral-600 dark:text-neutral-400 mb-2">
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
