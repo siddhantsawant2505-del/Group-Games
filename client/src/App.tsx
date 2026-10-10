@@ -41,11 +41,17 @@ import { GtlInputScreen } from './screens/GtlInputScreen';
 import { GtlResponseRevealScreen } from './screens/GtlResponseRevealScreen';
 import { GtlGuessScreen } from './screens/GtlGuessScreen';
 import { GtlResultsScreen } from './screens/GtlResultsScreen';
+import { Top100RevealScreen } from './screens/Top100RevealScreen';
+import { Top100InputScreen } from './screens/Top100InputScreen';
+import { Top100BoardScreen } from './screens/Top100BoardScreen';
+import { Top100RankScreen } from './screens/Top100RankScreen';
+import { Top100ResultsScreen } from './screens/Top100ResultsScreen';
 
 /** Games that ship with a dedicated server-side rules module. */
 const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
 const MAFIA_GAME_ID = 'mafia';
 const GUESS_THE_LINK_GAME_ID = 'guess-the-link';
+const TOP_100_GAME_ID = 'top-100';
 
 type PreRoomScreen = 'loading' | 'name-entry' | 'home' | 'join-room';
 
@@ -431,6 +437,32 @@ export default function App() {
     });
   }, [room, myPlayer]);
 
+  // Top 100: the host pushes their live drag order
+  const handleTop100Reorder = useCallback(
+    (order: string[]) => {
+      if (!room || !myPlayer) return;
+      const socket = getSocket();
+      socket.emit('top100-reorder', {
+        roomCode: room.roomCode,
+        playerId: myPlayer.id,
+        order,
+      });
+    },
+    [room, myPlayer]
+  );
+
+  // Top 100: the host locks the ordering in and reveals the true numbers
+  const handleTop100LockOrder = useCallback(() => {
+    if (!room || !myPlayer) return;
+    playNotificationSound('phase-change');
+    triggerHaptic('medium');
+    const socket = getSocket();
+    socket.emit('top100-lock-order', {
+      roomCode: room.roomCode,
+      playerId: myPlayer.id,
+    });
+  }, [room, myPlayer]);
+
   // Return to lobby
   const handleReturnToLobby = useCallback(() => {
     if (!room) return;
@@ -511,6 +543,7 @@ export default function App() {
   const isAvoidTheWord = room?.selectedGame?.id === AVOID_THE_WORD_GAME_ID;
   const isMafia = room?.selectedGame?.id === MAFIA_GAME_ID;
   const isGuessTheLink = room?.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
+  const isTop100 = room?.selectedGame?.id === TOP_100_GAME_ID;
   const isAtwDescriber = Boolean(
     privateState.atwIsDescriber || room?.atwState?.describerPlayerId === myPlayer?.id
   );
@@ -600,6 +633,13 @@ export default function App() {
             privateState={privateState}
             onAdvance={() => handleAdvancePhase('input')}
           />
+        ) : isTop100 ? (
+          <Top100RevealScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onAdvance={() => handleAdvancePhase('input')}
+          />
         ) : (
           <RevealPhaseScreen
             room={room}
@@ -656,6 +696,14 @@ export default function App() {
             onSubmitAnswer={handleSubmitAnswer}
             onHostSkip={() => handleAdvancePhase('reveal-answers')}
           />
+        ) : isTop100 ? (
+          <Top100InputScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onSubmitAnswer={handleSubmitAnswer}
+            onHostSkip={() => handleAdvancePhase('reveal-answers')}
+          />
         ) : (
           <InputPhaseScreen
             room={room}
@@ -673,6 +721,12 @@ export default function App() {
             privateState={privateState}
             onAdvance={() => handleAdvancePhase('guess')}
           />
+        ) : isTop100 ? (
+          <Top100BoardScreen
+            room={room}
+            myPlayer={myPlayer}
+            onAdvance={() => handleAdvancePhase('rank')}
+          />
         ) : (
           <RevealAnswersScreen
             room={room}
@@ -687,6 +741,13 @@ export default function App() {
           privateState={privateState}
           onGuess={handleGtlGuess}
           onHostSkip={() => handleAdvancePhase('results')}
+        />
+      ) : room.phase === 'rank' ? (
+        <Top100RankScreen
+          room={room}
+          myPlayer={myPlayer}
+          onReorder={handleTop100Reorder}
+          onLockOrder={handleTop100LockOrder}
         />
       ) : room.phase === 'discussion' ? (
         <DiscussionPhaseScreen
@@ -724,6 +785,14 @@ export default function App() {
           />
         ) : isGuessTheLink ? (
           <GtlResultsScreen
+            room={room}
+            myPlayer={myPlayer}
+            onNextRound={() => handleAdvancePhase('next-round')}
+            onReturnToLobby={handleReturnToLobby}
+            onEndSession={() => handleAdvancePhase('post-game')}
+          />
+        ) : isTop100 ? (
+          <Top100ResultsScreen
             room={room}
             myPlayer={myPlayer}
             onNextRound={() => handleAdvancePhase('next-round')}
