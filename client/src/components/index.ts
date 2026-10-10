@@ -4,6 +4,7 @@ export * from './PlayerChip';
 export * from './ActionButton';
 export * from './Timer';
 export * from './RevealCard';
+export * from './SpectrumBar';
 export * from './HostBuzzOverride';
 export * from './GameCard';
 export * from './GameIcon';

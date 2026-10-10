@@ -25,6 +25,7 @@ export type GamePhase =
   | 'day'
   | 'reveal-answers'
   | 'guess'
+  | 'rank'
   | 'discussion'
   | 'vote'
   | 'results'
@@ -131,6 +132,38 @@ export interface GtlHintShare {
   hint: string;
 }
 
+export interface Top100ExampleCard {
+  playerId: string;
+  playerName: string;
+  playerColor: string;
+  colorIndex: number;
+  text: string;
+  /** Only populated once the round is revealed (results). */
+  secretNumber?: number;
+}
+
+export interface Top100OrderEntry extends Top100ExampleCard {
+  secretNumber: number;
+  hostPosition: number;  // 1-based slot in the host's final ordering
+  truePosition: number;  // 1-based slot in true ascending numeric order
+  correctlyPlaced: boolean;
+}
+
+export interface Top100PublicState {
+  category: string;
+  /** "1 = mildly annoying, 100 = absolute catastrophic disaster" */
+  promptText: string;
+  lowLabel: string;
+  highLabel: string;
+  /** Every written example, in the order the host has arranged them. */
+  examples: Top100ExampleCard[];
+  examplesReady: boolean;   // all examples compiled for the reveal
+  orderLocked: boolean;     // the host locked the ordering in
+  revealed: boolean;        // true numbers are public (results only)
+  playerCount: number;
+  rankSeconds: number;
+}
+
 export interface GtlPublicState {
   category: string;            // broad category of the hidden concept
   conceptWordCount: number;    // how many words the concept has (a fair nudge)
@@ -213,6 +246,15 @@ export interface PhaseResultsData {
   mafiaWinningSide?: MafiaSide;
   mafiaLog?: string[];
   mafiaEliminations?: MafiaElimination[];
+  // Top 100-specific
+  top100PromptText?: string;
+  top100LowLabel?: string;
+  top100HighLabel?: string;
+  top100Category?: string;
+  top100Entries?: Top100OrderEntry[];
+  top100CorrectPairs?: number;
+  top100TotalPairs?: number;
+  top100Points?: number;
 }
 
 export interface RoomPublicState {
@@ -234,6 +276,7 @@ export interface RoomPublicState {
   atwState: AtwPublicState | null; // Avoid the Word game state
   mafiaState: MafiaPublicState | null; // Mafia game state
   gtlState: GtlPublicState | null; // Guess the Link game state
+  top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
   /** True while a host-authored concept is queued for the next GTL round.
    *  Never carries the concept itself — only that a custom round is loaded. */
   gtlCustomReady?: boolean;
@@ -282,6 +325,16 @@ export interface PlayerPrivateState {
   gtlGuessText?: string;
   gtlGuessCorrect?: boolean;
   gtlPointsAwarded?: number;
+  // Top 100
+  top100Number?: number;            // this player's secret number (1-100)
+  top100PromptText?: string;        // the spectrum, e.g. "1 = ... 100 = ..."
+  top100LowLabel?: string;
+  top100HighLabel?: string;
+  top100Category?: string;
+  top100ExampleSubmitted?: boolean;
+  top100ExampleText?: string;
+  top100CanRank?: boolean;          // host holds the ordering controls
+  top100PointsAwarded?: number;
 }
 
 export interface RoomStateUpdatePayload {

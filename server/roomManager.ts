@@ -16,6 +16,7 @@ import {
   AtwPublicState,
   MafiaPublicState,
   GtlPublicState,
+  Top100PublicState,
 } from '../shared/types';
 import { PLAYER_COLORS } from '../shared/theme/tokens';
 import { PARTY_GAMES } from '../shared/data/games';
@@ -83,12 +84,27 @@ import {
   calculateGtlResults,
   cleanupGtlRound,
 } from './games/guessTheLink';
+import {
+  TOP100_INPUT_SECONDS,
+  TOP100_REVEAL_SECONDS,
+  TOP100_RANK_SECONDS,
+  setupTop100Round,
+  recordTop100Example,
+  simulateTop100BotExamples,
+  finalizeTop100Reveal,
+  beginTop100Ranking,
+  setTop100Order,
+  finalizeTop100Order,
+  calculateTop100Results,
+  cleanupTop100Round,
+} from './games/top100';
 
 /** Game ids that ship with a dedicated server-side rules module. */
 const IMPOSTOR_GAME_ID = 'impostor';
 const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
 const MAFIA_GAME_ID = 'mafia';
 const GUESS_THE_LINK_GAME_ID = 'guess-the-link';
+const TOP_100_GAME_ID = 'top-100';
 
 export interface InternalPlayer extends Player {
   socketId: string | null;
@@ -117,6 +133,7 @@ export interface InternalRoom {
   atwState: AtwPublicState | null; // Avoid the Word turn state
   mafiaState: MafiaPublicState | null; // Mafia night/day state
   gtlState: GtlPublicState | null; // Guess the Link round state
+  top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
   /** Host-authored Guess the Link prompt, consumed by the next round.
    *  Kept off public state so the concept never leaks before results. */
   gtlCustomPrompt: GuessTheLinkPrompt | null;
@@ -205,6 +222,7 @@ export class RoomManager {
       atwState: null,
       mafiaState: null,
       gtlState: null,
+      top100State: null,
       gtlCustomPrompt: null,
       botTimeouts: [],
       createdAt: Date.now(),
@@ -531,10 +549,12 @@ export class RoomManager {
         room.atwState = null;
         room.mafiaState = null;
         room.gtlState = null;
+        room.top100State = null;
         room.gtlCustomPrompt = null;
         cleanupAvoidTheWordRound(room.code);
         cleanupMafiaRound(room.code);
         cleanupGtlRound(room.code);
+        cleanupTop100Round(room.code);
         break;
       }
 
@@ -554,6 +574,8 @@ export class RoomManager {
           setupMafiaRound(room);
         } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
           setupGtlRound(room);
+        } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
+          setupTop100Round(room);
         } else {
           this.setupPhaseReveal(room);
         }
@@ -635,8 +657,15 @@ export class RoomManager {
 
       case 'input': {
         const inputIsGtl = room.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
-        room.phasePrompt = inputIsGtl ? 'Write Your Response' : 'Submit Your Clue';
-        room.phaseSubprompt = inputIsGtl
+        const inputIsTop100 = room.selectedGame?.id === TOP_100_GAME_ID;
+        room.phasePrompt = inputIsTop100
+          ? 'Write Your Example'
+          : inputIsGtl
+          ? 'Write Your Response'
+          : 'Submit Your Clue';
+        room.phaseSubprompt = inputIsTop100
+          ? 'A short scenario that fits your secret number on the spectrum'
+          : inputIsGtl
           ? 'One word or a short phrase inspired by your private hint'
           : 'Enter a one-word clue before the timer expires';
         room.hasSubmittedInput.clear();
@@ -646,19 +675,23 @@ export class RoomManager {
           simulateImpostorBotClues(room);
         } else if (inputIsGtl) {
           simulateGtlBotResponses(room);
+        } else if (inputIsTop100) {
+          simulateTop100BotExamples(room);
         } else {
           this.simulateBotInputs(room);
         }
 
         this.startPhaseTimer(
           room,
-          inputIsGtl ? GTL_INPUT_SECONDS : 20,
+          inputIsTop100 ? TOP100_INPUT_SECONDS : inputIsGtl ? GTL_INPUT_SECONDS : 20,
           () => broadcastState(),
           () => {
             if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
               finalizeImpostorReveal(room);
             } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
               finalizeGtlReveal(room);
+            } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
+              finalizeTop100Reveal(room);
             }
             this.transitionToPhase(room, 'reveal-answers', broadcastState);
           }
@@ -668,22 +701,57 @@ export class RoomManager {
 
       case 'reveal-answers': {
         const revealIsGtl = room.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
-        room.phasePrompt = revealIsGtl ? 'The Link Board' : 'Simultaneous Reveal';
+        const revealIsTop100 = room.selectedGame?.id === TOP_100_GAME_ID;
+        room.phasePrompt = revealIsGtl
+          ? 'The Link Board'
+          : revealIsTop100
+          ? 'The Example Board'
+          : 'Simultaneous Reveal';
         room.phaseSubprompt = revealIsGtl
           ? 'Every response, shuffled — what single concept ties them together?'
+          : revealIsTop100
+          ? 'Every example, shuffled — the secret numbers stay hidden for now'
           : 'Review every player’s clue in randomized order';
         if (room.selectedGame?.id === 'impostor') {
           finalizeImpostorReveal(room);
         } else if (revealIsGtl) {
           finalizeGtlReveal(room);
+        } else if (revealIsTop100) {
+          finalizeTop100Reveal(room);
         } else {
           this.prepareRevealedAnswers(room);
         }
         this.startPhaseTimer(
           room,
-          revealIsGtl ? GTL_REVEAL_SECONDS : 15,
+          revealIsGtl ? GTL_REVEAL_SECONDS : revealIsTop100 ? TOP100_REVEAL_SECONDS : 15,
           () => broadcastState(),
-          () => this.transitionToPhase(room, revealIsGtl ? 'guess' : 'discussion', broadcastState)
+          () =>
+            this.transitionToPhase(
+              room,
+              revealIsGtl ? 'guess' : revealIsTop100 ? 'rank' : 'discussion',
+              broadcastState
+            )
+        );
+        break;
+      }
+
+      case 'rank': {
+        // Top 100: the host drags the examples into ascending numeric order
+        // (host-authoritative) while everyone else watches live.
+        if (room.selectedGame?.id !== TOP_100_GAME_ID) {
+          this.transitionToPhase(room, 'results', broadcastState);
+          return;
+        }
+
+        beginTop100Ranking(room);
+        room.phasePrompt = 'Put the Examples in Order';
+        room.phaseSubprompt = 'Host drags the cards — everyone else watches live';
+
+        this.startPhaseTimer(
+          room,
+          TOP100_RANK_SECONDS,
+          () => broadcastState(),
+          () => this.transitionToPhase(room, 'results', broadcastState)
         );
         break;
       }
@@ -772,6 +840,8 @@ export class RoomManager {
           calculateMafiaResults(room);
         } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
           calculateGtlResults(room);
+        } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
+          calculateTop100Results(room);
         } else {
           this.calculateResults(room);
         }
@@ -1058,6 +1128,8 @@ export class RoomManager {
       recordPlayerClue(room, playerId, answer);
     } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
       recordGtlResponse(room, playerId, answer);
+    } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
+      recordTop100Example(room, playerId, answer);
     } else {
       room.hasSubmittedInput.add(playerId);
       if (!room.privateData[playerId]) {
@@ -1074,6 +1146,8 @@ export class RoomManager {
         finalizeImpostorReveal(room);
       } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
         finalizeGtlReveal(room);
+      } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
+        finalizeTop100Reveal(room);
       }
       this.transitionToPhase(room, 'reveal-answers', broadcastState);
     } else {
@@ -1259,6 +1333,40 @@ export class RoomManager {
   }
 
   /**
+   * Top 100: the host pushes their live drag order. Host-only, rank phase only,
+   * and rejected unless it is a complete permutation of the board.
+   */
+  public submitTop100Order(
+    room: InternalRoom,
+    playerId: string,
+    orderedPlayerIds: string[],
+    broadcastState: () => void
+  ) {
+    if (room.phase !== 'rank') return;
+    if (room.selectedGame?.id !== TOP_100_GAME_ID) return;
+    if (playerId !== room.hostId) return;
+    if (!Array.isArray(orderedPlayerIds)) return;
+
+    const outcome = setTop100Order(room, orderedPlayerIds.map((id) => String(id)));
+    if (!outcome.accepted) return;
+
+    broadcastState();
+  }
+
+  /**
+   * Top 100: host locks the order in and jumps straight to the results reveal.
+   */
+  public hostLockTop100Order(room: InternalRoom, playerId: string, broadcastState: () => void) {
+    if (room.phase !== 'rank') return;
+    if (room.selectedGame?.id !== TOP_100_GAME_ID) return;
+    if (playerId !== room.hostId) return;
+
+    this.clearBotTimeouts(room);
+    finalizeTop100Order(room);
+    this.transitionToPhase(room, 'results', broadcastState);
+  }
+
+  /**
    * Calculates round results, unmasks roles, and updates standings
    */
   private calculateResults(room: InternalRoom) {
@@ -1372,6 +1480,7 @@ export class RoomManager {
       atwState: room.atwState,
       mafiaState: room.mafiaState,
       gtlState: room.gtlState,
+      top100State: room.top100State,
       gtlCustomReady: Boolean(room.gtlCustomPrompt),
     };
   }

@@ -248,6 +248,8 @@ async function startServer() {
               ? ['lobby', 'game-select', 'reveal', 'night', 'day', 'discussion', 'vote', 'results']
               : room.selectedGame?.id === 'guess-the-link'
               ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'guess', 'results']
+              : room.selectedGame?.id === 'top-100'
+              ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'rank', 'results']
               : [
                   'lobby',
                   'game-select',
@@ -456,6 +458,40 @@ async function startServer() {
         if (result.success) {
           broadcastRoom(upperCode);
         }
+      }
+    );
+
+    // 14c. Top 100: the host pushes their live drag order
+    socket.on(
+      'top100-reorder',
+      ({
+        roomCode,
+        playerId,
+        order,
+      }: {
+        roomCode: string;
+        playerId: string;
+        order: string[];
+      }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.submitTop100Order(room, playerId, order || [], () =>
+          broadcastRoom(upperCode)
+        );
+      }
+    );
+
+    // 14d. Top 100: the host locks the ordering in and reveals the truth
+    socket.on(
+      'top100-lock-order',
+      ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.hostLockTop100Order(room, playerId, () => broadcastRoom(upperCode));
       }
     );
 
