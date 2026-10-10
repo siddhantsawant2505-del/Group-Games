@@ -43,8 +43,8 @@ npm run clean        # Clean build artifacts (dist/ directory)
 - A 4-character room code + QR code are used for joining.
 - A "next-round" loop lets a host replay a new round with a fresh role assignment.
 
-Four games ship dedicated server engines — **Impostor**, **Avoid the Word**, **Mafia**, and
-**Guess the Link** — with additional game ideas documented for future expansion.
+Five games ship dedicated server engines — **Impostor**, **Avoid the Word**, **Mafia**,
+**Guess the Link**, and **Top 100** — with additional game ideas documented for future expansion.
 
 ---
 
@@ -63,7 +63,8 @@ Four games ship dedicated server engines — **Impostor**, **Avoid the Word**, *
 - **Live describing turns** — Avoid the Word runs one describer at a time with buzz confirmation.
 - **Dedicated Mafia engine** — privately dealt roles, timed night actions, day eliminations, win-condition checks, and scoring.
 - **Dedicated Guess the Link engine** — one hidden concept, a different private hint angle per player, a shuffled link board, and simultaneous concept guessing with per-correct points.
-- **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, guess, discussion, vote, atw-describe, night, day, results, next-round.
+- **Dedicated Top 100 engine** — one 1-to-100 spectrum, a unique secret number per player, private example writing, a host-authoritative drag-and-drop ranking phase broadcast live to everyone, and adjacent-pair accuracy scoring.
+- **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, guess, rank, discussion, vote, atw-describe, night, day, results, next-round.
 
 ---
 
@@ -82,7 +83,7 @@ Four games ship dedicated server engines — **Impostor**, **Avoid the Word**, *
 
 ## Games collection, rules & working state
 
-Party Games features a collection of six multiplayer party games designed for phone controllers. **Impostor**, **Avoid the Word**, **Mafia**, and **Guess the Link** are 100% operational with dedicated server game engines, while the remaining two games are integrated into the selection UI and execute on the generic round framework.
+Party Games features a collection of six multiplayer party games designed for phone controllers. **Impostor**, **Avoid the Word**, **Mafia**, **Guess the Link**, and **Top 100** are 100% operational with dedicated server game engines, while the remaining game is integrated into the selection UI and executes on the generic round framework.
 
 | Game | Players | Category | Icon | Current Working State |
 |---|---|---|---|---|
@@ -90,7 +91,7 @@ Party Games features a collection of six multiplayer party games designed for ph
 | **Avoid the Word** | 3–10 | Taboo / Communication | Ban | 🟢 **Fully Working & Playable** — Dedicated taboo engine with live 45s describing turns, buzz confirmation, bot simulation, and scoring |
 | **Mafia** | 4–16 | Social Deduction | Detective | 🟢 **Fully Working & Playable** — Dedicated engine with private role deal, timed night actions, day eliminations, and win-condition scoring |
 | **Guess the Link** | 3–8 | Word Association | Link | 🟢 **Fully Working & Playable** — Dedicated engine with one hidden concept, per-player private hint angles, shuffled board, simultaneous guessing, and scoring |
-| **Top 100** | 3–10 | Ranking / Spectrum | List-Ordered | 🟡 **Selectable & Framework-Ready** — Generic clue/vote phase; drag-and-drop ranking UI planned |
+| **Top 100** | 3–10 | Ranking / Spectrum | List-Ordered | 🟢 **Fully Working & Playable** — Dedicated engine with a unique secret number per player, private example writing, a host-authoritative drag-to-rank phase broadcast live, and adjacent-pair accuracy scoring |
 | **Reverse Categories** | 3–8 | Trivia / Creative | Shuffle | 🟡 **Selectable & Framework-Ready** — Generic clue/vote phase; 3-item prompt generation planned |
 
 ---
@@ -223,18 +224,34 @@ Party Games features a collection of six multiplayer party games designed for ph
 
 ---
 
-### 5. Catalog Games (🟡 Framework-Integrated & Selectable)
+### 5. Top 100 — Dedicated Spectrum Ranking Engine (🟢 Fully Operational)
 
-The remaining two games are fully registered in `@shared/data/games.ts` and can be selected by the host in the `game-select` screen. They currently run through the generic phase state machine (`server/roomManager.ts`) with dedicated game rule modules planned:
+**Top 100** ships a fully custom server engine (`server/games/top100.ts`) with its own phase chain (`reveal → input → reveal-answers → rank → results`), server-side spectrum picking, unique secret-number dealing, private example collection, a shuffled example board, and host-authoritative ordering validation. Spectra live in 22 original entries (`shared/data/top100Prompts.ts`).
 
-#### Top 100 (Spectrum Ranking)
-- **Min/Max Players**: 3–10 | **Icon**: `list-ordered`
-- **Tagline**: Rank the absurd, place your bets!
-- **Rules**:
-  - Players are given a secret number from 1 to 100 on an outrageous intensity spectrum (e.g. *"Mildly annoying to Absolute catastrophic disaster"*).
-  - Each player writes an example scaled to their exact secret number.
-  - The group must debate and arrange all submitted answers in ascending order from 1 to 100.
-- **Current State**: Selectable in game menu; accepts generic text inputs; drag-and-drop spectrum ordering interface planned.
+- **Objective**: Every player secretly owns a different number on the same 1-to-100 spectrum. Write an example that fits your number, then get the whole set of examples into the right order.
+
+- **Game Rules & Mechanics**:
+  1. **Player Requirements**: 3 to 10 players (solo testing supported via "+ Add Bot").
+  2. **Number Reveal (`reveal` phase, 10s)**:
+     - The server picks one spectrum (e.g. *"1 = spotless, 100 = certified biohazard"*) and deals every player a **unique** secret number from 1 to 100. Numbers are never repeated within a round.
+     - Each player sees **only their own number** plotted on the spectrum, plus the category. Numbers never reach the public state before results.
+  3. **Example Submission (`input` phase, 45s)**:
+     - Each player privately writes **one short example/scenario** they believe sits at their own number, sanitized to a maximum of **9 words / 72 characters**.
+  4. **The Example Board (`reveal-answers` phase, 20s)**:
+     - Every example appears together in **Fisher-Yates shuffled order** (never join order) with the secret numbers still hidden — the table has to infer the order from the examples themselves.
+  5. **Ranking (`rank` phase, 120s)**:
+     - **Host-authoritative v1**: the host drags the example cards into ascending numeric order (pointer drag on the grip, with arrow-button nudges). The order broadcasts live, and everyone else watches it update read-only.
+     - The server only accepts a **complete permutation** of the round's examples, so one bad payload cannot drop or duplicate a card. The phase closes when the host locks the order in or the timer expires.
+  6. **Results (`results` phase)**:
+     - Every true number is revealed next to its example, along with its position in the real ascending order and the host's slot for it.
+     - Accuracy is measured in **correctly-placed adjacent pairs**: each neighbouring pair placed in the right relative order scores **+2**, and a flawless order adds a **+3** bonus. The ordering is collaborative, so the table shares the score.
+  7. **Next Round Loop (`next-round`)**: a fresh spectrum with new unique numbers, avoiding spectra already played in the room, with cumulative scores preserved.
+
+---
+
+### 6. Catalog Games (🟡 Framework-Integrated & Selectable)
+
+The remaining game is fully registered in `@shared/data/games.ts` and can be selected by the host in the `game-select` screen. It currently runs through the generic phase state machine (`server/roomManager.ts`) with a dedicated game rule module planned:
 
 #### Reverse Categories (Creative Trivia)
 - **Min/Max Players**: 3–8 | **Icon**: `shuffle`
@@ -273,16 +290,17 @@ The remaining two games are fully registered in `@shared/data/games.ts` and can 
 1. **`lobby`** — players join via room code/QR; host configures bots and launches.
 2. **`game-select`** — host chooses a party game.
 3. **`reveal`** — private assignment (impostor role, taboo cards, Mafia roles, or a Guess the Link hint angle).
-4. **`input`** — players submit clues (Impostor) or responses (Guess the Link).
-5. **`reveal-answers`** — clues revealed simultaneously (Impostor) or the shuffled link board (Guess the Link).
+4. **`input`** — players submit clues (Impostor), responses (Guess the Link), or examples (Top 100).
+5. **`reveal-answers`** — clues revealed simultaneously (Impostor), the shuffled link board (Guess the Link), or the shuffled example board with its numbers still hidden (Top 100).
 6. **`guess`** — simultaneous guessing at the hidden concept (Guess the Link).
-7. **`discussion`** — timed debate (Impostor; Mafia day phase).
-8. **`vote`** — secret ballot (Impostor; Mafia exile vote).
-9. **`atw-describe`** — Avoid the Word's live describing turns.
-10. **`night`** — Mafia and Detective act privately (Mafia).
-11. **`day`** — overnight elimination announced, then discussion and vote (Mafia).
-12. **`results`** — tally reveal, role exposure, winner, next-round option.
-13. **`next-round`** — new round with a fresh secret assignment.
+7. **`rank`** — the host drags the Top 100 examples into ascending numeric order while everyone else watches live.
+8. **`discussion`** — timed debate (Impostor; Mafia day phase).
+9. **`vote`** — secret ballot (Impostor; Mafia exile vote).
+10. **`atw-describe`** — Avoid the Word's live describing turns.
+11. **`night`** — Mafia and Detective act privately (Mafia).
+12. **`day`** — overnight elimination announced, then discussion and vote (Mafia).
+13. **`results`** — tally reveal, role exposure, winner, next-round option.
+14. **`next-round`** — new round with a fresh secret assignment.
 
 ---
 

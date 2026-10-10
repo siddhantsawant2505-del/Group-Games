@@ -151,6 +151,7 @@ game-select
 reveal
 input
 reveal-answers
+rank            (Top 100 host-authoritative ordering)
 discussion
 vote
 results
