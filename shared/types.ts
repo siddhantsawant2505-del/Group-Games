@@ -164,6 +164,27 @@ export interface Top100PublicState {
   rankSeconds: number;
 }
 
+export interface RevCatCategoryResult {
+  playerId: string;
+  playerName: string;
+  playerColor: string;
+  colorIndex: number;
+  category: string;
+  votes: number;
+  isWinner: boolean;
+  pointsAdded: number;
+}
+
+export interface RevCatPublicState {
+  /** The three public items every player has to link. */
+  items: string[];
+  /** Every invented category has been compiled for the reveal. */
+  categoriesReady: boolean;
+  totalPlayers: number;
+  /** How many different triplets this room has already played. */
+  roundsPlayed: number;
+}
+
 export interface GtlPublicState {
   category: string;            // broad category of the hidden concept
   conceptWordCount: number;    // how many words the concept has (a fair nudge)
@@ -255,6 +276,14 @@ export interface PhaseResultsData {
   top100CorrectPairs?: number;
   top100TotalPairs?: number;
   top100Points?: number;
+  // Reverse Categories-specific
+  revCatItems?: string[];
+  revCatCategories?: RevCatCategoryResult[];
+  revCatWinnerNames?: string[];
+  revCatWinnerCategory?: string | null;
+  revCatWinningVotes?: number;
+  revCatPointsBest?: number;
+  revCatPointsVoter?: number;
 }
 
 export interface RoomPublicState {
@@ -277,6 +306,7 @@ export interface RoomPublicState {
   mafiaState: MafiaPublicState | null; // Mafia game state
   gtlState: GtlPublicState | null; // Guess the Link game state
   top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
+  revCatState: RevCatPublicState | null; // Reverse Categories items/board state
   /** True while a host-authored concept is queued for the next GTL round.
    *  Never carries the concept itself — only that a custom round is loaded. */
   gtlCustomReady?: boolean;
@@ -335,6 +365,12 @@ export interface PlayerPrivateState {
   top100ExampleText?: string;
   top100CanRank?: boolean;          // host holds the ordering controls
   top100PointsAwarded?: number;
+  // Reverse Categories
+  revCatItems?: string[];             // the three items (public info, kept for the round)
+  revCatCategoryText?: string;        // this player's own invented category
+  revCatCategorySubmitted?: boolean;
+  revCatIsWinner?: boolean;
+  revCatPointsAwarded?: number;
 }
 
 export interface RoomStateUpdatePayload {
