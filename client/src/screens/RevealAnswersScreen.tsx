@@ -5,16 +5,33 @@ import { Timer } from '../components/Timer';
 import { RevealCard } from '../components/RevealCard';
 import { ActionButton } from '../components/ActionButton';
 
+/**
+ * Optional copy overrides so a game can reuse this screen with its own framing
+ * (Reverse Categories votes on categories rather than accusing the impostor).
+ * Every field falls back to the impostor-round wording.
+ */
+export interface RevealAnswersCopy {
+  badge?: string;
+  title?: string;
+  subtitle?: string;
+  timerLabel?: string;
+  actionLabel?: string;
+  actionSubtext?: string;
+  waitingLabel?: string;
+}
+
 interface RevealAnswersScreenProps {
   room: RoomPublicState;
   myPlayer: Player;
   onAdvance: () => void;
+  copy?: RevealAnswersCopy;
 }
 
 export function RevealAnswersScreen({
   room,
   myPlayer,
   onAdvance,
+  copy = {},
 }: RevealAnswersScreenProps) {
   const isHost = myPlayer.isHost;
   // Local reveal override toggles if host wants to reveal one by one
@@ -34,13 +51,13 @@ export function RevealAnswersScreen({
         <div className="text-center mb-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-xs font-bold text-neutral-600 dark:text-neutral-400 mb-1">
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Answers Revealed</span>
+            <span>{copy.badge || 'Answers Revealed'}</span>
           </div>
           <h2 className="text-2xl font-black text-[var(--text-primary)]">
-            Review the Clues
+            {copy.title || 'Review the Clues'}
           </h2>
           <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-            Compare responses to spot whoever is bluffing
+            {copy.subtitle || 'Compare responses to spot whoever is bluffing'}
           </p>
         </div>
 
@@ -48,7 +65,7 @@ export function RevealAnswersScreen({
           <Timer
             secondsRemaining={room.timer.remainingSeconds}
             totalDuration={room.timer.durationSeconds}
-            label="Reading Clues"
+            label={copy.timerLabel || 'Reading Clues'}
           />
         )}
 
@@ -80,14 +97,14 @@ export function RevealAnswersScreen({
             variant="shared"
             onClick={onAdvance}
             icon={<ArrowRight className="w-5 h-5" />}
-            subtext="Start discussion phase"
+            subtext={copy.actionSubtext || 'Start discussion phase'}
           >
-            Start Discussion
+            {copy.actionLabel || 'Start Discussion'}
           </ActionButton>
         ) : (
           <div className="party-card p-4 rounded-2xl text-center">
             <p className="text-xs font-bold text-neutral-500 dark:text-neutral-400">
-              Discussion starts when timer runs out...
+              {copy.waitingLabel || 'Discussion starts when timer runs out...'}
             </p>
           </div>
         )}

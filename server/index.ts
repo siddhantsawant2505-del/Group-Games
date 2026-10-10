@@ -250,6 +250,8 @@ async function startServer() {
               ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'guess', 'results']
               : room.selectedGame?.id === 'top-100'
               ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'rank', 'results']
+              : room.selectedGame?.id === 'reverse-categories'
+              ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'vote', 'results']
               : [
                   'lobby',
                   'game-select',

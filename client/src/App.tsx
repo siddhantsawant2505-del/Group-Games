@@ -46,12 +46,45 @@ import { Top100InputScreen } from './screens/Top100InputScreen';
 import { Top100BoardScreen } from './screens/Top100BoardScreen';
 import { Top100RankScreen } from './screens/Top100RankScreen';
 import { Top100ResultsScreen } from './screens/Top100ResultsScreen';
+import { RevealAnswersCopy } from './screens/RevealAnswersScreen';
+import { VoteCopy } from './screens/VotePhaseScreen';
+import { RevCatItemsScreen } from './screens/RevCatItemsScreen';
+import { RevCatInputScreen } from './screens/RevCatInputScreen';
+import { RevCatResultsScreen } from './screens/RevCatResultsScreen';
 
 /** Games that ship with a dedicated server-side rules module. */
 const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
 const MAFIA_GAME_ID = 'mafia';
 const GUESS_THE_LINK_GAME_ID = 'guess-the-link';
 const TOP_100_GAME_ID = 'top-100';
+const REVERSE_CATEGORIES_GAME_ID = 'reverse-categories';
+
+/** Reverse Categories reuses the answers screen and the secret ballot with its own framing. */
+const RC_BOARD_COPY: RevealAnswersCopy = {
+  badge: 'Categories Invented',
+  title: 'The Category Board',
+  subtitle: 'Read every invented category — then vote for the one that links the items best',
+  timerLabel: 'Reading the Board',
+  actionLabel: 'Start Voting',
+  actionSubtext: 'Everyone votes for the best category',
+  waitingLabel: 'Voting opens when the host moves on or the timer runs out...',
+};
+
+const RC_VOTE_COPY: VoteCopy = {
+  badge: 'Pick the best one',
+  title: 'Vote Best Category',
+  pickLabel: 'Choose the Cleverest Category',
+  pickHint: 'Tap the category you think links the three items best',
+  answerLabel: 'Category:',
+  missingAnswerLabel: '(No category)',
+  targetRoleLabel: 'Category author',
+  confirmLabel: 'Confirm your vote for',
+  selectHint: 'Select a category above to vote',
+  actionLabel: 'Lock In Vote',
+  actionLoadingLabel: 'Casting vote...',
+  lockedTitle: 'Vote Locked In!',
+  lockedPrefix: 'You voted for',
+};
 
 type PreRoomScreen = 'loading' | 'name-entry' | 'home' | 'join-room';
 
@@ -544,6 +577,7 @@ export default function App() {
   const isMafia = room?.selectedGame?.id === MAFIA_GAME_ID;
   const isGuessTheLink = room?.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
   const isTop100 = room?.selectedGame?.id === TOP_100_GAME_ID;
+  const isReverseCategories = room?.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
   const isAtwDescriber = Boolean(
     privateState.atwIsDescriber || room?.atwState?.describerPlayerId === myPlayer?.id
   );
@@ -640,6 +674,12 @@ export default function App() {
             privateState={privateState}
             onAdvance={() => handleAdvancePhase('input')}
           />
+        ) : isReverseCategories ? (
+          <RevCatItemsScreen
+            room={room}
+            myPlayer={myPlayer}
+            onAdvance={() => handleAdvancePhase('input')}
+          />
         ) : (
           <RevealPhaseScreen
             room={room}
@@ -704,6 +744,14 @@ export default function App() {
             onSubmitAnswer={handleSubmitAnswer}
             onHostSkip={() => handleAdvancePhase('reveal-answers')}
           />
+        ) : isReverseCategories ? (
+          <RevCatInputScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onSubmitAnswer={handleSubmitAnswer}
+            onHostSkip={() => handleAdvancePhase('reveal-answers')}
+          />
         ) : (
           <InputPhaseScreen
             room={room}
@@ -726,6 +774,13 @@ export default function App() {
             room={room}
             myPlayer={myPlayer}
             onAdvance={() => handleAdvancePhase('rank')}
+          />
+        ) : isReverseCategories ? (
+          <RevealAnswersScreen
+            room={room}
+            myPlayer={myPlayer}
+            onAdvance={() => handleAdvancePhase('vote')}
+            copy={RC_BOARD_COPY}
           />
         ) : (
           <RevealAnswersScreen
@@ -761,7 +816,14 @@ export default function App() {
           myPlayer={myPlayer}
           privateState={privateState}
           onCastVote={handleCastVote}
-          eligiblePlayerIds={isMafia ? room.mafiaState?.alivePlayerIds : undefined}
+          eligiblePlayerIds={
+            isMafia
+              ? room.mafiaState?.alivePlayerIds
+              : isReverseCategories
+              ? room.players.filter((p) => p.id !== myPlayer.id).map((p) => p.id)
+              : undefined
+          }
+          copy={isReverseCategories ? RC_VOTE_COPY : undefined}
           onHostSkip={() =>
             isMafia ? handleMafiaResolveTrial() : handleAdvancePhase('results')
           }
@@ -793,6 +855,14 @@ export default function App() {
           />
         ) : isTop100 ? (
           <Top100ResultsScreen
+            room={room}
+            myPlayer={myPlayer}
+            onNextRound={() => handleAdvancePhase('next-round')}
+            onReturnToLobby={handleReturnToLobby}
+            onEndSession={() => handleAdvancePhase('post-game')}
+          />
+        ) : isReverseCategories ? (
+          <RevCatResultsScreen
             room={room}
             myPlayer={myPlayer}
             onNextRound={() => handleAdvancePhase('next-round')}

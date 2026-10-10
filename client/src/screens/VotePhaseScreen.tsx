@@ -8,6 +8,31 @@ import { PlayerAvatar } from '../components/PlayerAvatar';
 import { ActionButton } from '../components/ActionButton';
 import { getPlayerColor } from '@shared/theme/tokens';
 
+/**
+ * Optional copy overrides so a game can reuse the same secret ballot with its
+ * own framing. Reverse Categories votes for the best invented category rather
+ * than accusing an impostor. Every field falls back to the impostor wording.
+ */
+export interface VoteCopy {
+  badge?: string;
+  title?: string;
+  pickLabel?: string;
+  pickHint?: string;
+  /** Prefix shown before the candidate's submitted answer. */
+  answerLabel?: string;
+  missingAnswerLabel?: string;
+  /** Small label under a candidate's name ("Suspect", "Category author", ...). */
+  targetRoleLabel?: string;
+  /** Confirmation button subtext prefix, e.g. "Confirm accusation for". */
+  confirmLabel?: string;
+  selectHint?: string;
+  actionLabel?: string;
+  actionLoadingLabel?: string;
+  lockedTitle?: string;
+  /** Text before the locked-in target's name, e.g. "You voted for". */
+  lockedPrefix?: string;
+}
+
 interface VotePhaseScreenProps {
   room: RoomPublicState;
   myPlayer: Player;
@@ -16,6 +41,7 @@ interface VotePhaseScreenProps {
   onHostSkip?: () => void;
   /** When set, only these players may be accused (Mafia day ballots exclude the dead). */
   eligiblePlayerIds?: string[];
+  copy?: VoteCopy;
 }
 
 export function VotePhaseScreen({
@@ -25,6 +51,7 @@ export function VotePhaseScreen({
   onCastVote,
   onHostSkip,
   eligiblePlayerIds,
+  copy = {},
 }: VotePhaseScreenProps) {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(
     privateState.votedForPlayerId || null
@@ -68,11 +95,11 @@ export function VotePhaseScreen({
               className="w-2.5 h-2.5 rounded-full"
               style={{ backgroundColor: playerColor.hex }}
             />
-            <span>Cast your accusation</span>
+            <span>{copy.badge || 'Cast your accusation'}</span>
           </div>
 
           <h2 className="text-2xl font-black text-[var(--text-primary)]">
-            Vote for Suspect
+            {copy.title || 'Vote for Suspect'}
           </h2>
           <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
             {room.hasVoted.length} of {votePool.length} votes locked in
@@ -96,10 +123,10 @@ export function VotePhaseScreen({
       >
         <div className="text-left">
           <span className="text-xs font-extrabold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 block mb-1">
-            Choose a Player to Accuse
+            {copy.pickLabel || 'Choose a Player to Accuse'}
           </span>
           <p className="text-xs text-neutral-400">
-            Tap a player chip to select who you think is the Impostor
+            {copy.pickHint || 'Tap a player chip to select who you think is the Impostor'}
           </p>
         </div>
 
@@ -110,7 +137,7 @@ export function VotePhaseScreen({
             const isSelected = selectedTargetId === p.id;
             const targetColor = getPlayerColor(p.colorIndex);
             const clueItem = room.revealedAnswers.find((a) => a.playerId === p.id);
-            const clueText = clueItem?.answerText || '(No clue)';
+            const clueText = clueItem?.answerText || copy.missingAnswerLabel || '(No clue)';
 
             return (
               <button
@@ -155,7 +182,7 @@ export function VotePhaseScreen({
                       {isMe && ' (You)'}
                     </span>
                     <span className="text-xs text-neutral-400 font-medium block">
-                      {p.isHost ? 'Host' : 'Suspect'}
+                      {p.isHost ? 'Host' : copy.targetRoleLabel || 'Suspect'}
                     </span>
                   </div>
                 </div>
@@ -163,7 +190,7 @@ export function VotePhaseScreen({
                 {/* Submitted clue next to player's name */}
                 <div className="shrink-0 text-right">
                   <span className="text-xs text-neutral-400 block font-semibold mb-0.5">
-                    Clue:
+                    {copy.answerLabel || 'Clue:'}
                   </span>
                   <span
                     className="inline-block px-2.5 py-1 rounded-xl text-xs font-black border"
@@ -192,10 +219,11 @@ export function VotePhaseScreen({
             <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
             <div>
               <span className="text-sm font-black block">
-                Vote Locked In!
+                {copy.lockedTitle || 'Vote Locked In!'}
               </span>
               <span className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">
-                You voted for <strong>{votedTargetPlayer?.name || 'suspect'}</strong>
+                {copy.lockedPrefix || 'You voted for'}{' '}
+                <strong>{votedTargetPlayer?.name || 'suspect'}</strong>
               </span>
             </div>
           </motion.div>
@@ -205,16 +233,16 @@ export function VotePhaseScreen({
             playerColorIndex={myPlayer.colorIndex}
             disabled={!selectedTargetId}
             loading={isPending && !hasVoted}
-            loadingText="Casting Accusation..."
+            loadingText={copy.actionLoadingLabel || 'Casting Accusation...'}
             onClick={handleVoteSubmit}
             icon={<Lock className="w-5 h-5" />}
             subtext={
               selectedTargetId
-                ? `Confirm accusation for ${votedTargetPlayer?.name || 'player'}`
-                : 'Select a player chip above to vote'
+                ? `${copy.confirmLabel || 'Confirm accusation for'} ${votedTargetPlayer?.name || 'player'}`
+                : copy.selectHint || 'Select a player chip above to vote'
             }
           >
-            Lock In Vote
+            {copy.actionLabel || 'Lock In Vote'}
           </ActionButton>
         )}
       </motion.div>

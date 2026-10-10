@@ -17,6 +17,7 @@ import {
   MafiaPublicState,
   GtlPublicState,
   Top100PublicState,
+  RevCatPublicState,
 } from '../shared/types';
 import { PLAYER_COLORS } from '../shared/theme/tokens';
 import { PARTY_GAMES } from '../shared/data/games';
@@ -98,6 +99,16 @@ import {
   calculateTop100Results,
   cleanupTop100Round,
 } from './games/top100';
+import {
+  RC_INPUT_SECONDS,
+  RC_REVEAL_SECONDS,
+  setupReverseCategoriesRound,
+  recordRevCatCategory,
+  simulateRevCatBotCategories,
+  finalizeRevCatReveal,
+  calculateReverseCategoriesResults,
+  cleanupRevCatRound,
+} from './games/reverseCategories';
 
 /** Game ids that ship with a dedicated server-side rules module. */
 const IMPOSTOR_GAME_ID = 'impostor';
@@ -105,6 +116,7 @@ const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
 const MAFIA_GAME_ID = 'mafia';
 const GUESS_THE_LINK_GAME_ID = 'guess-the-link';
 const TOP_100_GAME_ID = 'top-100';
+const REVERSE_CATEGORIES_GAME_ID = 'reverse-categories';
 
 export interface InternalPlayer extends Player {
   socketId: string | null;
@@ -134,6 +146,7 @@ export interface InternalRoom {
   mafiaState: MafiaPublicState | null; // Mafia night/day state
   gtlState: GtlPublicState | null; // Guess the Link round state
   top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
+  revCatState: RevCatPublicState | null; // Reverse Categories items/board state
   /** Host-authored Guess the Link prompt, consumed by the next round.
    *  Kept off public state so the concept never leaks before results. */
   gtlCustomPrompt: GuessTheLinkPrompt | null;
@@ -223,6 +236,7 @@ export class RoomManager {
       mafiaState: null,
       gtlState: null,
       top100State: null,
+      revCatState: null,
       gtlCustomPrompt: null,
       botTimeouts: [],
       createdAt: Date.now(),
@@ -550,11 +564,13 @@ export class RoomManager {
         room.mafiaState = null;
         room.gtlState = null;
         room.top100State = null;
+        room.revCatState = null;
         room.gtlCustomPrompt = null;
         cleanupAvoidTheWordRound(room.code);
         cleanupMafiaRound(room.code);
         cleanupGtlRound(room.code);
         cleanupTop100Round(room.code);
+        cleanupRevCatRound(room.code);
         break;
       }
 
@@ -576,11 +592,17 @@ export class RoomManager {
           setupGtlRound(room);
         } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
           setupTop100Round(room);
+        } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
+          setupReverseCategoriesRound(room);
         } else {
           this.setupPhaseReveal(room);
         }
-        room.phasePrompt = 'Check Your Secret Role';
-        room.phaseSubprompt = 'Keep your screen hidden from others!';
+        // Reverse Categories hides nothing, so it never uses the secret-role copy.
+        const revealIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
+        room.phasePrompt = revealIsRevCat ? 'Your Three Items' : 'Check Your Secret Role';
+        room.phaseSubprompt = revealIsRevCat
+          ? 'Everyone sees the same items — invent the best category that links them'
+          : 'Keep your screen hidden from others!';
         this.startPhaseTimer(
           room,
           10,
@@ -658,12 +680,17 @@ export class RoomManager {
       case 'input': {
         const inputIsGtl = room.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
         const inputIsTop100 = room.selectedGame?.id === TOP_100_GAME_ID;
-        room.phasePrompt = inputIsTop100
+        const inputIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
+        room.phasePrompt = inputIsRevCat
+          ? 'Invent Your Category'
+          : inputIsTop100
           ? 'Write Your Example'
           : inputIsGtl
           ? 'Write Your Response'
           : 'Submit Your Clue';
-        room.phaseSubprompt = inputIsTop100
+        room.phaseSubprompt = inputIsRevCat
+          ? 'One category name that cleverly links all three items'
+          : inputIsTop100
           ? 'A short scenario that fits your secret number on the spectrum'
           : inputIsGtl
           ? 'One word or a short phrase inspired by your private hint'
@@ -677,13 +704,23 @@ export class RoomManager {
           simulateGtlBotResponses(room);
         } else if (inputIsTop100) {
           simulateTop100BotExamples(room);
+        } else if (inputIsRevCat) {
+          simulateRevCatBotCategories(room);
         } else {
           this.simulateBotInputs(room);
         }
 
+        const inputSeconds = inputIsTop100
+          ? TOP100_INPUT_SECONDS
+          : inputIsRevCat
+          ? RC_INPUT_SECONDS
+          : inputIsGtl
+          ? GTL_INPUT_SECONDS
+          : 20;
+
         this.startPhaseTimer(
           room,
-          inputIsTop100 ? TOP100_INPUT_SECONDS : inputIsGtl ? GTL_INPUT_SECONDS : 20,
+          inputSeconds,
           () => broadcastState(),
           () => {
             if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
@@ -692,6 +729,8 @@ export class RoomManager {
               finalizeGtlReveal(room);
             } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
               finalizeTop100Reveal(room);
+            } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
+              finalizeRevCatReveal(room);
             }
             this.transitionToPhase(room, 'reveal-answers', broadcastState);
           }
@@ -702,12 +741,17 @@ export class RoomManager {
       case 'reveal-answers': {
         const revealIsGtl = room.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
         const revealIsTop100 = room.selectedGame?.id === TOP_100_GAME_ID;
-        room.phasePrompt = revealIsGtl
+        const revealIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
+        room.phasePrompt = revealIsRevCat
+          ? 'The Category Board'
+          : revealIsGtl
           ? 'The Link Board'
           : revealIsTop100
           ? 'The Example Board'
           : 'Simultaneous Reveal';
-        room.phaseSubprompt = revealIsGtl
+        room.phaseSubprompt = revealIsRevCat
+          ? 'Every invented category, shuffled — then vote for the best one'
+          : revealIsGtl
           ? 'Every response, shuffled — what single concept ties them together?'
           : revealIsTop100
           ? 'Every example, shuffled — the secret numbers stay hidden for now'
@@ -718,17 +762,34 @@ export class RoomManager {
           finalizeGtlReveal(room);
         } else if (revealIsTop100) {
           finalizeTop100Reveal(room);
+        } else if (revealIsRevCat) {
+          finalizeRevCatReveal(room);
         } else {
           this.prepareRevealedAnswers(room);
         }
+
+        const revealSeconds = revealIsTop100
+          ? TOP100_REVEAL_SECONDS
+          : revealIsRevCat
+          ? RC_REVEAL_SECONDS
+          : revealIsGtl
+          ? GTL_REVEAL_SECONDS
+          : 15;
+
         this.startPhaseTimer(
           room,
-          revealIsGtl ? GTL_REVEAL_SECONDS : revealIsTop100 ? TOP100_REVEAL_SECONDS : 15,
+          revealSeconds,
           () => broadcastState(),
           () =>
             this.transitionToPhase(
               room,
-              revealIsGtl ? 'guess' : revealIsTop100 ? 'rank' : 'discussion',
+              revealIsGtl
+                ? 'guess'
+                : revealIsTop100
+                ? 'rank'
+                : revealIsRevCat
+                ? 'vote'
+                : 'discussion',
               broadcastState
             )
         );
@@ -797,8 +858,11 @@ export class RoomManager {
       }
 
       case 'vote': {
-        room.phasePrompt = 'Cast Your Accusation';
-        room.phaseSubprompt = 'Tap a suspect to vote them out';
+        const voteIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
+        room.phasePrompt = voteIsRevCat ? 'Vote Best Category' : 'Cast Your Accusation';
+        room.phaseSubprompt = voteIsRevCat
+          ? 'Pick the invented category that links the items best'
+          : 'Tap a suspect to vote them out';
         room.hasVoted.clear();
         room.voteTallies = {};
         room.playerVotes = {};
@@ -842,6 +906,8 @@ export class RoomManager {
           calculateGtlResults(room);
         } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
           calculateTop100Results(room);
+        } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
+          calculateReverseCategoriesResults(room);
         } else {
           this.calculateResults(room);
         }
@@ -1130,6 +1196,8 @@ export class RoomManager {
       recordGtlResponse(room, playerId, answer);
     } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
       recordTop100Example(room, playerId, answer);
+    } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
+      recordRevCatCategory(room, playerId, answer);
     } else {
       room.hasSubmittedInput.add(playerId);
       if (!room.privateData[playerId]) {
@@ -1148,6 +1216,8 @@ export class RoomManager {
         finalizeGtlReveal(room);
       } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
         finalizeTop100Reveal(room);
+      } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
+        finalizeRevCatReveal(room);
       }
       this.transitionToPhase(room, 'reveal-answers', broadcastState);
     } else {
@@ -1481,6 +1551,7 @@ export class RoomManager {
       mafiaState: room.mafiaState,
       gtlState: room.gtlState,
       top100State: room.top100State,
+      revCatState: room.revCatState,
       gtlCustomReady: Boolean(room.gtlCustomPrompt),
     };
   }
