@@ -1,0 +1,211 @@
+// Authored vocabulary source for scripts/generateCommonNouns.ts
+//
+// Format:  `# Category Name` header, then lines `1:`, `2:` or `3:` holding
+// comma-separated everyday nouns. The digit is the difficulty tier:
+//   1 = a ten-year-old knows it instantly (the bulk of the pool)
+//   2 = known but a bit less common
+//   3 = rarer / more technical (never served in easy mode)
+// Multi-word ideas are written closed-up ("hotdog", "tshirt"); the generator
+// strips any trailing digits, which are only used to avoid accidental repeats.
+// A category MAY appear more than once: later blocks just add more words to it.
+
+# Food & Meals
+1: bread, cheese, butter, sandwich, pizza, burger, pasta, rice, soup, salad, toast, cereal, jam, honey, chocolate, cookie, cake, pie, chips, fries, taco, egg, banana2, bacon, ham, ketchup, sugar, flour, dough, pudding, dessert, snack, breakfast, lunch, dinner, picnic, jelly, ice, cream, cupcake, bagel, bun, crust, oatmeal, yogurt, popcorn2
+2: noodle, pancake, waffle, omelette, biscuit, muffin, donut, pretzel, burrito, dumpling, curry, stew, sausage, steak, chicken, meatball, mustard, mayonnaise, gravy, syrup, pepper2, salt, batter, barbecue, buffet, marshmallow, caramel, nugget, patty, granola, porridge, sorbet, brownie, croissant, nachos, kebab, hotdog, wrap, lasagna, casserole, stuffing
+3: licorice, frosting, sprinkles, quesadilla, samosa, scone, fritter, cobbler, quiche, risotto
+
+# Fruit & Vegetables
+1: apple, orange, grape, lemon, banana, peach, pear, tomato, potato, carrot, onion, corn, pea, bean, mushroom, strawberry, coconut, olive, pepper, salad2, cabbage, lettuce
+2: lime, cherry, plum, apricot, mango, pineapple, watermelon, melon, blueberry, raspberry, blackberry, cranberry, kiwi, papaya, pomegranate, fig, date, avocado, garlic, spinach, broccoli, cauliflower, cucumber, pumpkin, radish, beetroot, turnip, celery, asparagus, lentil, chickpea, peanut, almond, walnut, cashew, chestnut, hazelnut, pistachio, raisin, prune, parsley, basil, mint, ginger, cinnamon, nutmeg, vanilla, eggplant, leek, sprouts
+3: gooseberry, rhubarb, artichoke, courgette, swede, parsnip, scallion, kumquat, plantain, aubergine
+
+# Drinks
+1: water, milk, juice, coffee, tea, soda, lemonade, cocoa, tea2, cup2, glass2, bottle, straw
+2: smoothie, milkshake, cider, punch, latte, espresso, cappuccino, teapot, kettle, mug, jug, pitcher, tap, fountain, flask, saucer, coaster, tonic, nectar, broth, cordial, brew, steam, foam, fizz
+3: thermos, tumbler, carafe, decanter, infusion, kombucha, espresso2, percolator, toddy, cordial2
+
+# Animals
+1: dog, cat, horse, cow, pig, sheep, goat, duck, rabbit, mouse, lion, tiger, bear, deer, fox, wolf, monkey, elephant, giraffe, zebra, snake, frog, turtle, fish, bird, bee, ant, spider
+2: chicken, hamster, squirrel, raccoon, otter, beaver, hedgehog, kangaroo, koala, panda, camel, donkey, pony, lamb, calf, puppy, kitten, pony2, buffalo, moose, elk, bison, llama, alpaca, leopard, cheetah, panther, gorilla, chimpanzee, baboon, lemur, sloth, hippo, rhino, mole, weasel, bat, lizard, gecko, iguana, chameleon, tortoise, snail, worm, crab, lobster
+3: ferret, gerbil, chipmunk, badger, armadillo, anteater, porcupine, mongoose, meerkat, wallaby, wombat, platypus, pangolin, tapir, okapi, gazelle, antelope, wildebeest, lynx, coyote, jackal, hyena
+
+# Birds & Bugs
+1: robin, sparrow, crow, pigeon, dove, swan, goose, owl, eagle, parrot, penguin, butterfly, ladybug, moth, beetle, fly, wasp, spider2
+2: seagull, pelican, turkey, pheasant, quail, magpie, raven, starling, finch, budgie, cockatoo, macaw, toucan, woodpecker, kingfisher, heron, stork, crane, flamingo, ostrich, puffin, albatross, hawk, falcon, owl2, vulture, hornet, termite, dragonfly, grasshopper, cricket, mantis, cockroach, scorpion, centipede, millipede, slug, caterpillar, mosquito, firefly
+3: kestrel, buzzard, hornbill, damselfly, locust, aphid, weevil, glowworm, cicada, maggot, chrysalis, barnacle
+
+# Sea Life
+1: whale, dolphin, shark, seal, octopus, starfish, crab2, shell, coral, wave, beach, sand
+2: jellyfish, squid, urchin, shrimp, prawn, clam, oyster, mussel, scallop, eel, salmon, trout, cod, tuna, herring, sardine, anchovy, mackerel, carp, catfish, goldfish, seahorse, pufferfish, angelfish, seaweed, sponge, reef, tide, lagoon, seabed, anchor, harbour, pier, dock, sail, mast
+3: walrus, manatee, dugong, crayfish, marlin, swordfish, plankton, kelp, limpet, anemone, estuary, shipwreck, rudder, figurehead
+
+# Kitchen
+1: pot, pan, plate, bowl, dish, tray, fork, knife, spoon, cup, glass, kettle2, oven, fridge, sink, towel, apron, recipe, jar, tin, box, napkin, counter
+2: saucepan, skillet, wok, lid, handle, spatula, ladle, whisk, tongs, peeler, grater, blender, mixer, toaster, stove, grill, microwave, freezer, cupboard, drawer, shelf, faucet, drain, sponge2, cloth, timer, scale, teaspoon, tablespoon, cutlery, chopstick, placemat, carton, packet, container, colander, funnel, rolling, dishwasher, scrub, leftover, cooker, hob
+3: pestle, mortar, trivet, sieve, whisk2, mandolin, cleaver, sharpener, ladle2, gasket
+
+# Bathroom
+1: soap, towel2, mirror, toilet, shower, bath, toothbrush, toothpaste, brush, comb, sink2, tap2, plug, tissue, bin, bucket
+2: shampoo, conditioner, lotion, razor, shaving, hairdryer, bathtub, slipper, scale2, tile, grout, basin, wipe, plaster, bandage, medicine, pill, thermometer, cabinet, shelf2, hook, basket, laundry, detergent, mop, broom, dustpan, rubbish, plunger, suds, lint, damp
+3: floss, mouthwash, loofah, robe, syringe, bleach, mildew, scum, grout2, cistern
+
+# Bedroom
+1: bed, pillow, blanket, sheet, quilt, lamp, bulb, switch, clock, mirror2, rug, curtain, sock, teddy, doll, poster, book, pen, ring, cushion
+2: mattress, pillowcase, duvet, headboard, bunk, cradle, crib, wardrobe, closet, hanger, dresser, nightstand, lampshade, socket, blind, shutter, carpet, ceiling, alarm, radio, diary, notebook, bookmark, novel, magazine, comic, sticker, pyjamas, jewellery, necklace, bracelet, earring, locket, brooch, perfume, wardrobe2, attic, loft, basement, hallway, landing, stairs, banister, drawer2
+3: bedframe, ottoman, cologne, satchel, valance, canopy, footboard, futon, tatami, chiffonier
+
+# Living Room
+1: sofa, couch, chair, table, stool, rug2, fireplace, candle, vase, frame, painting, remote, television, speaker, radio2, clock2, matches, photograph, album, trophy
+2: armchair, ottoman2, hearth, mantel, chimney, ornament, canvas, sculpture, bookshelf, bookcase, bookend, console, cabinet2, newspaper, puzzle, chess, dominoes, card, deck, wallpaper, paint, lighter, recliner, sideboard, souvenir, picture, cushion2
+3: footstool, tapestry, easel, chandelier, sconce, credenza, whatnot, curio
+
+# School
+1: teacher, student, class, lesson, homework, test, book, pencil, pen2, ruler, eraser, desk, chair2, bell, bag, library, map, glue, scissors, tape, paper, board
+2: pupil, classroom, subject, assignment, project, essay, exam, quiz, grade, mark, report, textbook, folder, binder, crayon, marker, highlighter, chalk, chalkboard, whiteboard, locker, backpack, lunchbox, timetable, schedule, register, uniform, badge, playground, gymnasium, corridor, dictionary, atlas, globe, alphabet, spelling, grammar, poetry, fiction, chapter, paragraph, sentence, vowel, comma, bracket, margin, staples, paste, clay, glitter, certificate, diploma, graduation, assembly, choir, club
+3: microscope, telescope, laboratory, beaker, cylinder, equation, apostrophe, asterisk, syllabus, protractor, semester, dissertation, valedictorian
+
+# Office
+1: office, desk2, meeting, letter, stamp, envelope, printer, laptop, keyboard, screen, monitor, phone, camera, clock3, badge2, calendar, folder2, contract, client, boss, job
+2: cubicle, agenda, memo, invoice, receipt, ledger, parcel, courier, scanner, photocopier, shredder, stapler, clip, rubber, notepad, planner, projector, mouse2, cable, charger, adapter, headset, briefcase, lanyard, signature, spreadsheet, database, report2, deadline, salary, wage, payroll, budget, manager, supervisor, colleague, intern, apprentice, interview, resume, promotion, pension, audit, minutes, ballot, postbox
+3: quorum, merger, letterhead, procurement, appraisal, stationery, memorandum, consortium
+
+# Transport
+1: car, bus, truck, van, taxi, train, boat, ship, bike, plane, rocket, tractor, wheel, engine, driver, road, bridge, tunnel, ticket, seat
+2: lorry, tram, trolley, locomotive, carriage, wagon, coach, minibus, scooter, moped, motorbike, bicycle, tricycle, skateboard, ferry, yacht, canoe, kayak, raft, gondola, submarine, hovercraft, helicopter, aeroplane, jet, glider, balloon, airship, shuttle, capsule, bulldozer, digger, crane, forklift, ambulance, siren, traffic, roundabout, junction, crossing, motorway, pavement, kerb, viaduct, station, platform, runway, hangar, port, quay, depot, garage, petrol, diesel, gearbox, clutch, brake, throttle, windscreen, bonnet, bumper, headlight, indicator, tyre, saddle, pedal, helmet, pannier
+3: unicycle, rollerblade, aqueduct, carport, propeller, fuselage, catamaran, gondola2, tramline, drawbridge
+
+# Clothes
+1: shirt, tshirt, jumper, jacket, coat, dress, skirt, trousers, jeans, shorts, sock2, shoe, boot, hat, cap, glove, scarf, belt, tie, button, pocket, hood
+2: blouse, sweater, cardigan, raincoat, anorak, cloak, cape, waistcoat, suit, gown, kilt, apron2, overalls, pyjamas2, stocking, tights, sandal, trainer, slipper2, clog, wellington, mitten, shawl, buckle, braces, bowtie, cufflink, zip, lace, hem, seam, collar, lapel, sleeve, hoodie, fleece, tracksuit, leotard, swimsuit, trunks, bikini, wetsuit, goggles, beanie, beret, bonnet, sunhat, headband, ribbon, needle, thread, patch, label
+3: moccasin, flipflop, fastener, mannequin, thimble, epaulette, cummerbund, brocade, gabardine, waistband
+
+# Sports & Games
+1: football, tennis, running, swimming, jumping, ball, goal, net, team, race, game, play, prize, medal, whistle, coach, referee, match, court, gym
+2: soccer, rugby, cricket, hockey, badminton, basketball, netball, volleyball, handball, baseball, golf, bowling, snooker, darts, archery, fencing, boxing, wrestling, judo, karate, gymnastics, marathon, sprint, relay, hurdles, javelin, discus, diving, surfing, rowing, sailing, climbing, hiking, cycling, skating, skiing, snowboarding, sledding, toboggan, curling, umpire, captain, goalkeeper, striker, defender, racket, puck, stick, hoop, basket2, pitch, stadium, arena, track, lane, trophy2, tournament, mascot
+3: taekwondo, shotput, highjump, longjump, canoeing, kayaking, skittles, rounders, lacrosse, wicket, shuttlecock, scoreboard
+
+# Nature
+1: tree, flower, grass, leaf, root, branch, seed, forest, hill, mountain, river, lake, pond, sea, sky, sun, moon, star, cloud, rock, stone, sand2, dirt, field, park, garden, wood, log
+2: oak, pine, birch, willow, maple, cedar, shrub, bush, hedge, ivy, fern, moss, mushroom2, flower2, rose, tulip, daisy, sunflower, daffodil, lily, orchid, poppy, lavender, petal, stem, thorn, twig, trunk, bark, stump, acorn, conker, pinecone, pollen, meadow, pasture, moor, marsh, swamp, bog, valley, hillside, cliff, ridge, summit, peak, glacier, waterfall, stream, brook, spring, geyser, desert, dune, canyon, cave, boulder, pebble, gravel, soil, mud
+3: lichen, toadstool, bluebell, snowdrop, heath, cavern, humus, alluvium, scree, tundra
+
+# Weather
+1: rain, snow, wind, storm, thunder, lightning, ice, sun2, cloud2, rainbow, fog, frost, shade, shadow, umbrella
+2: drizzle, shower, downpour, hail, sleet, blizzard, icicle, hailstone, snowflake, daylight, twilight, dawn, dusk, sunset, sunrise, mist, haze, humidity, breeze, gust, gale, tornado, cyclone, hurricane, monsoon, drought, flood, puddle, slush, thaw, forecast, temperature, thermometer2, barometer, weathervane, heatwave, chill, shiver, iceberg, avalanche, landslide
+3: cloudburst, anemometer, isobar, precipitation, cumulus, cirrus, permafrost, sleet2, chinook, monsoon2
+
+# Jobs
+1: doctor, nurse, teacher2, chef, farmer, driver2, police, guard, pilot, singer, actor, artist, writer, baker, builder, cleaner, waiter, postman, builder2, dentist, vet, soldier, sailor
+2: surgeon, pharmacist, paramedic, firefighter, detective, mechanic, plumber, electrician, carpenter, joiner, mason, bricklayer, roofer, painter, decorator, welder, locksmith, tailor, cobbler, barber, hairdresser, butcher, grocer, waitress, barista, gardener, shepherd, fisherman, miner, logger, architect, surveyor, accountant, banker, cashier, clerk, secretary, receptionist, manager2, director, editor, journalist, reporter, author, poet, novelist, translator, tutor, lecturer, professor, scientist, chemist, physicist, biologist, astronomer, historian, curator, dancer, musician, composer, photographer, designer, sculptor, athlete, judge, lawyer, notary, nanny, babysitter, lifeguard, ranger, janitor
+3: joiner2, archaeologist, metallurgist, cartographer, sommelier, actuary, farrier, milliner, cooper, blacksmith
+
+# Buildings & Places
+1: house, home, shop, school2, church, park2, farm, castle, tower, bridge2, hotel, bank, market, museum, theatre, cinema, library2, hospital, garage2, shed, tent, gate, wall, window, door, roof, room, kitchen, bedroom, garden2
+2: cottage, bungalow, villa, mansion, palace, hut, cabin, chalet, lodge, barn, lighthouse, windmill, factory, warehouse, workshop, studio, gallery, college, university, campus, clinic, pharmacy, bakery, supermarket, mall, arcade, restaurant, cafe, diner, pub, inn, hostel, campsite, caravan, kiosk, stall, booth, airport, terminal, shipyard, greenhouse, conservatory, gazebo, pavilion, pyramid, igloo, dungeon, cathedral, chapel, mosque, temple, shrine, abbey, monastery, fortress, moat, well, monument, obelisk, arch, plaza, square2, courtyard, alley, avenue
+3: orangery, rotunda, yurt, teepee, hovel, crypt, rampart, obelisk2, plinth, colonnade
+
+# Tools
+1: hammer, nail, screw, key, lock, rope, string, wire, tape2, glue2, saw, axe, ladder, bucket2, brush2, torch, battery, magnet
+2: mallet, screwdriver, chisel, drill, hacksaw, file, plane, sander, hatchet, crowbar, spanner, wrench, pliers, tweezers, clamp, vice, bolt, washer, rivet, pin, staple, trowel, spade, shovel, rake, hoe, fork2, sickle, scythe, pitchfork, wheelbarrow, stepladder, scaffold, plank, beam, girder, hinge, latch, doorknob, padlock, keyring, chain, twine, hose, pipe, valve, nozzle, barrow, toolbox, workbench, goggles2, earplugs, lantern, flint, magnifier, compass, spool, sandpaper, varnish, paintbrush, roller, dustpan2
+3: sickle2, adze, auger, calipers, gimlet, rasp, spokeshave, winch, pulley, anvil
+
+# Toys & Play
+1: toy, doll2, robot, marble, kite, balloon2, bubble, puzzle2, drum, whistle2, ball2, teddy2, game2, swing, slide, sand, crayon2, clown
+2: puppet, figurine, spinning-top, jigsaw, rattle, tambourine, xylophone, trumpet, harmonica, ukulele, guitar, piano, cymbal, chime, domino, dice, counter, checker, chessboard, cards, joker, ace, scooter2, wagon, spade2, sandpit, seesaw, roundabout2, trampoline, hulahoop, skippingrope, yoyo, slinky, kaleidoscope, sticker2, colouring, clay2, dough2, putty, slime, confetti, streamer, mask, costume, wand, crown, tiara, sword, shield
+3: marionette, actionfigure, abacus, jackstone, spinningtop, kaleidoscope2, pattercake
+
+# Body
+1: head, hair, face, eye, ear, nose, mouth, lip, tongue, tooth, neck, shoulder, arm, elbow, wrist, hand, finger, thumb, nail2, chest, back, stomach, leg, knee, foot, toe, skin, heart, brain, bone, blood, smile
+2: forehead, eyebrow, eyelash, eyelid, cheek, nostril, chin, jaw, earlobe, throat, collarbone, palm, knuckle, fingernail, rib, spine, waist, hip, navel, belly, thigh, shin, calf, ankle, heel, sole, freckle, mole, wrinkle, dimple, scar, bruise, blister, scab, muscle, skull, lung, liver, kidney, intestine, vein, artery, nerve, tendon, cartilage, pulse, breath, sneeze, cough, hiccup, yawn, blink, frown, grin, tear, sweat
+3: iris, pupil2, cartilage2, vertebra, bronchus, epidermis, cuticle, ligament, tonsil, ventricle
+
+# Music
+1: song, music, drum2, piano2, guitar2, singer2, band, dance, radio3, sound, note, tune, bell2, horn2
+2: melody, lyric, chorus, verse, rhythm, beat, tempo, harmony, chord, octave, clef, staff, quaver, crotchet, solo, duet, trio, quartet, choir2, orchestra, concert, rehearsal, audition, encore, applause, stage, spotlight, microphone, amplifier, headphone, cassette, record, album2, single, soundtrack, playlist, jukebox, stereo, boombox, violin, viola, cello, harp, flute, clarinet, oboe, bassoon, saxophone, trombone, tuba, cornet, bagpipes, accordion, organ, banjo, mandolin, sitar, bongo, conga, maraca, castanet, gong, metronome
+3: semibreve, minim, xylophone2, theremin, harpsichord, euphonium, contrabass, timpani, glockenspiel, vibraphone
+
+# Technology
+1: phone2, computer, camera2, screen2, keyboard2, mouse3, internet, email, message, video, button, wire2, light, motor, machine, battery2, password, website, chat, network
+2: laptop2, desktop, tablet, smartphone, monitor2, printer2, scanner2, trackpad, joystick, controller, console2, webcam, microphone2, speaker2, projector2, router, modem, cable2, adapter2, charger2, plug2, switch2, dial, remote2, sensor, lens, tripod, flash, recording, podcast, broadcast, satellite, antenna, radar, laser, circuit, chip, processor, memory, storage, software, program, algorithm, username, login, browser, folder3, file, icon, cursor, pixel, download, upload, server, database2, backup, virus, firewall, drone, gadget, device, appliance, turbine, generator2, fuse, bulb2
+3: motherboard, encryption, bandwidth, firmware, capacitor, transistor, telemetry, hologram, algorithm2, semiconductor
+
+# Party & Celebration
+1: party, guest, present, gift, cake2, balloon3, candle2, card, dance2, music2, hat2, mask2, wish, cheer, prize2, clown2, ribbon2, bow, invitation, trophy3
+2: celebration, festival, carnival, parade, fiesta, banquet, feast, toast2, applause2, confetti2, garland, bunting, banner, decoration, host, hostess, venue, marquee, tent2, disco, karaoke, limbo, cupcake2, wrapping, speech, anniversary, birthday, wedding, engagement, christening, reunion, sleepover, barbecue2, campfire, bonfire, firework, sparkler, lantern2, raffle, tombola, bingo, quiz2, charade, costume2, jester, magician, juggler, acrobat
+3: mascot2, fortune-teller, fire-eater, pantomime, cotillion, masquerade, soiree, pageant
+
+# Town & Travel
+1: town, village, city, street, road2, path, map2, shop2, cafe2, hotel2, market2, sign, post, station2, corner, bus2, taxi2, money, bank2, church2, museum2
+2: suburb, district, neighbourhood, lane, footpath, pavement2, crossing2, tunnel2, underpass, flyover, junction2, square3, stall2, store, boutique, bookshop, newsagent, bakery2, butcher2, florist, jeweller, supermarket2, mall2, arcade2, restaurant2, diner2, takeaway, hostel2, guesthouse, tourist, traveller, visitor, guidebook, atlas2, compass2, itinerary, passport, visa, luggage, suitcase, rucksack, backpack2, trolley2, fare, timetable2, departure, arrival, delay, platform2, carriage2, cabin2, aisle, seatbelt, journey, voyage, cruise, expedition, safari, pilgrimage, detour
+3: boulevard, crescent, culdesac, promenade, causeway, turnpike, thoroughfare, esplanade, hamlet, metropolis
+
+# Household & Misc
+1: bell3, door2, gate2, fence, step, stairs2, floor, wall2, window2, roof2, key2, box2, bag2, basket2, candle3, soap2, toothbrush2, clock4, mirror3, lamp4, blanket2, towel3
+2: doorknob2, doorway, railing, porch, balcony, patio, deck, veranda, staircase, hallway2, landing2, gutter, drainpipe, chimney2, skylight, windowsill, threshold, keyhole, knocker, letterbox, doormat, broom2, mop2, bucket3, dustpan3, duster, polish, wax, sponge3, detergent2, sanitizer, airfreshener, lamp3, lantern3, heater, radiator, boiler, furnace, fan, ventilator, thermostat, quilt2, cushion3, curtain2, blind3, mat, tile2, paint2, cement, mortar2, brick, timber, plywood, sawdust, glue3
+3: sill, lintel, joist, rafter, gable, eaves, balustrade, wainscot, cornice, parapet
+
+# Food & Meals
+1: gum, lollipop, popsicle, cracker
+
+# Fruit & Vegetables
+1: mandarin, nectarine, clementine
+
+# Drinks
+1: icecube, sipper
+
+# Animals
+1: chick, duckling, piglet, cub, joey
+
+# Birds & Bugs
+1: swallow, swift, wren, bluejay, hummingbird
+
+# Sea Life
+1: fin, gill
+
+# Kitchen
+1: teabag, dishcloth, mousetrap, griddle
+
+# Bathroom
+1: bathmat, soapdish
+
+# Bedroom
+1: alarmclock, bunkbed
+
+# Living Room
+1: hammock, beanbag, rockingchair
+
+# School
+1: pencilcase, workbook, blackboard
+
+# Sports & Games
+1: goalie
+
+# Nature
+1: reed, bud, bloom
+
+# Body
+1: fist, ponytail, beard, moustache
+
+# Clothes
+1: vest, sunglasses, hankie
+
+# Tools
+1: crank, axle, piston
+
+# Technology
+1: selfie, telephone, telly
+
+# Music
+1: lullaby, anthem, jingle
+
+# Party & Celebration
+1: wreath, giftbox
+
+# Buildings & Places
+1: silo, clocktower, belfry
+
+# Jobs
+1: bellhop, shopkeeper, milkman
+
+# Town & Travel
+1: bench, lamppost, mailbox, busstop, crossroads, footbridge

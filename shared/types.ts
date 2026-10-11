@@ -49,6 +49,50 @@ export interface PhaseTimer {
   remainingSeconds: number;
 }
 
+export type ImpostorMode = 'word' | 'question';
+export type ContentDifficultySetting = 'easy' | 'medium' | 'any';
+export type QuestionTone = 'clean' | 'spicy';
+
+/**
+ * Host-authored, fully public settings for the Impostor game. They describe how
+ * a round is played, never what the round's secret content is, so they can live
+ * in the broadcast room state.
+ */
+export interface ImpostorSettings {
+  mode: ImpostorMode;
+  difficulty: ContentDifficultySetting;
+  tone: QuestionTone;
+  /** Optional host topic for word mode. Omitted when unset. */
+  theme?: string;
+}
+
+/** Room-wide per-game settings (only Impostor uses them today). */
+export interface GameSettings {
+  impostor: ImpostorSettings;
+}
+
+export const DEFAULT_IMPOSTOR_SETTINGS: ImpostorSettings = {
+  mode: 'word',
+  difficulty: 'easy',
+  tone: 'clean',
+};
+
+export const IMPOSTOR_MODE_LABELS: Record<ImpostorMode, string> = {
+  word: 'Word',
+  question: 'Question',
+};
+
+export const DIFFICULTY_LABELS: Record<ContentDifficultySetting, string> = {
+  easy: 'Easy',
+  medium: 'Medium',
+  any: 'Any',
+};
+
+export const TONE_LABELS: Record<QuestionTone, string> = {
+  clean: 'Clean',
+  spicy: 'Spicy',
+};
+
 export interface RevealedAnswer {
   playerId: string;
   playerName: string;
@@ -307,6 +351,14 @@ export interface RoomPublicState {
   gtlState: GtlPublicState | null; // Guess the Link game state
   top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
   revCatState: RevCatPublicState | null; // Reverse Categories items/board state
+  /** Public host settings per game (how a round plays, never its secrets). */
+  gameSettings: GameSettings;
+  /**
+   * Whether the server has a usable AI provider for hosted content (custom
+   * themes / AI top-ups). Public because the host UI only offers the custom
+   * theme field when it can actually be used.
+   */
+  aiContentAvailable: boolean;
   /** True while a host-authored concept is queued for the next GTL round.
    *  Never carries the concept itself — only that a custom round is loaded. */
   gtlCustomReady?: boolean;

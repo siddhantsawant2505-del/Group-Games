@@ -1,0 +1,122 @@
+# Moderation blocklist for AI-generated content (words and question text).
+#
+# Format: one lowercase token per line, comments with `#`. Matching is
+# whole-word and case-insensitive, and stems are listed explicitly so
+# partial matches (scunthorpe-style false positives) never occur.
+#
+# This list is deliberately SHORT: it exists to stop the content engine's
+# AI top-up from introducing explicit or hateful material into a party game.
+# It is not a general-purpose profanity filter.
+
+# --- strong profanity ---
+fuck
+fucked
+fucker
+fucking
+motherfucker
+shit
+shitty
+bullshit
+cunt
+bastard
+bollocks
+wanker
+twat
+prick
+piss
+pissed
+arsed
+arsehole
+asshole
+bitch
+dickhead
+dick
+cock
+pussy
+
+# --- sexual / explicit ---
+sex
+sexy
+porn
+porno
+pornography
+nude
+nudes
+naked
+orgasm
+orgasms
+erotic
+erotica
+masturbate
+masturbation
+penis
+vagina
+testicle
+testicles
+sperm
+semen
+condom
+nipple
+nipples
+blowjob
+handjob
+threesome
+bondage
+fetish
+brothel
+hooker
+whore
+slut
+stripper
+stripping
+
+# --- alcohol / drugs / adult themes (party-safe default) ---
+cocaine
+heroin
+meth
+methamphetamine
+marijuana
+cannabis
+morphine
+overdose
+suicide
+suicidal
+selfharm
+gun
+guns
+pistol
+revolver
+rifle
+shotgun
+ammunition
+grenade
+bomb
+bombs
+explosive
+torture
+murder
+murderer
+massacre
+genocide
+rape
+rapist
+
+# --- slurs (stems) ---
+nigger
+nigga
+niggas
+faggot
+faggots
+retard
+retarded
+spastic
+chink
+gook
+kike
+paki
+tranny
+dyke
+wetback
+coon
+raghead
+towelhead

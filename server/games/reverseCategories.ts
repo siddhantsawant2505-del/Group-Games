@@ -172,12 +172,19 @@ export function simulateRevCatBotCategories(room: InternalRoom): void {
     'Great band names',
     'Things aliens would fear',
     'Bad answers to "how was your day"',
+    'Excuses for being late',
+    'Items in a villain lair',
   ];
 
+  // Draw without replacement first so no two bots post the same category.
+  const pool = [...templates];
   room.players
     .filter((player) => player.isBot)
-    .forEach((bot) => {
-      const pick = templates[Math.floor(Math.random() * templates.length)];
+    .forEach((bot, index) => {
+      const pick =
+        pool.length > 0
+          ? pool.splice(Math.floor(Math.random() * pool.length), 1)[0]
+          : templates[index % templates.length];
       recordRevCatCategory(room, bot.id, pick);
     });
 }

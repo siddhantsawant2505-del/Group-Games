@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Play, Sparkles, Link2, CheckCircle2 } from 'lucide-react';
-import { RoomPublicState, Player } from '@shared/types';
+import { RoomPublicState, Player, ImpostorSettings } from '@shared/types';
 import { PARTY_GAMES } from '@shared/data/games';
 import {
   GTL_MAX_CATEGORY_CHARS,
@@ -12,8 +12,12 @@ import {
 } from '@shared/data/guessTheLinkPrompts';
 import { GameCard } from '../components/GameCard';
 import { ActionButton } from '../components/ActionButton';
+import { GameSettingsPanel } from '../components/GameSettingsPanel';
 
 const GTL_GAME_ID = 'guess-the-link';
+const IMPOSTOR_GAME_ID = 'impostor';
+/** Question mode is wired up in phase 2; until then the panel hides it. */
+const QUESTION_MODE_AVAILABLE = false;
 
 interface GtlPromptDraft {
   concept: string;
@@ -37,6 +41,11 @@ interface GameSelectScreenProps {
     input: { concept: string; category?: string; hints?: string[] },
     callback: (res: { success: boolean; error?: string; prompt?: { concept: string; category: string; hints: string[] } | null }) => void
   ) => void;
+  /** Impostor only: host updates the public round settings. */
+  onSaveGameSettings?: (
+    patch: { impostor?: Partial<ImpostorSettings> },
+    callback: (res: { success: boolean; error?: string }) => void
+  ) => void;
 }
 
 export function GameSelectScreen({
@@ -45,6 +54,7 @@ export function GameSelectScreen({
   onSelectGame,
   onConfirmAndStart,
   onSaveGtlPrompt,
+  onSaveGameSettings,
 }: GameSelectScreenProps) {
   const isHost = myPlayer.isHost;
   const currentSelectedId = room.selectedGame?.id || PARTY_GAMES[0].id;
@@ -71,6 +81,8 @@ export function GameSelectScreen({
     PARTY_GAMES.find((g) => g.id === (isHost ? localSelectedId : currentSelectedId)) ||
     PARTY_GAMES[0];
   const isGtlSelected = (isHost ? localSelectedId : currentSelectedId) === GTL_GAME_ID;
+  const isImpostorSelected =
+    (isHost ? localSelectedId : currentSelectedId) === IMPOSTOR_GAME_ID;
 
   const setHint = (index: number, value: string) => {
     setDraft((prev) => {
@@ -175,6 +187,16 @@ export function GameSelectScreen({
             />
           ))}
         </div>
+
+        {/* Impostor: public round settings (mode, difficulty, tone, theme) */}
+        {isImpostorSelected && (
+          <GameSettingsPanel
+            room={room}
+            myPlayer={myPlayer}
+            onSaveGameSettings={onSaveGameSettings}
+            questionModeAvailable={QUESTION_MODE_AVAILABLE}
+          />
+        )}
 
         {/* Guess the Link: host-authored concept */}
         {isGtlSelected && isHost && (

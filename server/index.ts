@@ -1,3 +1,6 @@
+// Loads .env before any module reads the environment (PORT/HOST, GEMINI_API_KEY, APP_URL).
+// Kept first: ES module evaluation follows import order.
+import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import os from 'os';
@@ -5,10 +8,15 @@ import path from 'path';
 import { Server as SocketIOServer } from 'socket.io';
 import { createServer as createViteServer } from 'vite';
 import { roomManager } from './roomManager.ts';
+import { reportAiUnavailableOnce } from './content/index.ts';
 
 const projectRoot = process.cwd();
 
 async function startServer() {
+  // Announce once at boot whether the content engine has an AI provider, so the
+  // fallback behaviour is never a surprise. Silent when a real key is set.
+  reportAiUnavailableOnce();
+
   const app = express();
   const server = http.createServer(app);
   const PORT = Number(process.env.PORT) || 3000;
@@ -29,6 +37,10 @@ async function startServer() {
   const broadcastRoom = (roomCode: string) => {
     const room = roomManager.getRoom(roomCode);
     if (!room) return;
+
+    // Any broadcast counts as room activity: it is what keeps an in-progress
+    // game alive for the idle-room sweeper below.
+    room.lastActivityAt = Date.now();
 
     const publicState = roomManager.getPublicRoomState(room);
 
@@ -225,6 +237,34 @@ async function startServer() {
         const upperCode = (roomCode || '').toUpperCase().trim();
         const success = roomManager.selectGame(upperCode, gameId);
         if (success) {
+          broadcastRoom(upperCode);
+        }
+      }
+    );
+
+    // 4b. Host updates the selected game's public settings (difficulty, theme, mode, tone)
+    socket.on(
+      'set-game-settings',
+      (
+        {
+          roomCode,
+          playerId,
+          settings,
+        }: {
+          roomCode: string;
+          playerId: string;
+          settings?: {
+            impostor?: { mode?: string; difficulty?: string; tone?: string; theme?: string };
+          };
+        },
+        callback
+      ) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const result = roomManager.setGameSettings(upperCode, playerId, settings || {});
+        if (typeof callback === 'function') {
+          callback(result);
+        }
+        if (result.success) {
           broadcastRoom(upperCode);
         }
       }
@@ -538,6 +578,16 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  // Idle-room sweep: releases a room's content bags, round state and AI
+  // counters once nobody has been connected for two hours.
+  const sweepTimer = setInterval(() => {
+    const removed = roomManager.sweepIdleRooms();
+    if (removed.length > 0) {
+      console.log(`[rooms] Swept ${removed.length} idle room(s): ${removed.join(', ')}`);
+    }
+  }, 10 * 60 * 1000);
+  sweepTimer.unref?.();
 
   server.listen(PORT, HOST, () => {
     console.log(`\n🎉 Party Games Server running at:`);

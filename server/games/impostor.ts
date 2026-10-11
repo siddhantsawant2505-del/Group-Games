@@ -4,12 +4,13 @@
  * randomized reveal, voting verification, and +1 scoring rules.
  */
 
-import { getRandomImpostorWord, ImpostorWord } from '../../shared/data/impostorWords';
 import { InternalRoom, InternalPlayer } from '../roomManager';
 import { RoleRevealInfo, PlayerResultStanding, VoteBreakdownItem, RevealedAnswer } from '../../shared/types';
+import { WordItem } from '../content/types';
 
 export interface ImpostorRoundState {
-  currentWord: ImpostorWord;
+  /** Served by the content engine (shipped corpus, or an AI top-up). */
+  currentWord: WordItem;
   impostorPlayerId: string;
   divergedCluePlayerId?: string;
 }
@@ -31,12 +32,12 @@ function shuffleArray<T>(array: T[]): T[] {
 
 /**
  * 1. Role Assignment Phase
- * Server selects a random secret word from the starter list and a random impostor.
+ * The caller hands in the secret word (served by server/content/wordProvider so
+ * words never repeat inside a room) and the server picks a random impostor.
  * - Non-impostor players privately receive: "the word is: <word>"
  * - The impostor privately receives: "you're the impostor" (no word)
  */
-export function setupImpostorRound(room: InternalRoom): void {
-  const wordItem = getRandomImpostorWord();
+export function setupImpostorRound(room: InternalRoom, wordItem: WordItem): void {
   const eligiblePlayers = room.players.filter((p) => p.connected);
   const playerPool = eligiblePlayers.length > 0 ? eligiblePlayers : room.players;
 

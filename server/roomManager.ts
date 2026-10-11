@@ -27,7 +27,10 @@ import {
   buildGtlCustomPrompt,
   isBlankGtlCustomPrompt,
 } from '../shared/data/guessTheLinkPrompts';
-import { getRandomImpostorWord } from '../shared/data/impostorWords';
+import { DEFAULT_IMPOSTOR_SETTINGS, GameSettings } from '../shared/types';
+import { sanitizeTheme } from './content/types';
+import { prefetchWordContent, randomCorpusWord, wordProvider } from './content/wordProvider';
+import { isAiAvailable, releaseRoomContent } from './content';
 import {
   setupImpostorRound,
   recordPlayerClue,
@@ -110,6 +113,9 @@ import {
   cleanupRevCatRound,
 } from './games/reverseCategories';
 
+/** Rooms with no connected player are dropped after this much inactivity. */
+export const ROOM_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+
 /** Game ids that ship with a dedicated server-side rules module. */
 const IMPOSTOR_GAME_ID = 'impostor';
 const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
@@ -147,6 +153,8 @@ export interface InternalRoom {
   gtlState: GtlPublicState | null; // Guess the Link round state
   top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
   revCatState: RevCatPublicState | null; // Reverse Categories items/board state
+  /** Host settings per game. Public: they never carry round secrets. */
+  gameSettings: GameSettings;
   /** Host-authored Guess the Link prompt, consumed by the next round.
    *  Kept off public state so the concept never leaks before results. */
   gtlCustomPrompt: GuessTheLinkPrompt | null;
@@ -237,6 +245,7 @@ export class RoomManager {
       gtlState: null,
       top100State: null,
       revCatState: null,
+      gameSettings: { impostor: { ...DEFAULT_IMPOSTOR_SETTINGS } },
       gtlCustomPrompt: null,
       botTimeouts: [],
       createdAt: Date.now(),
@@ -466,6 +475,84 @@ export class RoomManager {
   }
 
   /**
+   * Applies a host-authored settings patch for the selected game.
+   * Settings are strategy, not secrets, so they live in the public room state
+   * and are only editable before a round starts (lobby / game-select).
+   */
+  public setGameSettings(
+    code: string,
+    playerId: string,
+    patch: {
+      impostor?: {
+        mode?: string;
+        difficulty?: string;
+        tone?: string;
+        theme?: string;
+      };
+    }
+  ): { success: boolean; error?: string } {
+    const room = this.getRoom(code);
+    if (!room) return { success: false, error: 'Room not found.' };
+    if (playerId !== room.hostId) return { success: false, error: 'Only the host can change settings.' };
+    if (room.phase !== 'lobby' && room.phase !== 'game-select') {
+      return { success: false, error: 'Settings are locked once a round starts.' };
+    }
+
+    const current = room.gameSettings.impostor;
+    const incoming = patch?.impostor || {};
+
+    const mode = incoming.mode === 'question' || incoming.mode === 'word' ? incoming.mode : current.mode;
+    const difficulty =
+      incoming.difficulty === 'medium' || incoming.difficulty === 'any' || incoming.difficulty === 'easy'
+        ? incoming.difficulty
+        : current.difficulty;
+    const tone =
+      incoming.tone === 'spicy' || incoming.tone === 'clean' ? incoming.tone : current.tone;
+    const theme =
+      typeof incoming.theme === 'string'
+        ? sanitizeTheme(incoming.theme)
+        : typeof current.theme === 'string'
+        ? current.theme
+        : '';
+
+    room.gameSettings = {
+      ...room.gameSettings,
+      impostor: { mode, difficulty, tone, ...(theme ? { theme } : {}) },
+    };
+    room.lastActivityAt = Date.now();
+    return { success: true };
+  }
+
+  /**
+   * Deletes a room and releases every per-room store it owned
+   * (round state, content bags, AI rate-limit counters).
+   */
+  public deleteRoom(code: string): boolean {
+    const room = this.getRoom(code);
+    if (!room) return false;
+    this.clearPhaseTimer(room);
+    releaseRoomContent(room.code);
+    this.rooms.delete(room.code);
+    return true;
+  }
+
+  /**
+   * Idle-room sweep: drops rooms that have had no connected player for
+   * `maxIdleMs`, which is the engine's only room-cleanup point today.
+   */
+  public sweepIdleRooms(maxIdleMs: number = ROOM_IDLE_TIMEOUT_MS): string[] {
+    const now = Date.now();
+    const removed: string[] = [];
+    for (const room of Array.from(this.rooms.values())) {
+      const hasConnectedPlayer = room.players.some((player) => player.connected);
+      if (hasConnectedPlayer) continue;
+      if (now - room.lastActivityAt < maxIdleMs) continue;
+      if (this.deleteRoom(room.code)) removed.push(room.code);
+    }
+    return removed;
+  }
+
+  /**
    * Starts a phase timer on the server.
    * Decrements every second and invokes onExpire callback when done.
    */
@@ -571,6 +658,7 @@ export class RoomManager {
         cleanupGtlRound(room.code);
         cleanupTop100Round(room.code);
         cleanupRevCatRound(room.code);
+        releaseRoomContent(room.code);
         break;
       }
 
@@ -581,10 +669,16 @@ export class RoomManager {
       }
 
       case 'reveal': {
-        // Prepare private roles/words based on selected game
+        // Impostor takes its word from the content engine. The shipped bag
+        // answers immediately, but the provider is asynchronous, so the reveal
+        // finishes in its own method rather than blocking the state machine.
         if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
-          setupImpostorRound(room);
-        } else if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) {
+          void this.startImpostorReveal(room, broadcastState);
+          return;
+        }
+
+        // Prepare private roles/words based on selected game
+        if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) {
           setupAvoidTheWordRound(room);
         } else if (room.selectedGame?.id === MAFIA_GAME_ID) {
           setupMafiaRound(room);
@@ -597,18 +691,7 @@ export class RoomManager {
         } else {
           this.setupPhaseReveal(room);
         }
-        // Reverse Categories hides nothing, so it never uses the secret-role copy.
-        const revealIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
-        room.phasePrompt = revealIsRevCat ? 'Your Three Items' : 'Check Your Secret Role';
-        room.phaseSubprompt = revealIsRevCat
-          ? 'Everyone sees the same items — invent the best category that links them'
-          : 'Keep your screen hidden from others!';
-        this.startPhaseTimer(
-          room,
-          10,
-          () => broadcastState(),
-          () => this.transitionToPhase(room, this.phaseAfterReveal(room), broadcastState)
-        );
+        this.startRevealTimer(room, broadcastState);
         break;
       }
 
@@ -848,6 +931,13 @@ export class RoomManager {
       case 'discussion': {
         room.phasePrompt = 'Group Discussion';
         room.phaseSubprompt = 'Compare clues, spot the bluffer, or skip early to vote!';
+        // Warm the next round's word (and any AI batch) while the table talks.
+        if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
+          prefetchWordContent(room.code, {
+            difficulty: room.gameSettings.impostor.difficulty,
+            theme: room.gameSettings.impostor.theme,
+          });
+        }
         this.startPhaseTimer(
           room,
           90,
@@ -931,6 +1021,43 @@ export class RoomManager {
     }
 
     broadcastState();
+  }
+
+  /**
+   * Impostor reveal: serves the round's word from the content engine (so a word
+   * never repeats inside a room) and then runs the standard reveal timer.
+   */
+  private async startImpostorReveal(room: InternalRoom, broadcastState: () => void) {
+    const settings = room.gameSettings.impostor;
+    const word = await wordProvider.next(room.code, {
+      difficulty: settings.difficulty,
+      theme: settings.theme,
+    });
+
+    // A host skip or disconnect may have moved the room on while we waited.
+    if (room.phase !== 'reveal' || room.selectedGame?.id !== IMPOSTOR_GAME_ID) return;
+
+    setupImpostorRound(room, word);
+    this.startRevealTimer(room, broadcastState);
+    broadcastState();
+  }
+
+  /**
+   * Shared reveal copy + timer, used by every game's reveal phase.
+   */
+  private startRevealTimer(room: InternalRoom, broadcastState: () => void) {
+    // Reverse Categories hides nothing, so it never uses the secret-role copy.
+    const revealIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
+    room.phasePrompt = revealIsRevCat ? 'Your Three Items' : 'Check Your Secret Role';
+    room.phaseSubprompt = revealIsRevCat
+      ? 'Everyone sees the same items — invent the best category that links them'
+      : 'Keep your screen hidden from others!';
+    this.startPhaseTimer(
+      room,
+      10,
+      () => broadcastState(),
+      () => this.transitionToPhase(room, this.phaseAfterReveal(room), broadcastState)
+    );
   }
 
   /**
@@ -1089,9 +1216,9 @@ export class RoomManager {
 
     // Pick 1 player randomly to be Impostor/Special Role
     const impostorIndex = Math.floor(Math.random() * room.players.length);
-    const wordItem = getRandomImpostorWord();
+    const wordItem = randomCorpusWord('any');
     const secretWord = wordItem.word;
-    const secretCategory = `${wordItem.category}${wordItem.difficulty ? ` (${wordItem.difficulty})` : ''}`;
+    const secretCategory = `${wordItem.category} (tier ${wordItem.difficulty})`;
 
     room.players.forEach((player, index) => {
       const isImpostor = index === impostorIndex;
@@ -1552,6 +1679,8 @@ export class RoomManager {
       gtlState: room.gtlState,
       top100State: room.top100State,
       revCatState: room.revCatState,
+      gameSettings: room.gameSettings,
+      aiContentAvailable: isAiAvailable(),
       gtlCustomReady: Boolean(room.gtlCustomPrompt),
     };
   }

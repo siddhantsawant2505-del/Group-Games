@@ -80,7 +80,30 @@ The private channel is only for the intended recipient.
 - Transport should be selected by the client, but the server must handle reconnection gracefully
   when the transport changes.
 
-### 2.4 Event-driven input, state-driven output
+### 2.4 Content engine (`server/content/`)
+
+Generated and bundled game content is served through one provider layer so no game owns its own
+word list, and no room repeats content:
+
+- **`ContentProvider<T>`** — `next(roomId, opts?)` and `release(roomId)`. Providers are async
+  because they may top themselves up from the AI client in the background, but bundled content is
+  answered immediately: a round never waits on the network.
+- **Shuffle bag** — each room gets its own shuffled queue plus a served set. Nothing repeats until
+  the pool is exhausted, and after a reshuffle the first items are never any of the last 10 served.
+  Unused items always come before already-served ones, so even rebuilding the pool (a mid-session
+  difficulty switch) cannot replay a word.
+- **AI client** — server-only Gemini wrapper: 8s timeout, one retry, strict JSON output, a per-room
+  rate limit (20 calls/hour) and a single "unavailable" report. The API key never reaches a client,
+  and a missing or placeholder key degrades to bundled content without errors or log spam.
+- **Validation before use** — AI content is validated locally (shape, commonness data, blocklist,
+  shipped corpus, room history) before entering a room's bag. Host-authored themes are trimmed to
+  40 characters, stripped of control characters and passed to the model as declared data with a
+  "never an instruction" system rule.
+- **Lifecycle** — `releaseRoomContent(roomId)` drops the bags, histories and AI counters. It runs
+  when a room resets to the lobby and when the idle-room sweeper deletes a room (no connected
+  player for two hours).
+
+### 2.5 Event-driven input, state-driven output
 
 Clients emit commands; the server mutates state; the server emits state. This prevents clients
 from diverging.
@@ -166,7 +189,9 @@ closed (idle timeout / host left)
 2. **Players join** → validate code, cap at 12 players, assign color index (0–5), generate
    session token.
 3. **Game select** → host picks the game.
-4. **Reveal** → server assigns roles and hidden words; starts a reveal timer.
+4. **Reveal** → server assigns roles and hidden words; starts a reveal timer. The Impostor word is
+   served by the content engine, so this phase completes in its own method when the provider
+   resolves instead of blocking the synchronous state machine.
 5. **Input** → players submit clues; server records them; starts an input timer.
 6. **Reveal-answers** → compile revealed answers in random order; start timer.
 7. **Discussion** → timed discussion.
@@ -385,6 +410,9 @@ full replay.
 ### 8.6 Testing
 
 - Unit tests for room state machine transitions and validations.
+- A content-engine suite (`npm run test:content`) covering 500 rounds in one room, whole-pool
+  exhaustion, the reshuffle guard, mid-session difficulty switches, AI output validation and the
+  AI availability rules.
 - Integration tests over Socket.IO: create room, join, submit, vote, results, reconnect.
 - Fixture-based bot simulation to exercise edge cases (timeout, disconnect, full room).
 - Snapshot/UI tests for each phase.

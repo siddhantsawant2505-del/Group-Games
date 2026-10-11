@@ -43,8 +43,8 @@ npm run clean        # Clean build artifacts (dist/ directory)
 - A 4-character room code + QR code are used for joining.
 - A "next-round" loop lets a host replay a new round with a fresh role assignment.
 
-Five games ship dedicated server engines — **Impostor**, **Avoid the Word**, **Mafia**,
-**Guess the Link**, and **Top 100** — with additional game ideas documented for future expansion.
+All six games ship their own dedicated server engine — **Impostor**, **Avoid the Word**, **Mafia**,
+**Guess the Link**, **Top 100**, and **Reverse Categories**.
 
 ---
 
@@ -58,12 +58,14 @@ Five games ship dedicated server engines — **Impostor**, **Avoid the Word**, *
 - **Session reconnect** — reconnect by previous name or session token.
 - **Host controls** — game selection, phase advancement, skip timers, and bot injection for solo testing.
 - **Six built-in games** — Impostor, Avoid the Word, Mafia, Guess the Link, Top 100, Reverse Categories.
-- **100-word wordlist** — difficulty-stratified thematic nouns for the Impostor game.
+- **Content engine (`server/content/`)** — a reusable provider layer. Words are served from a 2,059-noun corpus through a per-room shuffle bag, so nothing repeats until a room has seen the whole pool; an optional AI top-up is validated locally (commonness, shape, blocklist, room history) before it can ever be used.
+- **Host difficulty setting** — Easy / Medium / Any filter the Impostor word pool, plus an optional custom theme and an AI top-up once a real `GEMINI_API_KEY` is configured. Without a key everything silently falls back to the bundled pool.
 - **40 taboo cards** — original subjects with 3 forbidden trap words each for Avoid the Word.
 - **Live describing turns** — Avoid the Word runs one describer at a time with buzz confirmation.
 - **Dedicated Mafia engine** — privately dealt roles, timed night actions, day eliminations, win-condition checks, and scoring.
 - **Dedicated Guess the Link engine** — one hidden concept, a different private hint angle per player, a shuffled link board, and simultaneous concept guessing with per-correct points.
 - **Dedicated Top 100 engine** — one 1-to-100 spectrum, a unique secret number per player, private example writing, a host-authoritative drag-and-drop ranking phase broadcast live to everyone, and adjacent-pair accuracy scoring.
+- **Dedicated Reverse Categories engine** — three deliberately unrelated items shown publicly (no secrets at all), privately invented category names, a shuffled attributed board, and the standard secret ballot repurposed to crown the best category.
 - **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, guess, rank, discussion, vote, atw-describe, night, day, results, next-round.
 
 ---
@@ -83,7 +85,7 @@ Five games ship dedicated server engines — **Impostor**, **Avoid the Word**, *
 
 ## Games collection, rules & working state
 
-Party Games features a collection of six multiplayer party games designed for phone controllers. **Impostor**, **Avoid the Word**, **Mafia**, **Guess the Link**, and **Top 100** are 100% operational with dedicated server game engines, while the remaining game is integrated into the selection UI and executes on the generic round framework.
+Party Games features a collection of six multiplayer party games designed for phone controllers. All six are 100% operational with dedicated server game engines.
 
 | Game | Players | Category | Icon | Current Working State |
 |---|---|---|---|---|
@@ -92,7 +94,7 @@ Party Games features a collection of six multiplayer party games designed for ph
 | **Mafia** | 4–16 | Social Deduction | Detective | 🟢 **Fully Working & Playable** — Dedicated engine with private role deal, timed night actions, day eliminations, and win-condition scoring |
 | **Guess the Link** | 3–8 | Word Association | Link | 🟢 **Fully Working & Playable** — Dedicated engine with one hidden concept, per-player private hint angles, shuffled board, simultaneous guessing, and scoring |
 | **Top 100** | 3–10 | Ranking / Spectrum | List-Ordered | 🟢 **Fully Working & Playable** — Dedicated engine with a unique secret number per player, private example writing, a host-authoritative drag-to-rank phase broadcast live, and adjacent-pair accuracy scoring |
-| **Reverse Categories** | 3–8 | Trivia / Creative | Shuffle | 🟡 **Selectable & Framework-Ready** — Generic clue/vote phase; 3-item prompt generation planned |
+| **Reverse Categories** | 3–8 | Trivia / Creative | Shuffle | 🟢 **Fully Working & Playable** — Dedicated engine with unrelated-item triplets, public items (no secrets), privately invented categories, a shuffled attributed board, and a best-category ballot with author and voter scoring |
 
 ---
 
@@ -106,24 +108,26 @@ Party Games features a collection of six multiplayer party games designed for ph
 
 - **Game Rules & Mechanics**:
   1. **Player Requirements**: 3 to 12 players (solo testing supported via "+ Add Bot").
-  2. **Role Assignment (`reveal` phase, 10s)**:
-     - The server selects a secret word and category from the 100-word curated dictionary (`data/wordlist.json`).
+  2. **Host Settings (`game-select` phase)**:
+     - The host picks a **difficulty** for the next round — *Easy* (everyday words), *Medium* (less common words) or *Any* (the whole pool) — and, when the server has a working AI provider, an optional **custom theme**. Settings are public, never secret, and non-hosts see them read-only.
+  3. **Role Assignment (`reveal` phase, 10s)**:
+     - The server asks the content engine (`server/content/wordProvider.ts`) for the round's word, drawn from a 2,059-noun corpus (`shared/data/words/commonNouns.json`) through a **per-room shuffle bag**: a word cannot repeat until that room has seen the whole pool, and a reshuffle never starts with any of the last 10 words served.
      - Exactly 1 player is secretly designated as **The Impostor**; all others become **Crew Members**.
      - **Crew View**: Sees the secret word (e.g. *"Submarine"*) and category hint (*"Maritime & Vessels"*).
      - **Impostor View**: Sees only the category hint with the secret instruction: *"You're the impostor! You do NOT know the secret word. Blend in!"*
-  3. **Clue Submission (`input` phase, 20s)**:
+  4. **Clue Submission (`input` phase, 20s)**:
      - Every player privately types a **single-word clue** that demonstrates knowledge of the word without giving it away to the Impostor.
      - Server sanitizes input to ensure single-word compliance.
      - Test bots automatically generate plausible contextual clues (from curated association pools) or convincing bluffs.
-  4. **Simultaneous Reveal (`reveal-answers` phase, 15s)**:
+  5. **Simultaneous Reveal (`reveal-answers` phase, 15s)**:
      - All clues are revealed simultaneously.
      - Display order is randomized using the Fisher-Yates algorithm to eliminate join-order or alphabetical bias.
      - Any player who failed to submit in time is automatically marked with `"(No answer)"`.
-  5. **Discussion (`discussion` phase, 90s)**:
+  6. **Discussion (`discussion` phase, 90s)**:
      - Timed group debate where players interrogate word choices, spot inconsistencies, and defend their clues. The host can skip the timer at any time.
-  6. **Secret Voting (`vote` phase, 25s)**:
+  7. **Secret Voting (`vote` phase, 25s)**:
      - Players secretly tap a suspect's card to cast an accusation vote. Bots cast simulated votes.
-  7. **Results & Scoring (`results` phase)**:
+  8. **Results & Scoring (`results` phase)**:
      - **Win Condition**: The Impostor is caught **if and only if** they are the sole candidate receiving the highest vote count.
      - **Scoring**:
        - **+1 point** awarded to each player who correctly voted for the Impostor.
@@ -133,8 +137,8 @@ Party Games features a collection of six multiplayer party games designed for ph
        - Full vote breakdown showing who voted for whom.
        - Dynamic "why" narrative explaining how the Impostor bluffed or why their clue gave them away.
        - Real-time leaderboard with running cumulative scores.
-  8. **Next Round Loop (`next-round`)**:
-     - Host advances to the next round with a new secret word and freshly randomized Impostor, preserving cumulative scores.
+  9. **Next Round Loop (`next-round`)**:
+     - Host advances to the next round with a new secret word and freshly randomized Impostor, preserving cumulative scores. The word comes straight out of the same room bag, so back-to-back rounds cannot repeat it.
 
 ---
 
@@ -249,18 +253,29 @@ Party Games features a collection of six multiplayer party games designed for ph
 
 ---
 
-### 6. Catalog Games (🟡 Framework-Integrated & Selectable)
+### 6. Reverse Categories — Dedicated Item-Link Engine (🟢 Fully Operational)
 
-The remaining game is fully registered in `@shared/data/games.ts` and can be selected by the host in the `game-select` screen. It currently runs through the generic phase state machine (`server/roomManager.ts`) with a dedicated game rule module planned:
+**Reverse Categories** ships a fully custom server engine (`server/games/reverseCategories.ts`) with its own phase chain (`reveal → input → reveal-answers → vote → results`), server-side triplet picking, private category collection, and a shuffled attributed board. Items live in a 66-entry pool across 22 distinct themes (`shared/data/reverseCategoriesItems.ts`).
 
-#### Reverse Categories (Creative Trivia)
-- **Min/Max Players**: 3–8 | **Icon**: `shuffle`
-- **Tagline**: Answers first, questions later!
-- **Rules**:
-  - Three bizarre, seemingly unrelated items appear on screen.
-  - Players race against the clock to invent the cleverest or funniest category that links all three items.
-  - The group reviews submissions and votes on the best category invention.
-- **Current State**: Selectable in game menu; runs on generic input/voting phase; multi-item prompt generator and creative voting planned.
+- **Objective**: Three deliberately unrelated items are on the table. Invent the category that links them best, then vote for the cleverest invention.
+
+- **Game Rules & Mechanics**:
+  1. **Player Requirements**: 3 to 8 players (solo testing supported via "+ Add Bot").
+  2. **Item Reveal (`reveal` phase, 10s)**:
+     - The server draws **three items that never share a theme** (e.g. *"flamingo", "spreadsheet", "thunderstorm"*) and shows them to **everyone at once**.
+     - This game hides nothing: there is no secret role, no hidden word, and no private reveal — the whole table looks at the same board.
+  3. **Category Submission (`input` phase, 45s)**:
+     - Each player privately invents one category name linking all three items, sanitized to a maximum of **6 words / 48 characters**.
+     - Bots are given distinct generic category names so a solo host can walk a full round.
+  4. **The Category Board (`reveal-answers` phase, 20s)**:
+     - Every invented category is shown together in **Fisher-Yates shuffled order**, attributed to its author (a friend group wants to know who wrote the winner).
+  5. **Voting (`vote` phase, 25s)**:
+     - The standard secret ballot is reused unchanged: a vote targets the **author** of the category you liked best, exactly as the impostor round votes for a suspect. `castVote` already forbids self-votes, so nobody can crown their own category.
+     - Bots vote randomly so a solo host still gets a tally.
+  6. **Results (`results` phase)**:
+     - The tally is revealed with the winning category (ties included) spotlighted.
+     - **+2** to each winning category's author, and **+1** to every voter who backed a winning category.
+  7. **Next Round Loop (`next-round`)**: a fresh unrelated triplet, avoiding items this room has already seen, with cumulative scores preserved.
 
 ---
 
@@ -285,17 +300,35 @@ The remaining game is fully registered in `@shared/data/games.ts` and can be sel
 - **Session Reconnection**: Each player receives a persistent `sessionToken` upon joining.
 - **Solo Testing & Bot Injection**: Hosts can click **"+ Add Bot"** in preview or development.
 
-### 3. Game Phase State Machine
+### 3. Content Engine (`server/content/`)
+
+One provider layer feeds every word-based game, and later the taboo/link/spectrum decks too.
+
+| Module | Responsibility |
+|---|---|
+| `types.ts` | `ContentProvider<T>` contract (`next(roomId, opts)`, `release(roomId)`), the shared difficulty setting, and the theme/word sanitizers |
+| `contentBag.ts` | Per-room shuffle bag: a room's shuffled queue + served set, so nothing repeats until the pool is exhausted. A reshuffle (and a mid-session difficulty switch) can never serve any of the 10 most recent items first, and never re-serves a word while unused words remain |
+| `aiClient.ts` | Server-side Gemini wrapper: 8s timeout, one retry, strict JSON output, 20 generation calls per room per hour, and an "unavailable" report that fires **once** — no key, placeholder key or failures all fall back to bundled content silently |
+| `wordProvider.ts` | The word provider: bundled corpus via the bag, background AI top-up when the bag drops below 15 items or a theme is set, and local validation of every AI word |
+| `index.ts` | Barrel: `releaseRoomContent(roomId)` drops every per-room bag, history and rate-limit counter |
+
+**AI top-up rules.** The AI is only ever asked in the background — a round never waits on the network. Every returned word must be `^[a-z]{3,12}$`, absent from the shipped corpus and the room's history, present in the commonness data, and absent from `data/blocklist.txt`, or it is dropped. Host themes are trimmed to 40 characters, stripped of control characters, and passed to the model as data with an explicit "never an instruction" system rule. The provider also **prefetches** at the start of the discussion phase so the next round's word is already in the bag.
+
+**Difficulty.** `difficulty: 1|2|3` on every corpus entry maps to the host's Easy (tier 1), Medium (tiers 2-3) and Any (everything) settings. Switching difficulty mid-session rebuilds the pool but keeps the room history, so no word is replayed.
+
+**Room cleanup.** Rooms are released when they reset to the lobby and when the idle sweeper drops them (no connected player for two hours); `release(roomId)` clears the bag, the served history and the AI counters.
+
+### 4. Game Phase State Machine
 
 1. **`lobby`** — players join via room code/QR; host configures bots and launches.
 2. **`game-select`** — host chooses a party game.
-3. **`reveal`** — private assignment (impostor role, taboo cards, Mafia roles, or a Guess the Link hint angle).
-4. **`input`** — players submit clues (Impostor), responses (Guess the Link), or examples (Top 100).
-5. **`reveal-answers`** — clues revealed simultaneously (Impostor), the shuffled link board (Guess the Link), or the shuffled example board with its numbers still hidden (Top 100).
+3. **`reveal`** — private assignment (impostor role, taboo cards, Mafia roles, a Guess the Link hint angle, or a Top 100 secret number), or the public three items (Reverse Categories). The Impostor word is served asynchronously by the content engine, so this phase finishes in its own method rather than blocking the state machine.
+4. **`input`** — players submit clues (Impostor), responses (Guess the Link), examples (Top 100), or invented categories (Reverse Categories).
+5. **`reveal-answers`** — clues revealed simultaneously (Impostor), the shuffled link board (Guess the Link), the shuffled example board with its numbers still hidden (Top 100), or the shuffled attributed category board (Reverse Categories).
 6. **`guess`** — simultaneous guessing at the hidden concept (Guess the Link).
 7. **`rank`** — the host drags the Top 100 examples into ascending numeric order while everyone else watches live.
 8. **`discussion`** — timed debate (Impostor; Mafia day phase).
-9. **`vote`** — secret ballot (Impostor; Mafia exile vote).
+9. **`vote`** — secret ballot (Impostor; Mafia exile vote; Reverse Categories' best-category vote).
 10. **`atw-describe`** — Avoid the Word's live describing turns.
 11. **`night`** — Mafia and Detective act privately (Mafia).
 12. **`day`** — overnight elimination announced, then discussion and vote (Mafia).
@@ -368,7 +401,7 @@ The application is structured into three distinct layers: `client/` (React SPA),
 ├── client/                    # React 19 frontend SPA (Vite root)
 │   ├── index.html             # Client HTML entry point
 │   └── src/
-│       ├── components/        # UI components (QR modal, header, player badges)
+│       ├── components/        # UI components (QR modal, header, player badges, game settings panel)
 │       ├── screens/           # Phase screens (incl. Atw*, Mafia*, and GtlHintReveal/Input/ResponseReveal/Guess/Results)
 │       ├── services/
 │       │   ├── socket.ts      # Client-side Socket.IO singleton
@@ -385,24 +418,40 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   ├── server.cjs             # Bundled standalone Node.js server (esbuild)
 │   └── server.cjs.map         # Server sourcemap
 ├── server/                    # Backend Node.js + Express + Socket.IO server
+│   ├── content/               # Content engine: bags, AI client, providers
+│   │   ├── types.ts           # ContentProvider<T>, difficulty setting, sanitizers
+│   │   ├── contentBag.ts      # Per-room shuffle bag with the recent-item reshuffle guard
+│   │   ├── aiClient.ts        # Gemini wrapper: timeout, retry, JSON, per-room rate limit
+│   │   ├── wordProvider.ts    # Words: corpus bag + validated background AI top-up
+│   │   └── index.ts           # releaseRoomContent(roomId) + provider exports
 │   ├── games/
-│   │   ├── impostor.ts        # Impostor game rules, clue validator, bot logic
+│   │   ├── impostor.ts        # Impostor rules: clue sanitizer, bots, reveal, scoring
 │   │   ├── avoidTheWord.ts    # Taboo engine: turns, buzz verification, scoring, bot logic
-│   │   ├── mafia.ts           # Mafia engine: roles, night actions, win conditions, scoring, bot logic
-│   │   └── guessTheLink.ts    # Link engine: concept hiding, hint dealing, guessing, scoring, bot logic
+│   │   ├── mafia.ts           # Mafia engine: roles, night actions, win conditions, scoring
+│   │   ├── guessTheLink.ts    # Link engine: concept hiding, hint dealing, guessing, scoring
+│   │   ├── top100.ts          # Spectrum engine: secret numbers, ordering, pair accuracy
+│   │   └── reverseCategories.ts # Item-triplet engine: categories, attribution, best-category ballot
 │   ├── roomManager.ts         # In-memory room manager, sessions, & state masks
 │   └── index.ts               # Server entry point with Vite middleware / static serving
 ├── shared/                    # Code imported by BOTH client and server (@shared/*)
 │   ├── data/
 │   │   ├── games.ts           # Game catalog definitions
-│   │   ├── impostorWords.ts   # Word list helpers (server-side word selection)
+│   │   ├── words/
+│   │   │   └── commonNouns.json    # 2,059-noun corpus, generated (27 categories, tiers 1-3)
 │   │   ├── avoidTheWordPrompts.ts  # 40 subjects × 3 forbidden trap words
-│   │   └── guessTheLinkPrompts.ts  # 44 concepts × 6 hint angles each
+│   │   ├── guessTheLinkPrompts.ts  # 44 concepts × 6 hint angles each
+│   │   ├── top100Prompts.ts        # 22 spectra with sample examples
+│   │   └── reverseCategoriesItems.ts # 66 items across 22 themes
 │   ├── theme/
 │   │   └── tokens.ts          # Player color tokens & palette
 │   └── types.ts               # Shared TypeScript models and interfaces
+├── scripts/                   # Development-time tooling (not bundled into the app)
+│   ├── commonNouns.source.txt # Authored vocabulary source for the corpus
+│   ├── generateCommonNouns.ts # Regenerates commonNouns.json + lints it
+│   └── testContentEngine.ts   # `npm run test:content`
 ├── data/
-│   └── wordlist.json          # 100-word difficulty-stratified dictionary
+│   ├── common-words-frequency.txt # 10k most common English words (MIT, FrequencyWords)
+│   └── blocklist.txt          # Moderation list applied to AI-generated content
 ├── docs/                      # Project documentation
 │   ├── ARCHITECTURE.md        # Architecture reference
 │   ├── GAME_rules.md          # Game rules & system rules
@@ -425,6 +474,12 @@ npm run dev
 
 # Run TypeScript type validation across client, server, and shared code (tsc --noEmit)
 npm run lint
+
+# Content-engine suite: 500 rounds in one room, pool exhaustion, the reshuffle guard, AI validation
+npm run test:content
+
+# Regenerate shared/data/words/commonNouns.json from scripts/commonNouns.source.txt
+npm run generate:words
 
 # Build client SPA (vite build) and bundle server (esbuild server/index.ts -> dist/server.cjs)
 npm run build
@@ -458,12 +513,16 @@ npm run clean
 | `HOST` | Server host binding address | `0.0.0.0` | No |
 | `NODE_ENV` | Environment mode (`development` vs `production`) | `development` | Yes |
 | `DISABLE_HMR` | Disable Vite HMR and file watcher during automated edits | `false` | No |
-| `GEMINI_API_KEY` | Gemini API key for server-side AI calls (if enabled) | — | No |
+| `GEMINI_API_KEY` | Gemini API key for the content engine's AI top-ups and custom themes | — | No |
+| `GEMINI_MODEL` | Model used for AI content generation | `gemini-2.5-flash` | No |
+| `CONTENT_AI_DISABLED` | Force the content engine to bundled content only | `false` | No |
 | `APP_URL` | Public app URL for self-referential links and QR codes | — | No |
 
 > **Note:** The repository currently contains placeholder values in `.env`
 > (`GEMINI_API_KEY="MY_GEMINI_API_KEY"`, `APP_URL="MY_APP_URL"`). Treat these as examples —
-> replace them with real values before deploying to production.
+> replace them with real values before deploying to production. A placeholder (or missing) key is
+> detected at boot: the server logs one line and every game keeps running on the bundled content,
+> with the custom-theme field hidden in the host UI.
 
 ---
 

@@ -12,7 +12,7 @@ import {
   loadUserProfile,
 } from './services/socket';
 import { playNotificationSound, triggerHaptic } from './services/sound';
-import { RoomPublicState, Player, PlayerPrivateState, GamePhase } from '@shared/types';
+import { RoomPublicState, Player, PlayerPrivateState, GamePhase, ImpostorSettings } from '@shared/types';
 import { Header } from './components/Header';
 import { LoadingScreen } from './screens/LoadingScreen';
 import { NameEntryScreen } from './screens/NameEntryScreen';
@@ -312,6 +312,23 @@ export default function App() {
           category: input.category,
           hints: input.hints,
         },
+        callback
+      );
+    },
+    [room, myPlayer]
+  );
+
+  // Host updates the selected game's public settings (Impostor difficulty/theme)
+  const handleSaveGameSettings = useCallback(
+    (
+      patch: { impostor?: Partial<ImpostorSettings> },
+      callback: (res: { success: boolean; error?: string }) => void
+    ) => {
+      if (!room || !myPlayer) return;
+      const socket = getSocket();
+      socket.emit(
+        'set-game-settings',
+        { roomCode: room.roomCode, playerId: myPlayer.id, settings: patch },
         callback
       );
     },
@@ -644,6 +661,7 @@ export default function App() {
           onSelectGame={handleSelectGame}
           onConfirmAndStart={handleConfirmAndStartRound}
           onSaveGtlPrompt={handleSaveGtlPrompt}
+          onSaveGameSettings={handleSaveGameSettings}
         />
       ) : room.phase === 'reveal' ? (
         isAvoidTheWord ? (
