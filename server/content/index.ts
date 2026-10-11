@@ -1,20 +1,55 @@
 /**
  * Content-engine entry point.
  *
- * Import providers from here (`wordProvider`, and later `questionProvider`) and
- * call `releaseRoomContent(roomId)` wherever a room is cleaned up: it drops every
+ * Import providers from here (`wordProvider`, `questionProvider`) and call
+ * `releaseRoomContent(roomId)` wherever a room is cleaned up: it drops every
  * per-room shuffle bag, history and AI rate-limit counter.
  */
 
 import { releaseAiRoom } from './aiClient';
+import { questionProvider } from './questionProvider';
 import { wordProvider } from './wordProvider';
 
 export function releaseRoomContent(roomId: string): void {
   wordProvider.release(roomId);
+  questionProvider.release(roomId);
   releaseAiRoom(roomId);
 }
 
-export { wordProvider, prefetchWordContent, poolSizeFor, validateAiWords } from './wordProvider';
+export {
+  wordProvider,
+  prefetchWordContent,
+  poolSizeFor,
+  validateAiWords,
+  randomCorpusWord,
+  isCommonWord,
+  isBlockedWord,
+  hasCommonnessData,
+} from './wordProvider';
+export {
+  questionProvider,
+  prefetchQuestionContent,
+  pairPoolSizeFor,
+  validateQuestionPair,
+  validateAiPairs,
+  textSimilarity,
+  KIND_ANSWER_TYPE,
+  SEED_QUESTION_PAIRS,
+  QUESTION_BAG_LOW_WATER_MARK,
+  QUESTION_AI_BATCH_SIZE,
+  resetQuestionProviderForTests,
+} from './questionProvider';
 export { ShuffleBag, shuffle, RECENT_GUARD } from './contentBag';
 export { getAiStatus, isAiAvailable, reportAiUnavailableOnce, AI_LIMITS } from './aiClient';
-export type { ContentProvider, ContentDifficulty, WordItem, WordRequestOptions } from './types';
+export {
+  sanitizeTheme,
+  readDifficulty,
+  normalizeContentWord,
+  DEFAULT_CONTENT_DIFFICULTY,
+} from './types';
+export type {
+  ContentProvider,
+  ContentDifficulty,
+  WordItem,
+  WordRequestOptions,
+} from './types';

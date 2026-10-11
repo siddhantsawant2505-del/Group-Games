@@ -30,7 +30,7 @@ import {
 import { DEFAULT_IMPOSTOR_SETTINGS, GameSettings } from '../shared/types';
 import { sanitizeTheme } from './content/types';
 import { prefetchWordContent, randomCorpusWord, wordProvider } from './content/wordProvider';
-import { isAiAvailable, releaseRoomContent } from './content';
+import { isAiAvailable, prefetchQuestionContent, questionProvider, releaseRoomContent } from './content';
 import {
   setupImpostorRound,
   recordPlayerClue,
@@ -38,6 +38,13 @@ import {
   finalizeImpostorReveal,
   calculateImpostorResults,
   cleanupImpostorRound,
+  QUESTION_INPUT_SECONDS,
+  setupImpostorQuestionRound,
+  recordImpostorQuestionAnswer,
+  simulateImpostorQuestionBots,
+  finalizeImpostorQuestionReveal,
+  calculateImpostorQuestionResults,
+  cleanupImpostorQuestionRound,
 } from './games/impostor';
 import {
   ATW_TURN_SECONDS,
@@ -153,6 +160,7 @@ export interface InternalRoom {
   gtlState: GtlPublicState | null; // Guess the Link round state
   top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
   revCatState: RevCatPublicState | null; // Reverse Categories items/board state
+  impostorQuestionState: RoomPublicState['impostorQuestionState']; // Question mode only
   /** Host settings per game. Public: they never carry round secrets. */
   gameSettings: GameSettings;
   /** Host-authored Guess the Link prompt, consumed by the next round.
@@ -245,6 +253,7 @@ export class RoomManager {
       gtlState: null,
       top100State: null,
       revCatState: null,
+      impostorQuestionState: null,
       gameSettings: { impostor: { ...DEFAULT_IMPOSTOR_SETTINGS } },
       gtlCustomPrompt: null,
       botTimeouts: [],
@@ -658,6 +667,8 @@ export class RoomManager {
         cleanupGtlRound(room.code);
         cleanupTop100Round(room.code);
         cleanupRevCatRound(room.code);
+        cleanupImpostorQuestionRound(room.code);
+        room.impostorQuestionState = null;
         releaseRoomContent(room.code);
         break;
       }
@@ -764,14 +775,19 @@ export class RoomManager {
         const inputIsGtl = room.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
         const inputIsTop100 = room.selectedGame?.id === TOP_100_GAME_ID;
         const inputIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
-        room.phasePrompt = inputIsRevCat
+        const inputIsImpostorQuestion = this.isImpostorQuestionMode(room);
+        room.phasePrompt = inputIsImpostorQuestion
+          ? 'Answer Your Question'
+          : inputIsRevCat
           ? 'Invent Your Category'
           : inputIsTop100
           ? 'Write Your Example'
           : inputIsGtl
           ? 'Write Your Response'
           : 'Submit Your Clue';
-        room.phaseSubprompt = inputIsRevCat
+        room.phaseSubprompt = inputIsImpostorQuestion
+          ? 'Keep your answer short — the table will compare all of them'
+          : inputIsRevCat
           ? 'One category name that cleverly links all three items'
           : inputIsTop100
           ? 'A short scenario that fits your secret number on the spectrum'
@@ -782,7 +798,8 @@ export class RoomManager {
 
         // Auto-populate bot answers if any bots are in room
         if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
-          simulateImpostorBotClues(room);
+          if (inputIsImpostorQuestion) simulateImpostorQuestionBots(room);
+          else simulateImpostorBotClues(room);
         } else if (inputIsGtl) {
           simulateGtlBotResponses(room);
         } else if (inputIsTop100) {
@@ -793,7 +810,9 @@ export class RoomManager {
           this.simulateBotInputs(room);
         }
 
-        const inputSeconds = inputIsTop100
+        const inputSeconds = inputIsImpostorQuestion
+          ? QUESTION_INPUT_SECONDS
+          : inputIsTop100
           ? TOP100_INPUT_SECONDS
           : inputIsRevCat
           ? RC_INPUT_SECONDS
@@ -807,7 +826,7 @@ export class RoomManager {
           () => broadcastState(),
           () => {
             if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
-              finalizeImpostorReveal(room);
+              this.finalizeImpostorInput(room);
             } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
               finalizeGtlReveal(room);
             } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
@@ -825,14 +844,19 @@ export class RoomManager {
         const revealIsGtl = room.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
         const revealIsTop100 = room.selectedGame?.id === TOP_100_GAME_ID;
         const revealIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
-        room.phasePrompt = revealIsRevCat
+        const revealIsImpostorQuestion = this.isImpostorQuestionMode(room);
+        room.phasePrompt = revealIsImpostorQuestion
+          ? 'The Answer Board'
+          : revealIsRevCat
           ? 'The Category Board'
           : revealIsGtl
           ? 'The Link Board'
           : revealIsTop100
           ? 'The Example Board'
           : 'Simultaneous Reveal';
-        room.phaseSubprompt = revealIsRevCat
+        room.phaseSubprompt = revealIsImpostorQuestion
+          ? 'Every answer, shuffled — did one of them fit a different question?'
+          : revealIsRevCat
           ? 'Every invented category, shuffled — then vote for the best one'
           : revealIsGtl
           ? 'Every response, shuffled — what single concept ties them together?'
@@ -840,7 +864,7 @@ export class RoomManager {
           ? 'Every example, shuffled — the secret numbers stay hidden for now'
           : 'Review every player’s clue in randomized order';
         if (room.selectedGame?.id === 'impostor') {
-          finalizeImpostorReveal(room);
+          this.finalizeImpostorInput(room);
         } else if (revealIsGtl) {
           finalizeGtlReveal(room);
         } else if (revealIsTop100) {
@@ -929,14 +953,23 @@ export class RoomManager {
       }
 
       case 'discussion': {
-        room.phasePrompt = 'Group Discussion';
-        room.phaseSubprompt = 'Compare clues, spot the bluffer, or skip early to vote!';
-        // Warm the next round's word (and any AI batch) while the table talks.
+        if (this.isImpostorQuestionMode(room)) {
+          room.phasePrompt = 'Compare Answers';
+          room.phaseSubprompt = 'Whose answer feels like it belongs to a different question?';
+        } else {
+          room.phasePrompt = 'Group Discussion';
+          room.phaseSubprompt = 'Compare clues, spot the bluffer, or skip early to vote!';
+        }
+        // Warm the next round's content (and any AI batch) while the table talks.
         if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
-          prefetchWordContent(room.code, {
-            difficulty: room.gameSettings.impostor.difficulty,
-            theme: room.gameSettings.impostor.theme,
-          });
+          if (this.isImpostorQuestionMode(room)) {
+            prefetchQuestionContent(room.code, { tone: room.gameSettings.impostor.tone });
+          } else {
+            prefetchWordContent(room.code, {
+              difficulty: room.gameSettings.impostor.difficulty,
+              theme: room.gameSettings.impostor.theme,
+            });
+          }
         }
         this.startPhaseTimer(
           room,
@@ -987,7 +1020,7 @@ export class RoomManager {
 
       case 'results': {
         if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
-          calculateImpostorResults(room);
+          this.calculateImpostorRoundResults(room);
         } else if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) {
           calculateAtwResults(room);
         } else if (room.selectedGame?.id === MAFIA_GAME_ID) {
@@ -1029,6 +1062,24 @@ export class RoomManager {
    */
   private async startImpostorReveal(room: InternalRoom, broadcastState: () => void) {
     const settings = room.gameSettings.impostor;
+
+    if (settings.mode === 'question') {
+      // Question mode: every player privately receives a question. The impostor
+      // gets a related but different one, and nothing on screen says so.
+      const pair = await questionProvider.next(room.code, { tone: settings.tone });
+
+      // A host skip or disconnect may have moved the room on while we waited.
+      if (room.phase !== 'reveal' || room.selectedGame?.id !== IMPOSTOR_GAME_ID) return;
+
+      setupImpostorQuestionRound(room, pair);
+      this.startRevealTimer(room, broadcastState, {
+        prompt: 'Your Question',
+        subprompt: 'Answer privately — nobody sees it until the reveal',
+      });
+      broadcastState();
+      return;
+    }
+
     const word = await wordProvider.next(room.code, {
       difficulty: settings.difficulty,
       theme: settings.theme,
@@ -1037,21 +1088,48 @@ export class RoomManager {
     // A host skip or disconnect may have moved the room on while we waited.
     if (room.phase !== 'reveal' || room.selectedGame?.id !== IMPOSTOR_GAME_ID) return;
 
+    // Word mode owns no question state: clear anything a question round left.
+    room.impostorQuestionState = null;
     setupImpostorRound(room, word);
     this.startRevealTimer(room, broadcastState);
     broadcastState();
   }
 
+  /** True while the selected Impostor round is question mode. */
+  private isImpostorQuestionMode(room: InternalRoom): boolean {
+    return (
+      room.selectedGame?.id === IMPOSTOR_GAME_ID && room.gameSettings.impostor.mode === 'question'
+    );
+  }
+
+  /** Compiles the Impostor answers board for whichever mode is running. */
+  private finalizeImpostorInput(room: InternalRoom) {
+    if (this.isImpostorQuestionMode(room)) finalizeImpostorQuestionReveal(room);
+    else finalizeImpostorReveal(room);
+  }
+
+  /** Impostor results for whichever mode is running. */
+  private calculateImpostorRoundResults(room: InternalRoom) {
+    if (this.isImpostorQuestionMode(room)) calculateImpostorQuestionResults(room);
+    else calculateImpostorResults(room);
+  }
+
   /**
    * Shared reveal copy + timer, used by every game's reveal phase.
    */
-  private startRevealTimer(room: InternalRoom, broadcastState: () => void) {
+  private startRevealTimer(
+    room: InternalRoom,
+    broadcastState: () => void,
+    copy?: { prompt: string; subprompt: string }
+  ) {
     // Reverse Categories hides nothing, so it never uses the secret-role copy.
     const revealIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
-    room.phasePrompt = revealIsRevCat ? 'Your Three Items' : 'Check Your Secret Role';
-    room.phaseSubprompt = revealIsRevCat
-      ? 'Everyone sees the same items — invent the best category that links them'
-      : 'Keep your screen hidden from others!';
+    room.phasePrompt = copy?.prompt ?? (revealIsRevCat ? 'Your Three Items' : 'Check Your Secret Role');
+    room.phaseSubprompt =
+      copy?.subprompt ??
+      (revealIsRevCat
+        ? 'Everyone sees the same items — invent the best category that links them'
+        : 'Keep your screen hidden from others!');
     this.startPhaseTimer(
       room,
       10,
@@ -1318,7 +1396,12 @@ export class RoomManager {
     if (room.phase !== 'input') return;
 
     if (room.selectedGame?.id === 'impostor') {
-      recordPlayerClue(room, playerId, answer);
+      if (this.isImpostorQuestionMode(room)) {
+        const outcome = recordImpostorQuestionAnswer(room, playerId, answer);
+        if (!outcome.accepted) return;
+      } else {
+        recordPlayerClue(room, playerId, answer);
+      }
     } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
       recordGtlResponse(room, playerId, answer);
     } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
@@ -1338,7 +1421,7 @@ export class RoomManager {
     const activeCount = room.players.filter((p) => p.connected).length;
     if (room.hasSubmittedInput.size >= activeCount) {
       if (room.selectedGame?.id === 'impostor') {
-        finalizeImpostorReveal(room);
+        this.finalizeImpostorInput(room);
       } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
         finalizeGtlReveal(room);
       } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
@@ -1679,6 +1762,7 @@ export class RoomManager {
       gtlState: room.gtlState,
       top100State: room.top100State,
       revCatState: room.revCatState,
+      impostorQuestionState: room.impostorQuestionState,
       gameSettings: room.gameSettings,
       aiContentAvailable: isAiAvailable(),
       gtlCustomReady: Boolean(room.gtlCustomPrompt),

@@ -58,6 +58,7 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 - **Session reconnect** — reconnect by previous name or session token.
 - **Host controls** — game selection, phase advancement, skip timers, and bot injection for solo testing.
 - **Six built-in games** — Impostor, Avoid the Word, Mafia, Guess the Link, Top 100, Reverse Categories.
+- **Two Impostor modes** — *Word* (the classic secret word) and *Question*: everyone privately receives the same question, one player was quietly asked a related but different one, and the difference only surfaces on the answer board.
 - **Content engine (`server/content/`)** — a reusable provider layer. Words are served from a 2,059-noun corpus through a per-room shuffle bag, so nothing repeats until a room has seen the whole pool; an optional AI top-up is validated locally (commonness, shape, blocklist, room history) before it can ever be used.
 - **Host difficulty setting** — Easy / Medium / Any filter the Impostor word pool, plus an optional custom theme and an AI top-up once a real `GEMINI_API_KEY` is configured. Without a key everything silently falls back to the bundled pool.
 - **40 taboo cards** — original subjects with 3 forbidden trap words each for Avoid the Word.
@@ -89,7 +90,7 @@ Party Games features a collection of six multiplayer party games designed for ph
 
 | Game | Players | Category | Icon | Current Working State |
 |---|---|---|---|---|
-| **Impostor** | 3–12 | Social Deduction | Mask | 🟢 **Fully Working & Playable** — Dedicated engine with clue sanitizer, bot AI, and scoring |
+| **Impostor** | 3–12 | Social Deduction | Mask | 🟢 **Fully Working & Playable** — Dedicated engine with two modes (secret word / different question), clue and answer sanitizers, bot AI, host difficulty + tone settings, and scoring |
 | **Avoid the Word** | 3–10 | Taboo / Communication | Ban | 🟢 **Fully Working & Playable** — Dedicated taboo engine with live 45s describing turns, buzz confirmation, bot simulation, and scoring |
 | **Mafia** | 4–16 | Social Deduction | Detective | 🟢 **Fully Working & Playable** — Dedicated engine with private role deal, timed night actions, day eliminations, and win-condition scoring |
 | **Guess the Link** | 3–8 | Word Association | Link | 🟢 **Fully Working & Playable** — Dedicated engine with one hidden concept, per-player private hint angles, shuffled board, simultaneous guessing, and scoring |
@@ -139,6 +140,19 @@ Party Games features a collection of six multiplayer party games designed for ph
        - Real-time leaderboard with running cumulative scores.
   9. **Next Round Loop (`next-round`)**:
      - Host advances to the next round with a new secret word and freshly randomized Impostor, preserving cumulative scores. The word comes straight out of the same room bag, so back-to-back rounds cannot repeat it.
+
+---
+
+### 1b. Impostor — Question Mode (🟢 Fully Operational)
+
+Pick **Question** in the host settings and the same engine plays a different game: everyone gets a question, and one player's question is a related different one.
+
+- **Reveal (10s)**: each player privately sees **only their own question** — the screen never hints that another version exists, and nobody is told they are the impostor.
+- **Answer (30s)**: the answer UI follows the question's type — *tap a player*, *a short answer* (max 5 words / 40 characters), *a number* inside the question's range, or *one of the shared options*. Any player may be named, including yourself.
+- **Answer board (15s)**: every answer in Fisher-Yates order. Player answers render as that player's chip, late answers as `(No answer)`, and **neither question appears** — that is the puzzle.
+- **Discussion / vote**: unchanged flow. Each player can re-open **their own** question in a collapsible card on their own screen.
+- **Results**: both questions are revealed side by side, with a one-line "why it showed" note and the same scoring as word mode (+1 per correct voter, +1 for an impostor who evades).
+- **Content**: 160 hand-reviewed question pairs across six kinds (`shared/data/questions/impostorQuestions.json`), 34 of which ask about another player (`{target}`, always chosen from the crew — the target sees a "you" phrasing, everybody else sees their name). The AI top-up validates each pair before use (kind/answer-type agreement, shared choices and ranges, 10-120 characters, not a reworded copy, `{target}` on both sides or neither, tone match, blocklist).
 
 ---
 
@@ -402,7 +416,7 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   ├── index.html             # Client HTML entry point
 │   └── src/
 │       ├── components/        # UI components (QR modal, header, player badges, game settings panel)
-│       ├── screens/           # Phase screens (incl. Atw*, Mafia*, and GtlHintReveal/Input/ResponseReveal/Guess/Results)
+│       ├── screens/           # Phase screens (incl. Atw*, Mafia*, Gtl*, Top100*, RevCat*, and the Impostor question-mode screens)
 │       ├── services/
 │       │   ├── socket.ts      # Client-side Socket.IO singleton
 │       │   └── sound.ts       # Web audio notifications & haptics
@@ -423,9 +437,11 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   │   ├── contentBag.ts      # Per-room shuffle bag with the recent-item reshuffle guard
 │   │   ├── aiClient.ts        # Gemini wrapper: timeout, retry, JSON, per-room rate limit
 │   │   ├── wordProvider.ts    # Words: corpus bag + validated background AI top-up
+│   │   ├── questionProvider.ts # Question pairs: tone-filtered bag + validateQuestionPair
 │   │   └── index.ts           # releaseRoomContent(roomId) + provider exports
 │   ├── games/
-│   │   ├── impostor.ts        # Impostor rules: clue sanitizer, bots, reveal, scoring
+│   │   ├── impostor.ts        # Impostor word mode: clue sanitizer, bots, reveal, scoring
+│   │   ├── impostorQuestionMode.ts # Impostor question mode: dealing, 4 answer types, board, results
 │   │   ├── avoidTheWord.ts    # Taboo engine: turns, buzz verification, scoring, bot logic
 │   │   ├── mafia.ts           # Mafia engine: roles, night actions, win conditions, scoring
 │   │   ├── guessTheLink.ts    # Link engine: concept hiding, hint dealing, guessing, scoring
@@ -441,6 +457,8 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   │   ├── avoidTheWordPrompts.ts  # 40 subjects × 3 forbidden trap words
 │   │   ├── guessTheLinkPrompts.ts  # 44 concepts × 6 hint angles each
 │   │   ├── top100Prompts.ts        # 22 spectra with sample examples
+│   │   ├── questions/
+│   │   │   └── impostorQuestions.json # 160 question pairs (6 kinds, 34 with {target})
 │   │   └── reverseCategoriesItems.ts # 66 items across 22 themes
 │   ├── theme/
 │   │   └── tokens.ts          # Player color tokens & palette
@@ -448,7 +466,8 @@ The application is structured into three distinct layers: `client/` (React SPA),
 ├── scripts/                   # Development-time tooling (not bundled into the app)
 │   ├── commonNouns.source.txt # Authored vocabulary source for the corpus
 │   ├── generateCommonNouns.ts # Regenerates commonNouns.json + lints it
-│   └── testContentEngine.ts   # `npm run test:content`
+│   ├── testContentEngine.ts   # `npm run test:content`
+│   └── testImpostorQuestionMode.ts # `npm run test:questions`
 ├── data/
 │   ├── common-words-frequency.txt # 10k most common English words (MIT, FrequencyWords)
 │   └── blocklist.txt          # Moderation list applied to AI-generated content
@@ -477,6 +496,9 @@ npm run lint
 
 # Content-engine suite: 500 rounds in one room, pool exhaustion, the reshuffle guard, AI validation
 npm run test:content
+
+# Impostor question-mode suite: all four answer types, {target} dealing, leak checks, scoring
+npm run test:questions
 
 # Regenerate shared/data/words/commonNouns.json from scripts/commonNouns.source.txt
 npm run generate:words

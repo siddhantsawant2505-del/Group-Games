@@ -165,7 +165,8 @@ export function GameSettingsPanel({
         </div>
       )}
 
-      {/* Difficulty (word mode) */}
+      {/* Difficulty is a word-mode setting; question mode uses tone instead. */}
+      {settings.mode === 'word' && (
       <div className="mb-3">
         <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block mb-1">
           Difficulty
@@ -196,6 +197,7 @@ export function GameSettingsPanel({
           {DIFFICULTY_HELP[settings.difficulty]}
         </p>
       </div>
+      )}
 
       {/* Tone (question mode only) */}
       {questionModeAvailable && settings.mode === 'question' && (

@@ -9,11 +9,12 @@ export const PARTY_GAMES: GameMetadata[] = [
     maxPlayers: 12,
     icon: 'mask',
     description:
-      'Everyone gets the secret word except the Impostor. Take turns giving one-word clues and vote on who is faking.',
+      'Two modes: hunt the secret word, or answer a question while one player was quietly asked a different one. Clues or answers, then vote out the faker.',
     rules: [
-      'Every player receives a secret location/word, except one Impostor.',
-      'Players submit subtle clues to prove they know the word without revealing it to the Impostor.',
-      'Discuss clues, find inconsistencies, and vote to eliminate the Impostor.',
+      'Word mode: every player receives a secret word except one Impostor.',
+      'Question mode: everyone receives the same question — except the Impostor, who gets a related one.',
+      'Players submit private clues (or answers) to prove they belong, without giving the secret away.',
+      'Discuss, find inconsistencies, and vote to eliminate the Impostor.',
     ],
   },
   {

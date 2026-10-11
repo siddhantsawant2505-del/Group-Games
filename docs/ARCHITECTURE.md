@@ -87,7 +87,12 @@ word list, and no room repeats content:
 
 - **`ContentProvider<T>`** — `next(roomId, opts?)` and `release(roomId)`. Providers are async
   because they may top themselves up from the AI client in the background, but bundled content is
-  answered immediately: a round never waits on the network.
+  answered immediately: a round never waits on the network. Two providers ship today
+  (`wordProvider.ts` for words, `questionProvider.ts` for Impostor question pairs), and each gets
+  its own bag and history per room, so switching modes mid-session cannot replay content.
+- **Bonus content on the side** — both providers expose a `prefetch(roomId, opts)` hook that runs
+  the AI top-up check off the round's critical path (word mode calls it when the discussion phase
+  starts; question mode does the same) so the next round's word or pair is already waiting.
 - **Shuffle bag** — each room gets its own shuffled queue plus a served set. Nothing repeats until
   the pool is exhausted, and after a reshuffle the first items are never any of the last 10 served.
   Unused items always come before already-served ones, so even rebuilding the pool (a mid-session
@@ -196,7 +201,8 @@ closed (idle timeout / host left)
 6. **Reveal-answers** → compile revealed answers in random order; start timer.
 7. **Discussion** → timed discussion.
 8. **Vote** → record votes; start vote timer.
-9. **Results** → calculate standings, reveal roles, award points.
+9. **Results** → calculate standings, reveal roles, award points. Impostor question mode adds the
+   crew and impostor questions plus the "why it showed" note to the same payload.
 10. **Next round** → increment round number, return to `reveal` with new secrets.
 
 ### 4.3 Timer model

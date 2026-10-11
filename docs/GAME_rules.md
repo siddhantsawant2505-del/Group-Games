@@ -74,10 +74,15 @@ discussion).
 
 ### 2.3 Impostor game rules
 
-- **Host settings (game-select, public):** the host picks the round's **difficulty** — *Easy*
-  (everyday words), *Medium* (less common words) or *Any* (the whole pool) — and, when the server
-  has a working AI provider, an optional **custom theme** of up to 40 characters. Settings are
-  strategy, not secrets: everyone sees them, non-hosts read-only, and they lock once a round starts.
+Impostor has **two modes**, chosen by the host in the game-select settings panel (public state):
+**Word** (default) and **Question**.
+
+- **Host settings (game-select, public):** **mode** (*Word* / *Question*); in word mode a
+  **difficulty** — *Easy* (everyday words), *Medium* (less common words) or *Any* (the whole pool)
+  — and, when the server has a working AI provider, an optional **custom theme** of up to 40
+  characters; in question mode a **tone** (*Clean*, default, or *Spicy*, mild-innuendo questions
+  only). Settings are strategy, not secrets: everyone sees them, non-hosts read-only, and they lock
+  once a round starts.
 - **Word source:** the word is served by the content engine
   (`server/content/wordProvider.ts`) from a 2,059-noun corpus
   (`shared/data/words/commonNouns.json`). Each room has its own **shuffle bag**, so a word cannot
@@ -100,6 +105,38 @@ discussion).
   - If the Impostor evades detection (majority voted wrong), the Impostor receives a point.
   - Each correct voter receives a point.
   - Scores are updated and the round ends.
+
+#### 2.3.1 Impostor — Question mode
+
+Everyone privately receives a question. All crew share one question (Q); the impostor receives a
+related but different one (Q'). Everyone answers privately, answers are revealed together, and the
+existing discussion → vote → results flow then runs unchanged. The impostor's whole job is to read
+the answer board, notice their question differed, and blend in anyway.
+
+- **Phase mapping (existing phases and timers):** `reveal` (10s) shows each player **only their own
+  question** and never hints that another version exists; `input` (30s) collects the answer;
+  `reveal-answers` (15s) shows the board; then the unchanged `discussion` → `vote` → `results`.
+- **Answer types** (`answerType` in the pair): `player` — tap a player chip, yourself included;
+  `text` — one short answer, at most 40 characters and 4 words, trimmed, whitespace collapsed,
+  control characters stripped; `number` — inside the pair's `numberRange`; `choice` — one of the
+  pair's shared `choices`.
+- **The answer board** is a Fisher-Yates shuffle of name → answer. `player` answers render as that
+  player's chip, late answers render as `(No answer)`, and **neither question is shown here**.
+- **Discussion and vote** are unchanged. Each player may re-open **their own** question in a
+  collapsible card that only they can see.
+- **Results** additionally show both questions (crew and impostor) plus a one-line "why it showed"
+  note. Scoring is identical to word mode.
+- **Pair invariants (hard rules):** both sides always share one `answerType`, the same `choices` and
+  the same `numberRange`; the two questions clearly differ in meaning while their answers stay
+  plausible side by side, otherwise the impostor is exposed instantly.
+- **The `{target}` rule:** when a pair `needsTarget`, the server picks the target from the **crew
+  only**. The target receives `crew.selfText`, other crew receive `crew.text` with the target's name
+  filled in, and the impostor receives `impostor.text` with that same name filled in.
+- **Question source:** `server/content/questionProvider.ts` serves a tone-filtered per-room shuffle
+  bag over 160 hand-reviewed pairs (`shared/data/questions/impostorQuestions.json`) and tops it up
+  in the background with validated AI pairs (about 20 at a time when fewer than 15 remain).
+- **Bots:** `player` picks at random, `number` picks randomly inside the range, `choice` picks at
+  random, and `text` uses a small canned list per kind. Bots never call the AI.
 
 ### 2.4 Avoid the Word game rules
 
@@ -253,6 +290,22 @@ The engine follows a **server-authoritative, Socket.IO-based** architecture:
 - `server/content/wordProvider.ts` — words: bundled corpus bag, background AI top-up, local
   validation, prefetch at the discussion phase. Records its data provenance and licences (the
   commonness list is MIT-licensed FrequencyWords data).
+- `server/content/questionProvider.ts` — question pairs: tone-filtered bag, background AI top-up,
+  and `validateQuestionPair()`, which rejects a pair unless the answer type matches, `choices` and
+  `numberRange` match, both texts are 10-120 characters, the two texts are not a reworded copy
+  (normalized similarity below 0.8), `{target}` appears on both sides or neither, the tone fits,
+  nothing hits the blocklist, and the pair is not already in the room's history.
+- `shared/data/questions/impostorQuestions.json` — 160 original question pairs across the six kinds
+  (`most-likely`, `about-player`, `preference`, `hypothetical`, `numeric`, `choice`) and all four
+  answer types, 34 of them needing `{target}`; 50 are `spicy` tone and only play when the host
+  opts in.
+- `server/games/impostorQuestionMode.ts` — question-mode dealing (crew question, impostor
+  question, target selection), answer sanitizing, the shuffled board, and the results payload.
+- `client/src/components/GameSettingsPanel.tsx` — the public post-selection settings panel
+  (mode/difficulty/tone/theme), read-only for non-hosts.
+- `client/src/screens/ImpostorQuestionRevealScreen.tsx`, `ImpostorAnswerScreen.tsx`,
+  `ImpostorAnswersGridScreen.tsx` — the question-mode views (private question, the four answer
+  inputs, and the answer board).
 - `server/content/index.ts` — `releaseRoomContent(roomId)`, called on lobby resets and idle-room sweeps.
 - `shared/data/words/commonNouns.json` — the 2,059-word corpus (27 categories, difficulty tiers 1-3).
 - `data/common-words-frequency.txt` — the 10,000 most common English words, used only as the

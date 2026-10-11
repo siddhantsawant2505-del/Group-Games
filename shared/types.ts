@@ -66,6 +66,51 @@ export interface ImpostorSettings {
   theme?: string;
 }
 
+export type AnswerType = 'player' | 'text' | 'number' | 'choice';
+
+export type QuestionKind =
+  | 'most-likely'
+  | 'about-player'
+  | 'preference'
+  | 'hypothetical'
+  | 'numeric'
+  | 'choice';
+
+/**
+ * One Impostor question pair: the crew's question (Q) and the impostor's
+ * different-but-related question (Q'). Both sides always share the same answer
+ * type, choices and numeric range so the answers stay plausible side by side.
+ */
+export interface QuestionPair {
+  id: string;
+  kind: QuestionKind;
+  answerType: AnswerType;
+  tone: QuestionTone;
+  /** `text` may contain `{target}`; `selfText` is what the target themself sees. */
+  crew: { text: string; selfText?: string };
+  impostor: { text: string };
+  needsTarget: boolean;
+  /** Shared by both sides (choice questions only). */
+  choices?: string[];
+  /** Shared by both sides (numeric questions only). */
+  numberRange?: { min: number; max: number };
+}
+
+/** Public question-mode round state. Never carries a question before results. */
+export interface ImpostorQuestionState {
+  answerType: AnswerType;
+  /** Players who have answered this round (public, like hasSubmittedInput). */
+  answeredPlayerIds: string[];
+  totalPlayers: number;
+  /** Distinct question pairs this room has already played. */
+  roundsPlayed: number;
+  /** Choice options when the round is a choice question (public once answering). */
+  choices?: string[];
+  numberRange?: { min: number; max: number };
+  /** True while the answers board is up. */
+  answersReady: boolean;
+}
+
 /** Room-wide per-game settings (only Impostor uses them today). */
 export interface GameSettings {
   impostor: ImpostorSettings;
@@ -101,6 +146,11 @@ export interface RevealedAnswer {
   answerText: string;
   revealed: boolean;
   subtext?: string;
+  /**
+   * Impostor question mode only: when the answer names another player
+   * ('player' answer type), the client renders that player's chip.
+   */
+  answeredPlayerId?: string;
 }
 
 export interface PlayerResultStanding {
@@ -320,6 +370,11 @@ export interface PhaseResultsData {
   top100CorrectPairs?: number;
   top100TotalPairs?: number;
   top100Points?: number;
+  // Impostor question mode-specific
+  impostorCrewQuestion?: string;
+  impostorImpostorQuestion?: string;
+  /** One-line explanation of how the two questions differ. */
+  impostorQuestionNote?: string;
   // Reverse Categories-specific
   revCatItems?: string[];
   revCatCategories?: RevCatCategoryResult[];
@@ -353,6 +408,8 @@ export interface RoomPublicState {
   revCatState: RevCatPublicState | null; // Reverse Categories items/board state
   /** Public host settings per game (how a round plays, never its secrets). */
   gameSettings: GameSettings;
+  /** Impostor question mode's public round state (null in word mode). */
+  impostorQuestionState: ImpostorQuestionState | null;
   /**
    * Whether the server has a usable AI provider for hosted content (custom
    * themes / AI top-ups). Public because the host UI only offers the custom
@@ -417,6 +474,15 @@ export interface PlayerPrivateState {
   top100ExampleText?: string;
   top100CanRank?: boolean;          // host holds the ordering controls
   top100PointsAwarded?: number;
+  // Impostor question mode
+  impostorQuestion?: string;            // the player's OWN question (Q or Q'), never the other side
+  impostorAnswerType?: AnswerType;
+  impostorChoices?: string[];
+  impostorNumberRange?: { min: number; max: number };
+  impostorAnswerSubmitted?: boolean;
+  impostorAnswerText?: string;
+  impostorAnswerPlayerId?: string;      // 'player' answers: who they named
+  impostorAnswerPlayerName?: string;
   // Reverse Categories
   revCatItems?: string[];             // the three items (public info, kept for the round)
   revCatCategoryText?: string;        // this player's own invented category

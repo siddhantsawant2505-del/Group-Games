@@ -16,8 +16,8 @@ import { GameSettingsPanel } from '../components/GameSettingsPanel';
 
 const GTL_GAME_ID = 'guess-the-link';
 const IMPOSTOR_GAME_ID = 'impostor';
-/** Question mode is wired up in phase 2; until then the panel hides it. */
-const QUESTION_MODE_AVAILABLE = false;
+/** Impostor ships two modes: secret-word rounds and question rounds. */
+const QUESTION_MODE_AVAILABLE = true;
 
 interface GtlPromptDraft {
   concept: string;

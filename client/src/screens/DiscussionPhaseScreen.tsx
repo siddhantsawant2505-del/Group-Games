@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { motion } from 'motion/react';
-import { MessageSquare, Vote, HelpCircle } from 'lucide-react';
+import { ChevronDown, MessageSquare, Vote, HelpCircle } from 'lucide-react';
 import { RoomPublicState, Player } from '@shared/types';
 import { Timer } from '../components/Timer';
 import { ActionButton } from '../components/ActionButton';
@@ -9,14 +10,21 @@ interface DiscussionPhaseScreenProps {
   room: RoomPublicState;
   myPlayer: Player;
   onAdvanceToVote: () => void;
+  /**
+   * Impostor question mode only: the player's own question, re-openable on their
+   * own screen. Never send another player's question here.
+   */
+  ownQuestion?: string;
 }
 
 export function DiscussionPhaseScreen({
   room,
   myPlayer,
   onAdvanceToVote,
+  ownQuestion,
 }: DiscussionPhaseScreenProps) {
   const isHost = myPlayer.isHost;
+  const [showOwnQuestion, setShowOwnQuestion] = useState(false);
 
   return (
     <div className="flex-1 flex flex-col justify-between p-5 max-w-md mx-auto w-full">
@@ -43,6 +51,32 @@ export function DiscussionPhaseScreen({
           />
         )}
       </div>
+
+      {/* Impostor question mode: re-open your own question, nobody else's */}
+      {ownQuestion && (
+        <div className="party-card p-3 rounded-2xl mt-3">
+          <button
+            type="button"
+            onClick={() => setShowOwnQuestion((prev) => !prev)}
+            className="w-full flex items-center justify-between gap-2 cursor-pointer"
+            aria-expanded={showOwnQuestion}
+          >
+            <span className="text-xs font-black text-[var(--text-primary)]">
+              Your own question
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 text-neutral-400 transition-transform ${
+                showOwnQuestion ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+          {showOwnQuestion && (
+            <p className="text-sm font-bold text-[var(--text-primary)] mt-2 leading-snug">
+              “{ownQuestion}”
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Clue list from phase 3 kept visible during discussion */}
       <div className="my-auto space-y-3">
@@ -87,7 +121,9 @@ export function DiscussionPhaseScreen({
         </div>
 
         <p className="text-xs text-center font-semibold text-neutral-500 dark:text-neutral-400">
-          Discuss out loud with your group: whose clue feels fake or out of place?
+          {ownQuestion
+            ? 'Compare answers out loud: whose answer fits a different question?'
+            : 'Discuss out loud with your group: whose clue feels fake or out of place?'}
         </p>
       </div>
 

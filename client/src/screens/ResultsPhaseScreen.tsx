@@ -56,35 +56,74 @@ export function ResultsPhaseScreen({
 
         {/* Secret Word & Impostor Unmasked Spotlight Card */}
         <div className="party-card p-5 rounded-3xl mb-4 border border-[var(--border-subtle)] space-y-3">
-          <div className="grid grid-cols-2 gap-2 text-center">
-            <div className="p-3 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-[var(--border-subtle)]">
-              <span className="text-[11px] font-black uppercase tracking-wider text-neutral-400 block mb-0.5">
-                Real Secret Word
-              </span>
-              <span className="text-xl font-black text-[var(--text-primary)] block">
-                {results?.secretWord || 'Hidden'}
-              </span>
-              {results?.category && (
-                <span className="text-[10px] font-bold text-neutral-400 block mt-0.5">
-                  {results.category}
+          {/* Question mode reveals both questions instead of a secret word. */}
+          {results?.impostorCrewQuestion ? (
+            <div className="grid grid-cols-1 gap-2 text-center">
+              <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/30">
+                <span className="text-[11px] font-black uppercase tracking-wider text-indigo-500 block mb-0.5">
+                  The Question Everyone Answered
                 </span>
-              )}
-            </div>
+                <span className="text-sm font-black text-[var(--text-primary)] block leading-snug">
+                  “{results.impostorCrewQuestion}”
+                </span>
+              </div>
 
-            <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-center">
-              <span className="text-[11px] font-black uppercase tracking-wider text-red-500 block mb-0.5">
-                The Impostor
-              </span>
-              <span className="text-xl font-black text-red-600 dark:text-red-400 block">
-                {results?.impostorName || 'Unknown'}
-              </span>
-              {results?.impostorClue && (
-                <span className="text-[10px] font-bold text-neutral-400 block mt-0.5">
-                  Bluffed: "{results.impostorClue}"
+              <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30">
+                <span className="text-[11px] font-black uppercase tracking-wider text-red-500 block mb-0.5">
+                  The Impostor's Question
                 </span>
-              )}
+                <span className="text-sm font-black text-[var(--text-primary)] block leading-snug">
+                  “{results.impostorImpostorQuestion || 'Hidden'}”
+                </span>
+                <span className="text-[10px] font-bold text-neutral-400 block mt-1">
+                  {results.impostorName || 'The impostor'} answered:
+                  {results.impostorClue ? ` "${results.impostorClue}"` : ' —'}
+                </span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="p-3 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-[var(--border-subtle)]">
+                <span className="text-[11px] font-black uppercase tracking-wider text-neutral-400 block mb-0.5">
+                  Real Secret Word
+                </span>
+                <span className="text-xl font-black text-[var(--text-primary)] block">
+                  {results?.secretWord || 'Hidden'}
+                </span>
+                {results?.category && (
+                  <span className="text-[10px] font-bold text-neutral-400 block mt-0.5">
+                    {results.category}
+                  </span>
+                )}
+              </div>
+
+              <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-center">
+                <span className="text-[11px] font-black uppercase tracking-wider text-red-500 block mb-0.5">
+                  The Impostor
+                </span>
+                <span className="text-xl font-black text-red-600 dark:text-red-400 block">
+                  {results?.impostorName || 'Unknown'}
+                </span>
+                {results?.impostorClue && (
+                  <span className="text-[10px] font-bold text-neutral-400 block mt-0.5">
+                    Bluffed: "{results.impostorClue}"
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Question mode: one line on how the two questions differed. */}
+          {results?.impostorQuestionNote && (
+            <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/50 text-left">
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300 block mb-1">
+                Why It Showed
+              </span>
+              <p className="text-xs font-semibold text-indigo-800 dark:text-indigo-200 leading-relaxed">
+                {results.impostorQuestionNote}
+              </p>
+            </div>
+          )}
 
           {/* Short Why Hint */}
           {results?.whyHint && (

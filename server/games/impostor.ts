@@ -361,3 +361,26 @@ export function calculateImpostorResults(room: InternalRoom): void {
 export function cleanupImpostorRound(roomCode: string): void {
   activeRounds.delete(roomCode);
 }
+
+/* --------------------------------------------------------------- question mode
+ * The second Impostor mode (every player gets a question, one player gets a
+ * different one) lives in its own module so word mode above stays untouched.
+ * `roomManager` picks between them from room.gameSettings.impostor.mode.
+ */
+export {
+  QUESTION_INPUT_SECONDS,
+  QUESTION_REVEAL_SECONDS,
+  QUESTION_MAX_CHARS,
+  QUESTION_MAX_WORDS,
+  setupImpostorQuestionRound,
+  recordImpostorQuestionAnswer,
+  simulateImpostorQuestionBots,
+  finalizeImpostorQuestionReveal,
+  pendingQuestionAnswerers,
+  calculateImpostorQuestionResults,
+  cleanupImpostorQuestionRound,
+  getImpostorQuestionRound,
+  sanitizeQuestionText,
+  clampQuestionText,
+} from './impostorQuestionMode';
+export type { QuestionRoundState, QuestionAnswer } from './impostorQuestionMode';

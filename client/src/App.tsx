@@ -51,6 +51,9 @@ import { VoteCopy } from './screens/VotePhaseScreen';
 import { RevCatItemsScreen } from './screens/RevCatItemsScreen';
 import { RevCatInputScreen } from './screens/RevCatInputScreen';
 import { RevCatResultsScreen } from './screens/RevCatResultsScreen';
+import { ImpostorQuestionRevealScreen } from './screens/ImpostorQuestionRevealScreen';
+import { ImpostorAnswerScreen } from './screens/ImpostorAnswerScreen';
+import { ImpostorAnswersGridScreen } from './screens/ImpostorAnswersGridScreen';
 
 /** Games that ship with a dedicated server-side rules module. */
 const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
@@ -598,6 +601,9 @@ export default function App() {
   const isAtwDescriber = Boolean(
     privateState.atwIsDescriber || room?.atwState?.describerPlayerId === myPlayer?.id
   );
+  // Impostor runs two modes: 'word' (the classic round) and 'question'.
+  const isImpostorQuestionMode =
+    room?.selectedGame?.id === 'impostor' && room.gameSettings?.impostor?.mode === 'question';
 
   return (
     <div className="mobile-app-shell">
@@ -698,6 +704,13 @@ export default function App() {
             myPlayer={myPlayer}
             onAdvance={() => handleAdvancePhase('input')}
           />
+        ) : isImpostorQuestionMode ? (
+          <ImpostorQuestionRevealScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onAdvance={() => handleAdvancePhase('input')}
+          />
         ) : (
           <RevealPhaseScreen
             room={room}
@@ -770,6 +783,14 @@ export default function App() {
             onSubmitAnswer={handleSubmitAnswer}
             onHostSkip={() => handleAdvancePhase('reveal-answers')}
           />
+        ) : isImpostorQuestionMode ? (
+          <ImpostorAnswerScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onSubmitAnswer={handleSubmitAnswer}
+            onHostSkip={() => handleAdvancePhase('reveal-answers')}
+          />
         ) : (
           <InputPhaseScreen
             room={room}
@@ -800,6 +821,12 @@ export default function App() {
             onAdvance={() => handleAdvancePhase('vote')}
             copy={RC_BOARD_COPY}
           />
+        ) : isImpostorQuestionMode ? (
+          <ImpostorAnswersGridScreen
+            room={room}
+            myPlayer={myPlayer}
+            onAdvance={() => handleAdvancePhase('discussion')}
+          />
         ) : (
           <RevealAnswersScreen
             room={room}
@@ -827,6 +854,7 @@ export default function App() {
           room={room}
           myPlayer={myPlayer}
           onAdvanceToVote={() => handleAdvancePhase('vote')}
+          ownQuestion={isImpostorQuestionMode ? privateState.impostorQuestion : undefined}
         />
       ) : room.phase === 'vote' ? (
         <VotePhaseScreen
