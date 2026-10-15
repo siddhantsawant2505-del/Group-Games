@@ -13,8 +13,8 @@ server.cjs
 
 # Environment / secrets (deploy first, then inject)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # OS / editor files
 .DS_Store

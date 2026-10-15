@@ -28,6 +28,9 @@ npm run preview      # Preview Vite client build locally
 npm run clean        # Clean build artifacts (dist/ directory)
 ```
 
+Copy `.env.example` to `.env` to configure local environment variables. `.env` is ignored by Git;
+keep real credentials in `.env` or your deployment environment, never in `.env.example`.
+
 ---
 
 ## What "Party Games" is
@@ -585,11 +588,8 @@ npm run clean
 | `CONTENT_AI_DISABLED` | Force the content engine to bundled content only | `false` | No |
 | `APP_URL` | Public app URL for self-referential links and QR codes | — | No |
 
-> **Note:** The repository currently contains placeholder values in `.env`
-> (`GEMINI_API_KEY="MY_GEMINI_API_KEY"`, `APP_URL="MY_APP_URL"`). Treat these as examples —
-> replace them with real values before deploying to production. A placeholder (or missing) key is
-> detected at boot: the server logs one line and every game keeps running on the bundled content,
-> with the custom-theme field hidden in the host UI.
+> **Note:** A placeholder or missing Gemini key is detected at boot: the server logs one line and
+> every game keeps running on the bundled content, with the custom-theme field hidden in the host UI.
 
 ---
 

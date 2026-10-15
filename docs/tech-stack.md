@@ -144,9 +144,9 @@ npm run lint     # tsc --noEmit: TypeScript type check
 | `GEMINI_API_KEY` | — | Gemini API key for server-side AI features |
 | `APP_URL` | — | Public app URL for links, callbacks, and reverse-proxy routes |
 
-The repo currently includes placeholder values in `.env` (`MY_GEMINI_API_KEY`, `MY_APP_URL`).
-Replace them with real credentials before production use. Secrets should also be injected by the
-hosting environment rather than committed.
+Use the tracked [`.env.example`](../.env.example) as a template for a local `.env` file. `.env`
+files are ignored by Git. Replace placeholders with real credentials locally or inject secrets
+through the hosting environment; never commit credentials.
 
 ---
 
