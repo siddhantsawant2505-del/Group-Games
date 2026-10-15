@@ -56,6 +56,20 @@ async function startServer() {
     }
   };
 
+  /**
+   * Emits an event to the sockets of ONE team only (Top 100's team suggestions).
+   * The payload is the team's own suggestion list; other teams never see it, and
+   * it is deliberately not part of `room:update`.
+   */
+  const emitToTeam = (roomCode: string, teamId: string, event: string, payload: unknown) => {
+    const room = roomManager.getRoom(roomCode);
+    if (!room || !teamId) return;
+    for (const player of room.players) {
+      if (player.teamId !== teamId || !player.socketId) continue;
+      io.to(player.socketId).emit(event, payload);
+    }
+  };
+
   // Socket.IO Connection and Event Handlers
   io.on('connection', (socket) => {
     // 1. Host creates a new room
@@ -255,6 +269,8 @@ async function startServer() {
           playerId: string;
           settings?: {
             impostor?: { mode?: string; difficulty?: string; tone?: string; theme?: string };
+            avoidTheWord?: Record<string, unknown>;
+            top100?: Record<string, unknown>;
           };
         },
         callback
@@ -388,7 +404,7 @@ async function startServer() {
               : room.selectedGame?.id === 'guess-the-link'
               ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'guess', 'results']
               : room.selectedGame?.id === 'top-100'
-              ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'rank', 'results']
+              ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'results']
               : room.selectedGame?.id === 'reverse-categories'
               ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'vote', 'results']
               : [
@@ -624,37 +640,67 @@ async function startServer() {
       }
     );
 
-    // 14c. Top 100: the host pushes their live drag order
+    // 14c. Top 100 (team mode): a teammate sends a suggestion only their team sees
     socket.on(
-      'top100-reorder',
+      'top100-suggest',
+      (
+        { roomCode, playerId, text }: { roomCode: string; playerId: string; text: string },
+        callback
+      ) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        const result = roomManager.submitTop100Suggestion(room, playerId, text || '', () =>
+          broadcastRoom(upperCode)
+        );
+        if (typeof callback === 'function') callback(result);
+
+        // Team-scoped push: only that team's sockets get the suggestion list.
+        if (result.success && result.teamId) {
+          emitToTeam(
+            upperCode,
+            result.teamId,
+            'top100:suggestions',
+            roomManager.top100SuggestionsForTeam(upperCode, result.teamId)
+          );
+        }
+      }
+    );
+
+    // 14d. Top 100: the host overrules one guess (a forced position, or null = off list)
+    socket.on(
+      'top100-overrule',
       ({
         roomCode,
         playerId,
-        order,
+        rowId,
+        rank,
       }: {
         roomCode: string;
         playerId: string;
-        order: string[];
+        rowId: string;
+        rank: number | null;
       }) => {
         const upperCode = (roomCode || '').toUpperCase().trim();
         const room = roomManager.getRoom(upperCode);
         if (!room) return;
 
-        roomManager.submitTop100Order(room, playerId, order || [], () =>
+        roomManager.hostOverruleTop100Guess(room, playerId, rowId, rank, () =>
           broadcastRoom(upperCode)
         );
       }
     );
 
-    // 14d. Top 100: the host locks the ordering in and reveals the truth
+    // 14e. Top 100: the host taps Continue — points become final, slices revealed
     socket.on(
-      'top100-lock-order',
+      'top100-continue',
       ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
         const upperCode = (roomCode || '').toUpperCase().trim();
         const room = roomManager.getRoom(upperCode);
         if (!room) return;
 
-        roomManager.hostLockTop100Order(room, playerId, () => broadcastRoom(upperCode));
+        roomManager.hostContinueTop100Reveal(room, playerId, () => broadcastRoom(upperCode));
       }
     );
 

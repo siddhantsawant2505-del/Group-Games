@@ -67,13 +67,13 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 - **Two Impostor modes** — *Word* (the classic secret word) and *Question*: everyone privately receives the same question, one player was quietly asked a related but different one, and the difference only surfaces on the answer board.
 - **Content engine (`server/content/`)** — a reusable provider layer. Words are served from a 2,059-noun corpus through a per-room shuffle bag, so nothing repeats until a room has seen the whole pool; an optional AI top-up is validated locally (commonness, shape, blocklist, room history) before it can ever be used.
 - **Host difficulty setting** — Easy / Medium / Any filter the Impostor word pool, plus an optional custom theme and an AI top-up once a real `GEMINI_API_KEY` is configured. Without a key everything silently falls back to the bundled pool.
-- **40 taboo cards** — original subjects with 3 forbidden trap words each for Avoid the Word.
-- **Live describing turns** — Avoid the Word runs one describer at a time with buzz confirmation.
+- **123-question Avoid the Word deck** — four answer types (open text, 8+ options, numeric ranges, "who here" player picks) in `shared/data/questions/avoidTheWordQuestions.json`, validated by the provider before use.
+- **Hidden-answer elimination rounds** — one anchor answers a question privately, everyone else answers it one at a time, and any answer that matches the anchor is announced live (never the answer itself) and knocked out on the host's Continue.
 - **Dedicated Mafia engine** — privately dealt roles, timed night actions, day eliminations, win-condition checks, and scoring.
 - **Dedicated Guess the Link engine** — one hidden concept, a different private hint angle per player, a shuffled link board, and simultaneous concept guessing with per-correct points.
 - **Dedicated Top 100 engine** — one 1-to-100 spectrum, a unique secret number per player, private example writing, a host-authoritative drag-and-drop ranking phase broadcast live to everyone, and adjacent-pair accuracy scoring.
 - **Dedicated Reverse Categories engine** — three deliberately unrelated items shown publicly (no secrets at all), privately invented category names, a shuffled attributed board, and the standard secret ballot repurposed to crown the best category.
-- **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, guess, rank, discussion, vote, atw-describe, night, day, results, next-round.
+- **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, guess, rank, avoid-anchor, avoid-turn, avoid-reveal, discussion, vote, night, day, results, next-round.
 
 ---
 
@@ -84,6 +84,7 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 | TypeScript / TypeCheck | `PASSING` | `npm run lint` exits with 0 errors |
 | Content engine suite | `PASSING` | `npm run test:content` — 500 rounds, no repeats before pool exhaustion |
 | Question-mode suite | `PASSING` | `npm run test:questions` — four answer types, `{target}` dealing, leak checks |
+| Avoid the Word suite | `PASSING` | `npm run test:avoid` — matching rules, question bank and answer-space rules, shuffle bag, a full bot game, leak/overrule/AFK/reconnect/placement checks |
 | Team-mode suite | `PASSING` | `npm run test:teams` — play modes, team seating, start gate, team scoring |
 | Vite Client Build | `PASSING` | React 19 SPA bundled to `dist/` with Tailwind CSS v4 |
 | Server Build | `PASSING` | Bundled into standalone CommonJS executable `dist/server.cjs` via esbuild |
@@ -100,7 +101,7 @@ Party Games features a collection of six multiplayer party games designed for ph
 | Game | Players | Category | Icon | Current Working State |
 |---|---|---|---|---|
 | **Impostor** | 3–12 | Social Deduction | Mask | 🟢 **Fully Working & Playable** — Dedicated engine with two modes (secret word / different question), clue and answer sanitizers, bot AI, host difficulty + tone settings, and scoring |
-| **Avoid the Word** | 3–10 | Taboo / Communication | Ban | 🟢 **Fully Working & Playable** — Dedicated taboo engine with live 45s describing turns, buzz confirmation, bot simulation, and scoring |
+| **Avoid the Word** | 3–10 | Bluff / Elimination | Ban | 🟢 **Fully Working & Playable** — Dedicated elimination engine: rotating anchor with a hidden answer, one timed turn per player, live match announcements, a host-overruled round reveal, AFK skips, bot simulation, and placement/point scoring |
 | **Mafia** | 4–16 | Social Deduction | Detective | 🟢 **Fully Working & Playable** — Dedicated engine with private role deal, timed night actions, day eliminations, and win-condition scoring |
 | **Guess the Link** | 3–8 | Word Association | Link | 🟢 **Fully Working & Playable** — Dedicated engine with one hidden concept, per-player private hint angles, shuffled board, simultaneous guessing, and scoring |
 | **Top 100** | 3–10 | Ranking / Spectrum | List-Ordered | 🟢 **Fully Working & Playable** — Dedicated engine with a unique secret number per player, private example writing, a host-authoritative drag-to-rank phase broadcast live, and adjacent-pair accuracy scoring |
@@ -111,12 +112,14 @@ lobby's settings gear. In team mode individual scores are kept and each award al
 player's team; results and the post-game screen lead with the team leaderboard. Impostor and Mafia
 are **aggregate** today (their points simply roll up — badged "Teams: scores combine"); Avoid the
 Word, Guess the Link, Top 100 and Reverse Categories are **Team-ready** — they play as in solo for
-now and gain native team rules next (see `docs/GAME_rules.md` → "Adding a game").
+now and gain native team rules next (see `docs/GAME_rules.md` → "Adding a game"). Avoid the Word
+already ends by team in team mode: a team survives while it has an alive member, and the last team
+standing takes the win.
 
 **Per-game settings.** Each game-select card has its own gear: Impostor (mode, difficulty, tone,
-custom theme), Guess the Link (a host-authored round), and a read-only summary of the current
-choices for everyone else. The lobby gear covers the room-wide settings instead: play mode, teams
-and rounds per session.
+custom theme), Avoid the Word (anchor answer time, turn time, round cap, question tone), Guess the
+Link (a host-authored round), and a read-only summary of the current choices for everyone else. The
+lobby gear covers the room-wide settings instead: play mode, teams and rounds per session.
 
 ---
 
@@ -177,31 +180,29 @@ Pick **Question** in the host settings and the same engine plays a different gam
 
 ---
 
-### 2. Avoid the Word — Dedicated Taboo Engine (🟢 Fully Operational)
+### 2. Avoid the Word — Dedicated Elimination Engine (🟢 Fully Operational)
 
-**Avoid the Word** ships a fully custom server engine (`server/games/avoidTheWord.ts`) with its own phase chain (`reveal → atw-describe → results`), live turn rotation, buzz verification, simulated bots, and scoring. Taboo cards come from 40 original subjects (`shared/data/avoidTheWordPrompts.ts`), each with exactly 3 forbidden words.
+**Avoid the Word** ships a fully custom server engine (`server/games/avoidTheWord.ts`) with its own phase chain (`reveal → avoid-anchor → avoid-turn (repeats) → avoid-reveal → results`), a rotating anchor, one hidden answer, live match announcements, a host-overruled round reveal, eliminated spectators, simulated bots, and placement scoring. Questions come from a 123-question bank (`shared/data/questions/avoidTheWordQuestions.json`) served through a per-room shuffle bag, and the answer comparison lives in its own unit-tested module (`server/games/avoidTheWord.match.ts`).
 
-- **Objective**: Describe your secret subject out loud without saying any of your 3 trap words while the rest of the room listens for a slip.
+- **Objective**: The anchor privately answers a question; everyone else answers the same question on their own turn and is knocked out if their answer **matches the anchor**. Guess what the group would say, or be the last one standing.
 
 - **Game Rules & Mechanics**:
   1. **Player Requirements**: 3 to 10 players (solo testing supported via "+ Add Bot").
-  2. **Taboo Card Reveal (`reveal` phase, 10s)**:
-     - Every player privately receives a **unique subject** plus **exactly 3 forbidden trap words** (e.g. *"Submarine"* → `water`, `navy`, `underwater`).
-     - Only the card owner sees their subject and traps; nobody else's screen reveals them.
-  3. **Live Describing Turns (`atw-describe` phase, 45s per turn)**:
-     - Describers rotate **one at a time**; every player describes once per round and the starting describer rotates each round.
-     - **Describer View**: subject + trap words + countdown, a live "buzzes against you" meter, and a *Done Describing* button to hand over early.
-     - **Listener View**: the subject stays hidden, replaced by a **BUZZ** button, the group buzz meter, and the describer's name.
-  4. **Buzz Verification**:
-     - Tapping **BUZZ** flags a suspected taboo slip (tap again to withdraw it).
-     - A **strict majority** of listeners auto-confirms and ends the turn immediately as a miss.
-     - **Host override**: the host can confirm a pending buzz early or dismiss every buzz and let the describer keep going.
-  5. **Scoring (`results` phase)**:
-     - **+1 point** for a describe that survives its full 45s timer.
-     - **+1 point** for every player on a buzz the group confirms; a buzzed-out describer scores nothing.
-     - **Per-Turn Breakdown**: each turn lists the describer, subject, trap words, clean/buzzed verdict, buzz count, and who buzzed.
-  6. **Bot Simulation**: bot describers resolve their own turn after a short beat, and bot listeners may buzz a human turn partway through — so a solo host can play a full round.
-  7. **Next Round Loop (`next-round`)**: fresh subjects and trap words for everyone, with cumulative scores preserved.
+  2. **Anchor Briefing (`reveal` phase, 10s)**: the server picks the round's anchor from a rotation bag over the alive players (nobody anchors twice until everyone alive has) and draws a question from the content engine. Only the anchor's private state carries the question; the public state shows who is holding it.
+  3. **Anchor Answer (`avoid-anchor` phase, 30s default)**: the anchor answers privately in the shape the question asks for — a text field (max 3 words / 30 characters), a numeric range, option buttons, or a player grid. The answer stays server-side; the anchor can never be eliminated in their own round.
+  4. **Turns (`avoid-turn` phase, one player at a time, 20s default)**: the same question goes to each remaining alive player in a fresh randomized order. The server compares each answer the moment it lands:
+     - **match** → the player is marked *matched* and the room gets a live "<name> matched the anchor's answer!" banner that never includes the answer text;
+     - **no match** → *safe*;
+     - **timeout / disconnect** → auto-submitted as `(no answer)` and marked *skipped* (counts as safe), and **two consecutive skips eliminate the player as AFK**.
+     - Players who already answered never see anyone else's answer during the round.
+  5. **Round Reveal (`avoid-reveal` phase)**: the question, the anchor's answer and every answer become public with matches highlighted, plus the elimination list preview. Until the host taps **Continue** they can **overrule** any close call per player (*count as match* / *not a match*) to settle synonyms and typos, and the final list is what applies.
+  6. **Eliminated players become spectators**: they keep the public state and the reveals, but never see a hidden answer early.
+  7. **Scoring (`results` phase)**: the anchor scores **+1 for every player who matched** them, every game winner scores **+3**, and nothing else scores. Placements follow the elimination order (last one out places highest; players eliminated in the same round tie).
+  8. **End conditions**: the game ends when one player is left, or when the round cap is reached (10 rounds by default — survivors share the win), or when everyone but the anchor matched (the anchor is the only survivor). In **team mode** a team survives while it has an alive member, so the game ends when one team remains or at the cap.
+  9. **Host Settings (`game-select` phase)**: anchor answer time (10–60s), turn time (10–60s), round cap (3–20 rounds) and question tone (Clean / Spicy). All four are public strategy, clamped by the server, and read-only for non-hosts.
+  10. **Bot Simulation**: bot anchors and bot turn players answer from the question's own `botAnswers` / options / range / alive players after a short beat, so a solo host plays a full game. Bots never call the AI.
+  11. **Reconnect**: a reconnecting player gets the round's question back if their window is still open. A player who drops during their own window is treated as a timeout, so the round never stalls.
+  12. **Next Round Loop**: `Continue` deals a new anchor and a new question with the remaining players.
 
 ---
 
@@ -337,7 +338,7 @@ Pick **Question** in the host settings and the same engine plays a different gam
 
 ### 3. Content Engine (`server/content/`)
 
-One provider layer feeds every word-based game, and later the taboo/link/spectrum decks too.
+One provider layer feeds every content-driven game: the Impostor word pool, the Impostor question pairs, and the Avoid the Word question bank.
 
 | Module | Responsibility |
 |---|---|
@@ -345,6 +346,8 @@ One provider layer feeds every word-based game, and later the taboo/link/spectru
 | `contentBag.ts` | Per-room shuffle bag: a room's shuffled queue + served set, so nothing repeats until the pool is exhausted. A reshuffle (and a mid-session difficulty switch) can never serve any of the 10 most recent items first, and never re-serves a word while unused words remain |
 | `aiClient.ts` | Server-side Gemini wrapper: 8s timeout, one retry, strict JSON output, 20 generation calls per room per hour, and an "unavailable" report that fires **once** — no key, placeholder key or failures all fall back to bundled content silently |
 | `wordProvider.ts` | The word provider: bundled corpus via the bag, background AI top-up when the bag drops below 15 items or a theme is set, and local validation of every AI word |
+| `questionProvider.ts` | The Impostor question-pair provider: tone-filtered bag plus `validateQuestionPair` for both sides of a pair |
+| `avoidQuestionProvider.ts` | The Avoid the Word provider: tone/table-size filtered bag over the 123-question bank, the answer-space rule (`options ≥ alive + 4`, numeric range ≥ 20, "who here" only at 5+ alive), and a validated background AI top-up of ~15 questions per batch |
 | `index.ts` | Barrel: `releaseRoomContent(roomId)` drops every per-room bag, history and rate-limit counter |
 
 **AI top-up rules.** The AI is only ever asked in the background — a round never waits on the network. Every returned word must be `^[a-z]{3,12}$`, absent from the shipped corpus and the room's history, present in the commonness data, and absent from `data/blocklist.txt`, or it is dropped. Host themes are trimmed to 40 characters, stripped of control characters, and passed to the model as data with an explicit "never an instruction" system rule. The provider also **prefetches** at the start of the discussion phase so the next round's word is already in the bag.
@@ -370,22 +373,23 @@ One provider layer feeds every word-based game, and later the taboo/link/spectru
 - **Team leaderboards.** When any round resolves, the room manager attaches `results.teamStandings`
   (rank, icon, name, total, member contributions) and the results and post-game screens render it
   above the individual standings. Solo rounds keep exactly the old payload.
-- **Native team rules** for Avoid the Word, Guess the Link, Top 100, Reverse Categories and Mafia are
-  planned and documented, not implemented; until they ship those games play as they do in solo and
-  their points aggregate, which the game cards badge as "Team-ready".
+- **Native team rules** for Guess the Link, Top 100, Reverse Categories and Mafia are planned and
+  documented, not implemented; until they ship those games play as they do in solo and their points
+  aggregate, which the game cards badge as "Team-ready". Avoid the Word already uses its own team
+  end condition (a team survives while it has an alive member) on top of the central scoring roll-up.
 
 ### 5. Game Phase State Machine
 
 1. **`lobby`** — players join via room code/QR; host configures bots and launches.
 2. **`game-select`** — host chooses a party game.
-3. **`reveal`** — private assignment (impostor role, taboo cards, Mafia roles, a Guess the Link hint angle, or a Top 100 secret number), or the public three items (Reverse Categories). The Impostor word is served asynchronously by the content engine, so this phase finishes in its own method rather than blocking the state machine.
+3. **`reveal`** — private assignment (impostor role, the Avoid the Word anchor's question, Mafia roles, a Guess the Link hint angle, or a Top 100 secret number), or the public three items (Reverse Categories). The Impostor word and the Avoid the Word question are served asynchronously by the content engine, so those rounds finish in their own methods rather than blocking the state machine.
 4. **`input`** — players submit clues (Impostor), responses (Guess the Link), examples (Top 100), or invented categories (Reverse Categories).
 5. **`reveal-answers`** — clues revealed simultaneously (Impostor), the shuffled link board (Guess the Link), the shuffled example board with its numbers still hidden (Top 100), or the shuffled attributed category board (Reverse Categories).
 6. **`guess`** — simultaneous guessing at the hidden concept (Guess the Link).
 7. **`rank`** — the host drags the Top 100 examples into ascending numeric order while everyone else watches live.
 8. **`discussion`** — timed debate (Impostor; Mafia day phase).
 9. **`vote`** — secret ballot (Impostor; Mafia exile vote; Reverse Categories' best-category vote).
-10. **`atw-describe`** — Avoid the Word's live describing turns.
+10. **`avoid-anchor` → `avoid-turn` (repeats) → `avoid-reveal`** — Avoid the Word's private anchor answer, one timed turn per alive player, then the public round reveal with host overrules.
 11. **`night`** — Mafia and Detective act privately (Mafia).
 12. **`day`** — overnight elimination announced, then discussion and vote (Mafia).
 13. **`results`** — tally reveal, role exposure, winner, next-round option.
@@ -458,7 +462,7 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   ├── index.html             # Client HTML entry point
 │   └── src/
 │       ├── components/        # UI components (QR modal, header, player badges, settings sheets/panels, team leaderboard)
-│       ├── screens/           # Phase screens (incl. Atw*, Mafia*, Gtl*, Top100*, RevCat*, and the Impostor question-mode screens)
+│       ├── screens/           # Phase screens (Mafia*, Gtl*, Top100*, RevCat*, avoidTheWord/*, and the Impostor question-mode screens)
 │       ├── services/
 │       │   ├── socket.ts      # Client-side Socket.IO singleton
 │       │   └── sound.ts       # Web audio notifications & haptics
@@ -480,11 +484,13 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   │   ├── aiClient.ts        # Gemini wrapper: timeout, retry, JSON, per-room rate limit
 │   │   ├── wordProvider.ts    # Words: corpus bag + validated background AI top-up
 │   │   ├── questionProvider.ts # Question pairs: tone-filtered bag + validateQuestionPair
+│   │   ├── avoidQuestionProvider.ts # Avoid the Word questions: answer-space rules + validated AI top-up
 │   │   └── index.ts           # releaseRoomContent(roomId) + provider exports
 │   ├── games/
 │   │   ├── impostor.ts        # Impostor word mode: clue sanitizer, bots, reveal, scoring
 │   │   ├── impostorQuestionMode.ts # Impostor question mode: dealing, 4 answer types, board, results
-│   │   ├── avoidTheWord.ts    # Taboo engine: turns, buzz verification, scoring, bot logic
+│   │   ├── avoidTheWord.ts    # Avoid the Word engine: anchor rotation, turns, eliminations, overrule, placements
+│   │   ├── avoidTheWord.match.ts # Pure answer matching: normalisation, stems, typos, per-type comparison
 │   │   ├── mafia.ts           # Mafia engine: roles, night actions, win conditions, scoring
 │   │   ├── guessTheLink.ts    # Link engine: concept hiding, hint dealing, guessing, scoring
 │   │   ├── top100.ts          # Spectrum engine: secret numbers, ordering, pair accuracy
@@ -498,11 +504,11 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   │   ├── teams.ts           # Team templates, name sanitizing, and the team start gate
 │   │   ├── words/
 │   │   │   └── commonNouns.json    # 2,059-noun corpus, generated (27 categories, tiers 1-3)
-│   │   ├── avoidTheWordPrompts.ts  # 40 subjects × 3 forbidden trap words
+│   │   ├── questions/
+│   │   │   ├── impostorQuestions.json # 160 question pairs (6 kinds, 34 with {target})
+│   │   │   └── avoidTheWordQuestions.json # 123 Avoid the Word questions (text/choice/number/player)
 │   │   ├── guessTheLinkPrompts.ts  # 44 concepts × 6 hint angles each
 │   │   ├── top100Prompts.ts        # 22 spectra with sample examples
-│   │   ├── questions/
-│   │   │   └── impostorQuestions.json # 160 question pairs (6 kinds, 34 with {target})
 │   │   └── reverseCategoriesItems.ts # 66 items across 22 themes
 │   ├── theme/
 │   │   └── tokens.ts          # Player colour tokens, team accents, & palette
@@ -512,7 +518,8 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   ├── generateCommonNouns.ts # Regenerates commonNouns.json + lints it
 │   ├── testContentEngine.ts   # `npm run test:content`
 │   ├── testImpostorQuestionMode.ts # `npm run test:questions`
-│   └── testTeamMode.ts        # `npm run test:teams`
+│   ├── testTeamMode.ts        # `npm run test:teams`
+│   └── testAvoidTheWord.ts    # `npm run test:avoid`
 ├── data/
 │   ├── common-words-frequency.txt # 10k most common English words (MIT, FrequencyWords)
 │   └── blocklist.txt          # Moderation list applied to AI-generated content
@@ -547,6 +554,10 @@ npm run test:questions
 
 # Room team-mode suite: play modes, seating, balance/shuffle, start gate, and team leaderboard scoring
 npm run test:teams
+
+# Avoid the Word suite: matching rules, question bank/answer-space rules, shuffle bag, a full bot
+# game with leak, overrule, AFK, reconnect, team and placement checks
+npm run test:avoid
 
 # Regenerate shared/data/words/commonNouns.json from scripts/commonNouns.source.txt
 npm run generate:words

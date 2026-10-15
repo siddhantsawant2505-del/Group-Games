@@ -50,11 +50,10 @@ import { GtlInputScreen } from './screens/GtlInputScreen';
 import { GtlResponseRevealScreen } from './screens/GtlResponseRevealScreen';
 import { GtlGuessScreen } from './screens/GtlGuessScreen';
 import { GtlResultsScreen } from './screens/GtlResultsScreen';
-import { Top100RevealScreen } from './screens/Top100RevealScreen';
-import { Top100InputScreen } from './screens/Top100InputScreen';
-import { Top100BoardScreen } from './screens/Top100BoardScreen';
-import { Top100RankScreen } from './screens/Top100RankScreen';
-import { Top100ResultsScreen } from './screens/Top100ResultsScreen';
+import { Top100QuestionScreen } from './screens/top100/Top100QuestionScreen';
+import { Top100GuessScreen } from './screens/top100/Top100GuessScreen';
+import { Top100GuessesRevealScreen } from './screens/top100/Top100GuessesRevealScreen';
+import { Top100ListSlicesScreen } from './screens/top100/Top100ListSlicesScreen';
 import { RevealAnswersCopy } from './screens/RevealAnswersScreen';
 import { VoteCopy } from './screens/VotePhaseScreen';
 import { RevCatItemsScreen } from './screens/RevCatItemsScreen';
@@ -545,27 +544,43 @@ export default function App() {
     });
   }, [room, myPlayer]);
 
-  // Top 100: the host pushes their live drag order
-  const handleTop100Reorder = useCallback(
-    (order: string[]) => {
+  // Top 100 (team mode): a short suggestion only this player's team sees
+  const handleTop100Suggestion = useCallback(
+    (text: string) => {
       if (!room || !myPlayer) return;
       const socket = getSocket();
-      socket.emit('top100-reorder', {
+      socket.emit('top100-suggest', {
         roomCode: room.roomCode,
         playerId: myPlayer.id,
-        order,
+        text,
       });
     },
     [room, myPlayer]
   );
 
-  // Top 100: the host locks the ordering in and reveals the true numbers
-  const handleTop100LockOrder = useCallback(() => {
+  // Top 100: the host overrules one guess (a forced position, or null = off list)
+  const handleTop100Overrule = useCallback(
+    (rowId: string, rank: number | null) => {
+      if (!room || !myPlayer) return;
+      triggerHaptic('light');
+      const socket = getSocket();
+      socket.emit('top100-overrule', {
+        roomCode: room.roomCode,
+        playerId: myPlayer.id,
+        rowId,
+        rank,
+      });
+    },
+    [room, myPlayer]
+  );
+
+  // Top 100: the host finalises the points and opens the slices screen
+  const handleTop100Continue = useCallback(() => {
     if (!room || !myPlayer) return;
     playNotificationSound('phase-change');
     triggerHaptic('medium');
     const socket = getSocket();
-    socket.emit('top100-lock-order', {
+    socket.emit('top100-continue', {
       roomCode: room.roomCode,
       playerId: myPlayer.id,
     });
@@ -745,10 +760,9 @@ export default function App() {
             onAdvance={() => handleAdvancePhase('input')}
           />
         ) : isTop100 ? (
-          <Top100RevealScreen
+          <Top100QuestionScreen
             room={room}
             myPlayer={myPlayer}
-            privateState={privateState}
             onAdvance={() => handleAdvancePhase('input')}
           />
         ) : isReverseCategories ? (
@@ -818,11 +832,12 @@ export default function App() {
             onHostSkip={() => handleAdvancePhase('reveal-answers')}
           />
         ) : isTop100 ? (
-          <Top100InputScreen
+          <Top100GuessScreen
             room={room}
             myPlayer={myPlayer}
             privateState={privateState}
             onSubmitAnswer={handleSubmitAnswer}
+            onSendSuggestion={handleTop100Suggestion}
             onHostSkip={() => handleAdvancePhase('reveal-answers')}
           />
         ) : isReverseCategories ? (
@@ -859,10 +874,11 @@ export default function App() {
             onAdvance={() => handleAdvancePhase('guess')}
           />
         ) : isTop100 ? (
-          <Top100BoardScreen
+          <Top100GuessesRevealScreen
             room={room}
             myPlayer={myPlayer}
-            onAdvance={() => handleAdvancePhase('rank')}
+            onOverrule={handleTop100Overrule}
+            onContinue={handleTop100Continue}
           />
         ) : isReverseCategories ? (
           <RevealAnswersScreen
@@ -891,13 +907,6 @@ export default function App() {
           privateState={privateState}
           onGuess={handleGtlGuess}
           onHostSkip={() => handleAdvancePhase('results')}
-        />
-      ) : room.phase === 'rank' ? (
-        <Top100RankScreen
-          room={room}
-          myPlayer={myPlayer}
-          onReorder={handleTop100Reorder}
-          onLockOrder={handleTop100LockOrder}
         />
       ) : room.phase === 'discussion' ? (
         <DiscussionPhaseScreen
@@ -950,7 +959,7 @@ export default function App() {
             onEndSession={() => handleAdvancePhase('post-game')}
           />
         ) : isTop100 ? (
-          <Top100ResultsScreen
+          <Top100ListSlicesScreen
             room={room}
             myPlayer={myPlayer}
             onNextRound={() => handleAdvancePhase('next-round')}

@@ -30,7 +30,7 @@ import {
   DEFAULT_TEAM_COUNT,
   sanitizeTeamName,
 } from '../shared/data/teams';
-import { awardPoints, ScoreLogEntry } from './scoring';
+import { awardPoints, recomputeTeamScores as recomputeTeamScoreTotals, ScoreLogEntry } from './scoring';
 import { PLAYER_COLORS } from '../shared/theme/tokens';
 import { PARTY_GAMES } from '../shared/data/games';
 import {
@@ -42,8 +42,12 @@ import {
 import {
   DEFAULT_AVOID_SETTINGS,
   DEFAULT_IMPOSTOR_SETTINGS,
+  DEFAULT_TOP100_SETTINGS,
   GameSettings,
+  TOP100_SETTINGS_LIMITS,
+  Top100Settings,
 } from '../shared/types';
+import { TOP100_CATEGORY_IDS } from '../shared/data/top100Categories';
 import { sanitizeTheme } from './content/types';
 import { prefetchWordContent, randomCorpusWord, wordProvider } from './content/wordProvider';
 import { isAiAvailable, prefetchQuestionContent, questionProvider, releaseRoomContent } from './content';
@@ -120,19 +124,26 @@ import {
   cleanupGtlRound,
 } from './games/guessTheLink';
 import {
-  TOP100_INPUT_SECONDS,
-  TOP100_REVEAL_SECONDS,
-  TOP100_RANK_SECONDS,
-  setupTop100Round,
-  recordTop100Example,
-  simulateTop100BotExamples,
-  finalizeTop100Reveal,
-  beginTop100Ranking,
-  setTop100Order,
-  finalizeTop100Order,
-  calculateTop100Results,
+  TOP100_OVERRULE_SECONDS,
+  TOP100_QUESTION_SECONDS,
+  addTop100Suggestion,
+  applyTop100Scores,
+  buildTop100Results,
   cleanupTop100Round,
+  effectiveTop100GuessSeconds,
+  finalizeTop100Guesses,
+  getTop100Round,
+  pendingTop100Guessers,
+  readTop100Settings,
+  recordTop100Guess,
+  setTop100Overrule,
+  setupTop100Round,
+  simulateTop100BotGuesses,
+  simulateTop100BotSuggestions,
+  syncTop100PrivateState,
+  teamSuggestions,
 } from './games/top100';
+import { top100Provider } from './content/top100Provider';
 import {
   RC_INPUT_SECONDS,
   RC_REVEAL_SECONDS,
@@ -149,6 +160,54 @@ import {
  * sanctioned way for any game to change a score (see docs/GAME_rules.md).
  */
 export { awardPoints } from './scoring';
+
+/**
+ * Clamps a host-authored Top 100 settings patch into its legal ranges.
+ * Settings are public strategy (rounds, timers, duplicate policy, filters).
+ */
+function sanitizeTop100SettingsPatch(
+  patch: Partial<Top100Settings>,
+  current: Top100Settings
+): Top100Settings {
+  const clamp = (value: unknown, min: number, max: number, fallback: number) => {
+    const parsed = Math.floor(Number(value));
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+  };
+
+  const incoming = patch || {};
+  return {
+    roundCount: clamp(
+      incoming.roundCount,
+      TOP100_SETTINGS_LIMITS.roundCount.min,
+      TOP100_SETTINGS_LIMITS.roundCount.max,
+      current.roundCount
+    ),
+    guessSeconds: clamp(
+      incoming.guessSeconds,
+      TOP100_SETTINGS_LIMITS.guessSeconds.min,
+      TOP100_SETTINGS_LIMITS.guessSeconds.max,
+      current.guessSeconds
+    ),
+    duplicatePolicy:
+      incoming.duplicatePolicy === 'zero' || incoming.duplicatePolicy === 'allow'
+        ? incoming.duplicatePolicy
+        : current.duplicatePolicy,
+    region:
+      incoming.region === 'global' || incoming.region === 'india' || incoming.region === 'mixed'
+        ? incoming.region
+        : current.region,
+    categories: Array.isArray(incoming.categories)
+      ? readTop100CategoriesPatch(incoming.categories)
+      : current.categories,
+  };
+}
+
+/** Keeps only category ids the shipped bank actually uses. */
+function readTop100CategoriesPatch(value: unknown[]): string[] {
+  const known = new Set(TOP100_CATEGORY_IDS);
+  return [...new Set(value.map((entry) => String(entry)).filter((entry) => known.has(entry)))];
+}
 
 /**
  * Clamps a host-authored Avoid the Word settings patch into its legal ranges.
@@ -330,6 +389,7 @@ export class RoomManager {
       gameSettings: {
         impostor: { ...DEFAULT_IMPOSTOR_SETTINGS },
         avoidTheWord: { ...DEFAULT_AVOID_SETTINGS },
+        top100: { ...DEFAULT_TOP100_SETTINGS },
       },
       playMode: 'solo',
       teams: [],
@@ -619,6 +679,7 @@ export class RoomManager {
         theme?: string;
       };
       avoidTheWord?: Partial<AvoidSettings>;
+      top100?: Partial<Top100Settings>;
     }
   ): { success: boolean; error?: string } {
     const room = this.getRoom(code);
@@ -652,6 +713,7 @@ export class RoomManager {
         patch?.avoidTheWord || {},
         room.gameSettings.avoidTheWord
       ),
+      top100: sanitizeTop100SettingsPatch(patch?.top100 || {}, room.gameSettings.top100),
     };
     room.lastActivityAt = Date.now();
     return { success: true };
@@ -905,15 +967,12 @@ export class RoomManager {
   }
 
   /**
-   * Team totals are derived from member scores, so they stay correct even when
-   * a player switches teams after scoring.
+   * Team totals are derived from member scores plus any team-only awards
+   * (`awardTeamPoints()`, e.g. Top 100), so they stay correct even when a player
+   * switches teams after scoring.
    */
   private recomputeTeamScores(room: InternalRoom) {
-    room.teams.forEach((team) => {
-      team.score = room.players
-        .filter((player) => player.teamId === team.id)
-        .reduce((sum, player) => sum + player.score, 0);
-    });
+    recomputeTeamScoreTotals(room);
   }
 
   /** Builds the round's team leaderboard (team mode only). */
@@ -1113,13 +1172,19 @@ export class RoomManager {
           return;
         }
 
+        // Top 100 draws a hidden ranked list through the content engine. The
+        // list itself never leaves the server, so the reveal just publishes the
+        // question and arms the guess phase.
+        if (room.selectedGame?.id === TOP_100_GAME_ID) {
+          void this.startTop100Reveal(room, broadcastState);
+          return;
+        }
+
         // Prepare private roles/words based on selected game
         if (room.selectedGame?.id === MAFIA_GAME_ID) {
           setupMafiaRound(room);
         } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
           setupGtlRound(room);
-        } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
-          setupTop100Round(room);
         } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
           setupReverseCategoriesRound(room);
         } else {
@@ -1223,7 +1288,7 @@ export class RoomManager {
           : inputIsRevCat
           ? 'Invent Your Category'
           : inputIsTop100
-          ? 'Write Your Example'
+          ? 'Name Something on the List'
           : inputIsGtl
           ? 'Write Your Response'
           : 'Submit Your Clue';
@@ -1232,7 +1297,7 @@ export class RoomManager {
           : inputIsRevCat
           ? 'One category name that cleverly links all three items'
           : inputIsTop100
-          ? 'A short scenario that fits your secret number on the spectrum'
+          ? 'One guess each — the deeper it ranks, the more it scores'
           : inputIsGtl
           ? 'One word or a short phrase inspired by your private hint'
           : 'Enter a one-word clue before the timer expires';
@@ -1245,17 +1310,22 @@ export class RoomManager {
         } else if (inputIsGtl) {
           simulateGtlBotResponses(room);
         } else if (inputIsTop100) {
-          simulateTop100BotExamples(room);
+          // Bots lock a beat later, so the submitted board fills up live.
+          this.scheduleTop100Bots(room, broadcastState);
         } else if (inputIsRevCat) {
           simulateRevCatBotCategories(room);
         } else {
           this.simulateBotInputs(room);
         }
 
+        const top100GuessSeconds = inputIsTop100
+          ? effectiveTop100GuessSeconds(readTop100Settings(room), room.playMode)
+          : 0;
+
         const inputSeconds = inputIsImpostorQuestion
           ? QUESTION_INPUT_SECONDS
           : inputIsTop100
-          ? TOP100_INPUT_SECONDS
+          ? top100GuessSeconds
           : inputIsRevCat
           ? RC_INPUT_SECONDS
           : inputIsGtl
@@ -1272,7 +1342,7 @@ export class RoomManager {
             } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
               finalizeGtlReveal(room);
             } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
-              finalizeTop100Reveal(room);
+              finalizeTop100Guesses(room);
             } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
               finalizeRevCatReveal(room);
             }
@@ -1294,7 +1364,7 @@ export class RoomManager {
           : revealIsGtl
           ? 'The Link Board'
           : revealIsTop100
-          ? 'The Example Board'
+          ? 'The Guesses Board'
           : 'Simultaneous Reveal';
         room.phaseSubprompt = revealIsImpostorQuestion
           ? 'Every answer, shuffled — did one of them fit a different question?'
@@ -1303,14 +1373,14 @@ export class RoomManager {
           : revealIsGtl
           ? 'Every response, shuffled — what single concept ties them together?'
           : revealIsTop100
-          ? 'Every example, shuffled — the secret numbers stay hidden for now'
+          ? 'Every guess with its position — the host can overrule a close call'
           : 'Review every player’s clue in randomized order';
         if (room.selectedGame?.id === 'impostor') {
           this.finalizeImpostorInput(room);
         } else if (revealIsGtl) {
           finalizeGtlReveal(room);
         } else if (revealIsTop100) {
-          finalizeTop100Reveal(room);
+          finalizeTop100Guesses(room);
         } else if (revealIsRevCat) {
           finalizeRevCatReveal(room);
         } else {
@@ -1318,7 +1388,7 @@ export class RoomManager {
         }
 
         const revealSeconds = revealIsTop100
-          ? TOP100_REVEAL_SECONDS
+          ? TOP100_OVERRULE_SECONDS
           : revealIsRevCat
           ? RC_REVEAL_SECONDS
           : revealIsGtl
@@ -1335,33 +1405,12 @@ export class RoomManager {
               revealIsGtl
                 ? 'guess'
                 : revealIsTop100
-                ? 'rank'
+                ? 'results'
                 : revealIsRevCat
                 ? 'vote'
                 : 'discussion',
               broadcastState
             )
-        );
-        break;
-      }
-
-      case 'rank': {
-        // Top 100: the host drags the examples into ascending numeric order
-        // (host-authoritative) while everyone else watches live.
-        if (room.selectedGame?.id !== TOP_100_GAME_ID) {
-          this.transitionToPhase(room, 'results', broadcastState);
-          return;
-        }
-
-        beginTop100Ranking(room);
-        room.phasePrompt = 'Put the Examples in Order';
-        room.phaseSubprompt = 'Host drags the cards — everyone else watches live';
-
-        this.startPhaseTimer(
-          room,
-          TOP100_RANK_SECONDS,
-          () => broadcastState(),
-          () => this.transitionToPhase(room, 'results', broadcastState)
         );
         break;
       }
@@ -1470,7 +1519,11 @@ export class RoomManager {
         } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
           calculateGtlResults(room);
         } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
-          calculateTop100Results(room);
+          // Points land here (host overrules included) and the round's results
+          // carry the 1-10 / 90-100 slices. The last round reports the final
+          // standings instead of a "next round" prompt.
+          const { gameOver } = applyTop100Scores(room);
+          buildTop100Results(room, { final: gameOver });
         } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
           calculateReverseCategoriesResults(room);
         } else {
@@ -1484,8 +1537,13 @@ export class RoomManager {
               ? this.buildTeamStandings(room, room.results.standings)
               : undefined;
         }
-        room.phasePrompt = 'Round Results';
-        room.phaseSubprompt = 'Points awarded and secrets unmasked!';
+        if (room.selectedGame?.id === TOP_100_GAME_ID) {
+          room.phasePrompt = 'How the List Looks';
+          room.phaseSubprompt = 'The revealed slices, your own guess, then the standings';
+        } else {
+          room.phasePrompt = 'Round Results';
+          room.phaseSubprompt = 'Points awarded and secrets unmasked!';
+        }
         break;
       }
 
@@ -1586,6 +1644,67 @@ export class RoomManager {
       () => broadcastState(),
       () => this.transitionToPhase(room, this.phaseAfterReveal(room), broadcastState)
     );
+  }
+
+  /**
+   * Top 100 reveal: draws a hidden ranked list from the content engine. The list
+   * never leaves this method — only the question, its category and the round
+   * counter are published, and the guess phase opens right after the beat.
+   */
+  private async startTop100Reveal(room: InternalRoom, broadcastState: () => void) {
+    const settings = readTop100Settings(room);
+    const previous = getTop100Round(room.code);
+    // A finished game is not continued: the round counter restarts at one.
+    if (!previous || previous.gameOver) room.roundNumber = 1;
+
+    const list = await top100Provider.next(room.code, {
+      region: settings.region,
+      categories: settings.categories,
+    });
+
+    // A host skip or a disconnect may have moved the room on while we waited.
+    if (room.phase !== 'reveal' || room.selectedGame?.id !== TOP_100_GAME_ID) return;
+
+    const state = setupTop100Round(room, list);
+    room.phasePrompt = `Round ${state.roundNumber} of ${state.roundCount}`;
+    room.phaseSubprompt = 'Name something that is on this Top 100 — the deeper it ranks, the more it scores';
+
+    this.startPhaseTimer(
+      room,
+      TOP100_QUESTION_SECONDS,
+      () => broadcastState(),
+      () => this.transitionToPhase(room, 'input', broadcastState)
+    );
+    broadcastState();
+  }
+
+  /**
+   * Top 100: bots act a beat after the guess phase opens — teammates suggest, and
+   * every bot that owes a guess (solo players and team captains) locks one — so
+   * the submitted board fills up live instead of resolving instantly.
+   */
+  private scheduleTop100Bots(room: InternalRoom, broadcastState: () => void) {
+    if (room.playMode === 'team') {
+      this.scheduleBotAction(room, 900 + Math.floor(Math.random() * 1200), () => {
+        if (room.phase !== 'input') return;
+        if (room.selectedGame?.id !== TOP_100_GAME_ID) return;
+        simulateTop100BotSuggestions(room);
+        broadcastState();
+      });
+    }
+
+    this.scheduleBotAction(room, 1800 + Math.floor(Math.random() * 2500), () => {
+      if (room.phase !== 'input') return;
+      if (room.selectedGame?.id !== TOP_100_GAME_ID) return;
+      if (simulateTop100BotGuesses(room).length === 0) return;
+
+      if (pendingTop100Guessers(room).length === 0) {
+        finalizeTop100Guesses(room);
+        this.transitionToPhase(room, 'reveal-answers', broadcastState);
+        return;
+      }
+      broadcastState();
+    });
   }
 
   /**
@@ -1966,7 +2085,20 @@ export class RoomManager {
     } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
       recordGtlResponse(room, playerId, answer);
     } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
-      recordTop100Example(room, playerId, answer);
+      const outcome = recordTop100Guess(room, playerId, answer);
+      if (!outcome.accepted) {
+        broadcastState();
+        return;
+      }
+      // Top 100 decides for itself when the round has every guess it needs:
+      // solo counts players, team mode counts teams (one captain each).
+      if (pendingTop100Guessers(room).length === 0) {
+        finalizeTop100Guesses(room);
+        this.transitionToPhase(room, 'reveal-answers', broadcastState);
+        return;
+      }
+      broadcastState();
+      return;
     } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
       recordRevCatCategory(room, playerId, answer);
     } else {
@@ -1985,8 +2117,6 @@ export class RoomManager {
         this.finalizeImpostorInput(room);
       } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
         finalizeGtlReveal(room);
-      } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
-        finalizeTop100Reveal(room);
       } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
         finalizeRevCatReveal(room);
       }
@@ -2198,36 +2328,69 @@ export class RoomManager {
   }
 
   /**
-   * Top 100: the host pushes their live drag order. Host-only, rank phase only,
-   * and rejected unless it is a complete permutation of the board.
+   * Top 100 (team mode): a teammate sends a short suggestion that only their own
+   * team sees. The caller is responsible for pushing it to that team's sockets
+   * (see `emitToTeam` in server/index.ts) — it never enters public room state.
    */
-  public submitTop100Order(
+  public submitTop100Suggestion(
     room: InternalRoom,
     playerId: string,
-    orderedPlayerIds: string[],
+    text: string,
+    broadcastState: () => void
+  ): { success: boolean; error?: string; teamId?: string } {
+    if (room.phase !== 'input') return { success: false, error: 'Suggestions are closed.' };
+    if (room.selectedGame?.id !== TOP_100_GAME_ID) return { success: false, error: 'Wrong game.' };
+
+    const player = room.players.find((candidate) => candidate.id === playerId);
+    const teamId = player?.teamId;
+    const outcome = addTop100Suggestion(room, playerId, text);
+    // Team-private: the round state changed for the team, so every member's
+    // private state is refreshed (and the room's public state is untouched).
+    broadcastState();
+    if (!outcome.accepted) return { success: false, error: outcome.error, ...(teamId ? { teamId } : {}) };
+    return { success: true, ...(teamId ? { teamId } : {}) };
+  }
+
+  /** The team's suggestions as the server sees them (team-scoped emit helper). */
+  public top100SuggestionsForTeam(roomCode: string, teamId: string) {
+    return teamSuggestions(roomCode, teamId);
+  }
+
+  /**
+   * Top 100: the host overrules a guess on the guesses board — a forced list
+   * position, or null for "not on the list". Host-only, before points are final.
+   */
+  public hostOverruleTop100Guess(
+    room: InternalRoom,
+    playerId: string,
+    rowId: string,
+    rank: number | null,
     broadcastState: () => void
   ) {
-    if (room.phase !== 'rank') return;
+    if (room.phase !== 'reveal-answers') return;
     if (room.selectedGame?.id !== TOP_100_GAME_ID) return;
     if (playerId !== room.hostId) return;
-    if (!Array.isArray(orderedPlayerIds)) return;
 
-    const outcome = setTop100Order(room, orderedPlayerIds.map((id) => String(id)));
-    if (!outcome.accepted) return;
-
+    const result = setTop100Overrule(room, String(rowId), rank === null ? null : Number(rank));
+    if (!result.success) return;
     broadcastState();
   }
 
   /**
-   * Top 100: host locks the order in and jumps straight to the results reveal.
+   * Top 100: the host taps Continue on the guesses board. Points become final
+   * (overrules included) and the round resolves into the slices screen.
    */
-  public hostLockTop100Order(room: InternalRoom, playerId: string, broadcastState: () => void) {
-    if (room.phase !== 'rank') return;
+  public hostContinueTop100Reveal(
+    room: InternalRoom,
+    playerId: string,
+    broadcastState: () => void
+  ) {
+    if (room.phase !== 'reveal-answers') return;
     if (room.selectedGame?.id !== TOP_100_GAME_ID) return;
     if (playerId !== room.hostId) return;
 
     this.clearBotTimeouts(room);
-    finalizeTop100Order(room);
+    finalizeTop100Guesses(room);
     this.transitionToPhase(room, 'results', broadcastState);
   }
 
@@ -2372,6 +2535,11 @@ export class RoomManager {
     // from the public timer) back.
     if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) {
       syncAvoidPrivateState(room, room.phase);
+    }
+    // Top 100: the captain's input, the team's suggestions and the player's own
+    // round result all live here, so a reconnect gets them back.
+    if (room.selectedGame?.id === TOP_100_GAME_ID) {
+      syncTop100PrivateState(room);
     }
     return room.privateData[playerId] || {};
   }

@@ -7,7 +7,7 @@
  * player's team. See docs/GAME_rules.md → "Adding a game".
  */
 
-import { PlayMode, Team } from '../shared/types';
+import { PlayMode } from '../shared/types';
 
 /** Minimal structural shape of a player for scoring (InternalPlayer matches). */
 export interface ScorablePlayer {
@@ -20,7 +20,7 @@ export interface ScorablePlayer {
 export interface ScorableRoom {
   players: ScorablePlayer[];
   playMode?: PlayMode;
-  teams?: Team[];
+  teams?: ScorableTeam[];
   scoreLog?: ScoreLogEntry[];
 }
 
@@ -30,6 +30,14 @@ export interface ScoreLogEntry {
   playerName: string;
   points: number;
   reason: string;
+}
+
+/** Minimal structural shape of a team for team-only scoring (Team matches). */
+export interface ScorableTeam {
+  id: string;
+  score: number;
+  memberIds: string[];
+  bonusPoints?: number;
 }
 
 const SCORE_LOG_LIMIT = 200;
@@ -55,17 +63,63 @@ export function awardPoints(
     if (team) team.score += amount;
   }
 
-  if (room.scoreLog) {
-    room.scoreLog.push({
-      playerId: player.id,
-      playerName: (player as { name?: string }).name || player.id,
-      points: amount,
-      reason: reason || 'round',
-    });
-    if (room.scoreLog.length > SCORE_LOG_LIMIT) {
-      room.scoreLog.splice(0, room.scoreLog.length - SCORE_LOG_LIMIT);
-    }
-  }
-
+  logScore(room, player.id, (player as { name?: string }).name || player.id, amount, reason);
   return player.score;
+}
+
+/** Sum of a team's member scores — the part of a total that is always derived. */
+function memberScoreSum(room: ScorableRoom, team: ScorableTeam): number {
+  return room.players
+    .filter((player) => player.teamId === team.id)
+    .reduce((sum, player) => sum + player.score, 0);
+}
+
+/**
+ * Awards `points` to a TEAM only, leaving every member's individual score alone.
+ *
+ * Games with native team rules (Top 100: one guess per team) score the team, not
+ * the players. The award is stored as the team's `bonusPoints` so the derived
+ * total (`members + bonusPoints`) survives a membership change or a recompute.
+ * Returns the team's new total (0 when the team is unknown).
+ */
+export function awardTeamPoints(
+  room: ScorableRoom,
+  teamId: string,
+  points: number,
+  reason?: string
+): number {
+  const team = room.teams?.find((candidate) => candidate.id === teamId);
+  if (!team) return 0;
+
+  const amount = Number.isFinite(points) ? Math.round(points) : 0;
+  const bonus = (team.bonusPoints ?? 0) + amount;
+  team.bonusPoints = bonus;
+  team.score = memberScoreSum(room, team) + bonus;
+
+  logScore(room, team.id, (team as { name?: string }).name || team.id, amount, reason);
+  return team.score;
+}
+
+/**
+ * Recomputes every team total from its members plus any team-only awards.
+ * Membership changes (a player switching teams) must never lose bonus points.
+ */
+export function recomputeTeamScores(room: ScorableRoom): void {
+  room.teams?.forEach((team) => {
+    team.score = memberScoreSum(room, team) + (team.bonusPoints ?? 0);
+  });
+}
+
+function logScore(
+  room: ScorableRoom,
+  id: string,
+  name: string,
+  amount: number,
+  reason?: string
+): void {
+  if (!room.scoreLog) return;
+  room.scoreLog.push({ playerId: id, playerName: name, points: amount, reason: reason || 'round' });
+  if (room.scoreLog.length > SCORE_LOG_LIMIT) {
+    room.scoreLog.splice(0, room.scoreLog.length - SCORE_LOG_LIMIT);
+  }
 }

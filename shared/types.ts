@@ -30,7 +30,6 @@ export type GamePhase =
   | 'day'
   | 'reveal-answers'
   | 'guess'
-  | 'rank'
   | 'discussion'
   | 'vote'
   | 'results'
@@ -73,8 +72,15 @@ export interface Team {
   icon: string;
   /** Index into TEAM_ACCENTS in shared/theme/tokens.ts. */
   accentIndex: number;
+  /** Member scores plus `bonusPoints` (see below). Derived, never set directly. */
   score: number;
   memberIds: string[];
+  /**
+   * Team-only awards: points a game hands to the team rather than to one member
+   * (`awardTeamPoints()`), used by games with native team rules such as Top 100.
+   * Kept separate so recomputing a team total from its members never erases it.
+   */
+  bonusPoints?: number;
 }
 
 /** One team member's contribution inside a round's team leaderboard. */
@@ -166,10 +172,11 @@ export interface ImpostorQuestionState {
   answersReady: boolean;
 }
 
-/** Room-wide per-game settings (only Impostor uses them today). */
+/** Room-wide per-game settings (public strategy, never round secrets). */
 export interface GameSettings {
   impostor: ImpostorSettings;
   avoidTheWord: AvoidSettings;
+  top100: Top100Settings;
 }
 
 export const PLAY_MODE_LABELS: Record<PlayMode, string> = {
@@ -222,6 +229,8 @@ export interface PlayerResultStanding {
   pointsAdded: number;
   totalScore: number;
   badge?: string;
+  /** 1-based placement; ties share a rank (Top 100 final standings). */
+  rank?: number;
 }
 
 export interface RoleRevealInfo {
@@ -340,9 +349,12 @@ export interface AvoidAnswerRow {
   /** 'player' answers: who they named. */
   answeredPlayerId?: string;
   answeredPlayerName?: string;
-  /** True when the answer matched the anchor (before any host overrule). */
+  /**
+   * The comparison result, before any host overrule. The host's overrides live in
+   * `AvoidPublicState.overrules` (keyed by player id), so the reveal can show the
+   * automatic verdict and the final one separately.
+   */
   matched: boolean;
-  overruled?: boolean;
   skipped: boolean;
   isAnchor: boolean;
   pointsAdded: number;
@@ -428,36 +440,169 @@ export interface GtlHintShare {
   hint: string;
 }
 
-export interface Top100ExampleCard {
+/* ────────────────────────────── Top 100 ────────────────────────────────── */
+
+/** Where a list's ranking is scoped to. */
+export type Top100Region = 'global' | 'india';
+/** What a room draws from ('mixed' alternates global and India). */
+export type Top100RegionSetting = Top100Region | 'mixed';
+
+/**
+ * What happens when two players (or two teams) guess the same list item:
+ *  - 'allow' — both score the item's position (default)
+ *  - 'zero'  — nobody scores for an item that was guessed twice
+ */
+export type Top100DuplicatePolicy = 'allow' | 'zero';
+
+/** One entry of a hidden ranked list. `rank` is 1-based and awards its value. */
+export interface Top100Item {
+  rank: number;
+  name: string;
+  /** Accepted alternates (unique across the list — see `npm run validate:top100`). */
+  aliases: string[];
+}
+
+/**
+ * A hidden Top 100 list. Lives on the server only (`shared/data/top100/*.json`);
+ * the client never imports these files and never receives the whole list.
+ */
+export interface Top100List {
+  id: string;
+  /** Full question text including the metric and the year/basis. */
+  question: string;
+  /** e.g. 'social-media', 'music', 'movies', 'sports', 'geography'... */
+  category: string;
+  region: Top100Region;
+  /** The year or date the ranking is based on. */
+  asOf: string;
+  /** Where the ranking comes from. Never invented. */
+  source: string;
+  /** True only when the data was checked against `source`. */
+  verified: boolean;
+  /** Exactly 100 entries, ranks 1..100. */
+  items: Top100Item[];
+}
+
+/** Host settings for Top 100 (public strategy, never round secrets). */
+export interface Top100Settings {
+  /** Rounds played in one game. */
+  roundCount: number;
+  /** Seconds to type a guess. Team mode gets at least TOP100_TEAM_MIN_GUESS_SECONDS. */
+  guessSeconds: number;
+  duplicatePolicy: Top100DuplicatePolicy;
+  region: Top100RegionSetting;
+  /** Empty means every category is eligible. */
+  categories: string[];
+}
+
+export const TOP100_SETTINGS_LIMITS = {
+  roundCount: { min: 1, max: 10 },
+  guessSeconds: { min: 15, max: 120 },
+} as const;
+
+/** Captains need time to read their team's suggestions. */
+export const TOP100_TEAM_MIN_GUESS_SECONDS = 60;
+
+export const DEFAULT_TOP100_SETTINGS: Top100Settings = {
+  roundCount: 5,
+  guessSeconds: 45,
+  duplicatePolicy: 'allow',
+  region: 'mixed',
+  categories: [],
+};
+
+export const TOP100_DUPLICATE_POLICY_LABELS: Record<Top100DuplicatePolicy, string> = {
+  allow: 'Everyone who guesses it scores',
+  zero: 'Duplicates score nothing',
+};
+
+export const TOP100_REGION_LABELS: Record<Top100RegionSetting, string> = {
+  mixed: 'Mixed (global + India)',
+  global: 'Global only',
+  india: 'India only',
+};
+
+/** One team's short suggestion, visible to that team only. */
+export interface Top100Suggestion {
   playerId: string;
   playerName: string;
-  playerColor: string;
   colorIndex: number;
   text: string;
-  /** Only populated once the round is revealed (results). */
-  secretNumber?: number;
+  /** Arrival order within the round (1-based), used for the fallback pick. */
+  sequence: number;
 }
 
-export interface Top100OrderEntry extends Top100ExampleCard {
-  secretNumber: number;
-  hostPosition: number;  // 1-based slot in the host's final ordering
-  truePosition: number;  // 1-based slot in true ascending numeric order
-  correctlyPlaced: boolean;
+/**
+ * One scored guess: a player in solo mode, a whole team in team mode. Points are
+ * only final once the host has tapped Continue (overrules apply first).
+ */
+export interface Top100GuessRow {
+  /** playerId in solo mode, teamId in team mode. */
+  rowId: string;
+  /** The player who typed the guess (the captain in team mode). */
+  ownerId: string;
+  name: string;
+  colorIndex: number;
+  /** Team mode only. */
+  teamName?: string;
+  /** What was locked in, or '(no answer)'. */
+  text: string;
+  submitted: boolean;
+  /** 1-100 when the guess is on the list, null when it is not. */
+  matchedRank: number | null;
+  matchedName: string | null;
+  points: number;
+  /** Another guess matched the same item. */
+  duplicate: boolean;
+  /** The host overrode the automatic match for this row. */
+  overruled: boolean;
 }
 
+/** One revealed list entry. */
+export interface Top100SliceEntry {
+  rank: number;
+  name: string;
+}
+
+/**
+ * The only slices of a list that ever leave the server: ranks 1-10 and 90-100.
+ * Everything in between stays hidden forever.
+ */
+export interface Top100Slices {
+  top: Top100SliceEntry[];
+  bottom: Top100SliceEntry[];
+}
+
+/**
+ * Public Top 100 round state. Carries the question and the guesses board, never
+ * the list: only the 1-10 / 90-100 slices appear, and only at results.
+ */
 export interface Top100PublicState {
+  /** The list's id only — never its items. */
+  listId: string;
+  question: string;
   category: string;
-  /** "1 = mildly annoying, 100 = absolute catastrophic disaster" */
-  promptText: string;
-  lowLabel: string;
-  highLabel: string;
-  /** Every written example, in the order the host has arranged them. */
-  examples: Top100ExampleCard[];
-  examplesReady: boolean;   // all examples compiled for the reveal
-  orderLocked: boolean;     // the host locked the ordering in
-  revealed: boolean;        // true numbers are public (results only)
-  playerCount: number;
-  rankSeconds: number;
+  asOf: string;
+  roundNumber: number;
+  roundCount: number;
+  guessSeconds: number;
+  duplicatePolicy: Top100DuplicatePolicy;
+  region: Top100RegionSetting;
+  /** Everyone who owes a guess: playerIds (solo) or teamIds (team). */
+  guesserIds: string[];
+  /** Who has locked a guess — ids only. */
+  submittedIds: string[];
+  /** teamId -> the captain who types this round's guess (team mode only). */
+  captains: Record<string, string>;
+  /** Guess rows, in guess order. Populated from the guesses reveal onwards. */
+  guesses: Top100GuessRow[];
+  /** True once points are final (results phase). */
+  revealed: boolean;
+  /** Revealed 1-10 / 90-100 slices (results only). */
+  slices?: Top100Slices;
+  /** The last round of the game. */
+  finalRound: boolean;
+  gameOver: boolean;
 }
 
 export interface RevCatCategoryResult {
@@ -569,14 +714,20 @@ export interface PhaseResultsData {
   mafiaLog?: string[];
   mafiaEliminations?: MafiaElimination[];
   // Top 100-specific
-  top100PromptText?: string;
-  top100LowLabel?: string;
-  top100HighLabel?: string;
+  top100Question?: string;
   top100Category?: string;
-  top100Entries?: Top100OrderEntry[];
-  top100CorrectPairs?: number;
-  top100TotalPairs?: number;
-  top100Points?: number;
+  top100AsOf?: string;
+  /** Where the ranking comes from — shown at results so the table can judge it. */
+  top100Source?: string;
+  /** The revealed 1-10 / 90-100 slices (results only). */
+  top100Slices?: Top100Slices;
+  /** Guesses that matched nothing this round (helps the table learn the list). */
+  top100Unmatched?: string[];
+  /** True when this round ended the game (final standings). */
+  top100IsFinal?: boolean;
+  top100RoundsPlayed?: number;
+  /** Rounds won outright (best single-round score); ties share it. */
+  top100RoundWinnerNames?: string[];
   // Impostor question mode-specific
   impostorCrewQuestion?: string;
   impostorImpostorQuestion?: string;
@@ -686,14 +837,15 @@ export interface PlayerPrivateState {
   gtlGuessCorrect?: boolean;
   gtlPointsAwarded?: number;
   // Top 100
-  top100Number?: number;            // this player's secret number (1-100)
-  top100PromptText?: string;        // the spectrum, e.g. "1 = ... 100 = ..."
-  top100LowLabel?: string;
-  top100HighLabel?: string;
-  top100Category?: string;
-  top100ExampleSubmitted?: boolean;
-  top100ExampleText?: string;
-  top100CanRank?: boolean;          // host holds the ordering controls
+  top100GuessSubmitted?: boolean;
+  top100GuessText?: string;            // the locked guess (own, or the team's)
+  top100IsCaptain?: boolean;           // team mode: this player types the guess
+  top100CaptainName?: string;          // team mode: who types the team's guess
+  top100TeamNames?: string[];          // team mode: the captain's teammates
+  /** Team mode: this team's suggestions. Only teammates ever receive them. */
+  top100Suggestions?: Top100Suggestion[];
+  top100SuggestionsLeft?: number;      // how many more this player may send
+  top100MatchedRank?: number | null;   // this player's own result, once revealed
   top100PointsAwarded?: number;
   // Impostor question mode
   impostorQuestion?: string;            // the player's OWN question (Q or Q'), never the other side

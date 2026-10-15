@@ -72,16 +72,18 @@ export const PARTY_GAMES: GameMetadata[] = [
   {
     id: 'top-100',
     title: 'Top 100',
-    tagline: 'Rank the absurd, place your bets!',
+    tagline: 'Dig deep into the Top 100!',
     minPlayers: 3,
     maxPlayers: 10,
     icon: 'list-ordered',
     description:
-      'Given an outrageous spectrum (1 to 100), players give examples scaled to their secret number. Guess the correct order!',
+      'Name something on a Top 100 list. The deeper it ranks, the more points you score, but miss the list and you get nothing.',
     rules: [
-      'You are dealt a secret number from 1 to 100.',
-      'Provide an example matching that exact intensity on the spectrum.',
-      'The group must arrange all submitted answers in ascending order.',
+      'The server picks a hidden Top 100 list — a question about a real ranking you never see in full.',
+      'Everyone types one guess: the item on position N scores exactly N points, anything off the list scores 0.',
+      'The host can overrule a close call, then the guesses board resolves into points.',
+      'Only positions 1-10 and 90-100 are ever revealed — the middle of the list stays a secret.',
+      'Team mode: each team submits one guess, with rotating captains and team-only suggestions.',
     ],
     teamSupport: 'native',
   },

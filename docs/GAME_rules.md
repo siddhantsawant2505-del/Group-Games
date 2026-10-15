@@ -45,7 +45,8 @@ The implemented round phases, in order, are:
 
 1. `lobby` — players join; the host configures bots and launches.
 2. `game-select` — the host selects a game (default: Impostor).
-3. `reveal` — private role assignment (Impostor role, Avoid the Word cards, or Mafia roles).
+3. `reveal` — private role assignment (Impostor role, the Avoid the Word anchor's question, or
+   Mafia roles).
 4. `input` — players submit one-word clues (Impostor only).
 5. `reveal-answers` — clues are revealed simultaneously (Impostor only), the shuffled link board
    appears (Guess the Link only), the shuffled example board appears (Top 100 only), or the
@@ -57,16 +58,19 @@ The implemented round phases, in order, are:
 8. `discussion` — timed group discussion (Impostor only).
 9. `vote` — secret ballot (Impostor and Reverse Categories, where it crowns the best invented
    category instead of accusing a suspect; Mafia exile votes use it too).
-10. `atw-describe` — Avoid the Word's live rotation of 45-second describing turns.
+10. `avoid-anchor` → `avoid-turn` (repeats per alive player) → `avoid-reveal` — Avoid the Word's
+    private anchor answer, one timed turn at a time, then the public round reveal with the host's
+    overrules and Continue.
 11. `night` — Mafia (and the Detective, if present) act privately; townspeople wait (Mafia only).
 12. `day` — the overnight elimination is announced before discussion and vote (Mafia only).
 13. `results` — tally reveal, role exposure, per-turn breakdown, and standings.
-14. `next-round` — new round (new word, fresh taboo cards, a fresh role deal, a new concept, or a
-   fresh spectrum with new secret numbers).
+14. `next-round` — new round (new word, a fresh role deal, a new concept, or a fresh spectrum with
+   new secret numbers).
 
 Games with a dedicated engine follow their own chain: Impostor runs
 `reveal → input → reveal-answers → discussion → vote → results`, Avoid the Word runs
-`reveal → atw-describe → results`, Mafia runs
+`reveal → avoid-anchor → avoid-turn (repeats) → avoid-reveal → results` (its Continue either deals
+the next round or lands on `results` once the game is decided), Mafia runs
 `reveal → night → day → discussion → vote → results` (looping back to `night` after every exile
 until one side wins), Guess the Link runs
 `reveal → input → reveal-answers → guess → results`, Top 100 runs
@@ -142,22 +146,67 @@ the answer board, notice their question differed, and blend in anyway.
 
 ### 2.4 Avoid the Word game rules
 
-- **Cards:** every player privately receives a target subject and **exactly 3** forbidden
-  "taboo" trap words (see `shared/data/avoidTheWordPrompts.ts`).
-- **Turn order:** describers rotate one at a time; every player describes once per round and the
-  starting describer rotates each round.
-- **Describing turn:** the active describer talks their subject through out loud for **45
-  seconds** while everyone else listens. Their subject and trap words stay on their own screen.
-- **Buzz:** listeners see a **buzz** button instead of the subject. Tapping it flags a suspected
-  taboo slip; tapping again withdraws it. A **strict majority** of listening players auto-confirms
-  the buzz and ends the turn immediately as a miss.
-- **Host override:** the host can confirm a pending buzz early or dismiss all buzzes so the
-  describer keeps going.
-- **Scoring:** a describing turn that survives its timer is a success and scores **+1**; every
-  player on a confirmed buzz also scores **+1**. A buzzed-out turn scores nothing for the
-  describer.
-- **Results:** the round shows a per-turn success/fail breakdown (subject, trap words, buzz count,
-  who buzzed) plus the cumulative leaderboard.
+Avoid the Word is an **elimination game** over several rounds: one anchor answers a question
+privately, everyone else answers the same question on their own turn, and any answer that matches
+the anchor knocks that player out.
+
+- **Players:** 3-10. Eliminated players stay in the room as **spectators** (public state and
+  reveals only).
+- **Anchor pick:** at the start of every round the server picks the anchor from the alive players
+  with a **rotation bag** — nobody anchors twice until every alive player has, and the same player
+  never anchors two rounds in a row while there is a choice.
+- **The question:** served by the content engine (`server/content/avoidQuestionProvider.ts`) from
+  `shared/data/questions/avoidTheWordQuestions.json` through a per-room shuffle bag, so no question
+  repeats until the room has seen the whole eligible pool. Only the **anchor's private state** ever
+  carries the question text; the public state only says who is holding it.
+- **Answer shapes:** `text` (a broad prompt, max 3 words / 30 characters), `choice` (at least 8
+  options), `number` (a range of at least 20 values), `player` (a "who here" pick, only at 5+
+  alive). A question is only eligible when its answer space is comfortably bigger than the table:
+  `options ≥ alive players + 4`, numeric range ≥ 20 values, `player` questions at 5+ alive.
+- **Anchor answer (default 30s):** the anchor answers privately in the question's shape. The answer
+  is held server-side and never leaves it until the round reveal; the anchor can never be
+  eliminated in their own round.
+- **Turns (default 20s each, one at a time):** the same question goes to every other alive player in
+  a fresh randomized order each round. On a player's turn only that player gets the input; everyone
+  else sees "<name> is answering..." plus a **status strip** for the whole table (waiting / safe /
+  matched / skipped / out). The server compares each answer to the anchor's hidden answer the moment
+  it arrives:
+  - **match** → the player is marked **matched** and the room gets a live "<name> matched the
+    anchor's answer!" banner. The announcement never contains the answer text.
+  - **no match** → the player is marked **safe**.
+  - **timeout / disconnect** → the turn is auto-submitted as `(no answer)` and marked **skipped**
+    (counts as safe). **Two consecutive skips eliminate the player as AFK.**
+  - A player who has answered never sees anyone else's answer during the round.
+- **Round reveal:** after the last turn the question, the anchor's answer and every answer become
+  public with matches highlighted, plus a preview of who is about to be eliminated. Until the host
+  taps **Continue**, the host can **overrule** any single answer (*count as match* / *not a match*)
+  to settle synonyms, near-misses or typos; the final list is what applies.
+- **Answer matching** (`server/games/avoidTheWord.match.ts`, unit-tested by `npm run test:avoid`):
+  text is normalised (lowercase → NFKD with diacritics stripped → punctuation removed → leading
+  article dropped → whitespace collapsed → naive trailing plural folded) and matches when the two
+  normalised strings are equal, when one is a stem of the other, or when they are one edit apart
+  with both at least 5 characters; `choice` matches the same option, `number` the same value, and
+  `player` the same chosen player.
+- **Scoring:** the anchor scores **+1 for every player who matched** them (it rewards picking the
+  answer the group would say), and every game winner scores **+3**. Nothing else scores, and every
+  award goes through `awardPoints()`.
+- **End conditions:** the game ends when 1 player is left alive, when everyone but the anchor
+  matched (the anchor is the only survivor), or when the **round cap** (10 by default) is reached —
+  then all players still alive share the win.
+- **Team mode:** a team stays in while it has at least one alive member; anchors rotate across alive
+  players from every team; the game ends when one team remains (that team wins) or at the round cap
+  (teams with alive members share the win).
+- **Placements:** by elimination order — the last player eliminated places highest, and players
+  eliminated in the same round tie.
+- **Host settings (game-select, public):** anchor answer time (10-60s), turn time (10-60s), round
+  cap (3-20) and question **tone** (*Clean* by default, or *Spicy*, which stays mild — cheekier
+  everyday questions, never rude ones). Non-hosts see them read-only and they lock once a game
+  starts.
+- **Bots:** bot anchors and bot turn players answer from the question's own `botAnswers`, options,
+  numeric range or the alive players after a short beat. Bots never call the AI.
+- **Reconnect:** a reconnecting player gets the question back if their own window is still open
+  (with the remaining time from the public timer); a player who drops during their own window is
+  treated as a timeout so the round never stalls on a ghost.
 
 ### 2.5 Mafia game rules
 
@@ -255,8 +304,9 @@ the answer board, notice their question differed, and blend in anyway.
   leaderboard** (rank, icon, name, total, members and their contributions) and keeps the individual
   scoreboard underneath. The post-game screen shows final team totals the same way.
 - **Game support.** Each game declares `teamSupport` in `shared/data/games.ts`: `aggregate` (plays
-  as in solo, points roll up) or `native` (team-specific rules planned; treated as `aggregate` until
-  they ship). Game-select cards badge this as “Teams: scores combine” or “Team-ready”.
+  as in solo, points roll up) or `native` (the game itself knows about teams). Game-select cards
+  badge this as “Teams: scores combine” or “Team-ready”. Avoid the Word is the first **native**
+  game: a team survives while it has an alive member and the game ends when one team remains.
 - **Impostor in team mode.** Still exactly **one** impostor per round, chosen from all players, and
   voting stays individual — teammates may vote for each other. Only scoring changes.
 
@@ -264,8 +314,8 @@ the answer board, notice their question differed, and blend in anyway.
 
 - The **host** controls phase advancement, game selection, bot injection, and the selected game's
   public settings (Impostor difficulty/theme).
-- **Non-host players** can only act within their phase: submit a clue, cast a vote, buzz a taboo
-  slip, or skip a timer.
+- **Non-host players** can only act within their phase: submit a clue, answer the Avoid the Word
+  question on their own turn, cast a vote, or let a timer run out.
 - Server-side timers drive most phases; the host can override a timer with a skip action.
 
 ---
@@ -295,8 +345,11 @@ The engine follows a **server-authoritative, Socket.IO-based** architecture:
 - `next-round` returns to `reveal` with a fresh round and triggers role re-assignment.
 - `activeRounds` in `server/games/impostor.ts` keeps per-room impostor round data (secret word,
   impostor player id).
-- `activeRounds` in `server/games/avoidTheWord.ts` keeps the per-room taboo round data (prompts per
-  player, describer rotation, turn results, current buzz set, confirmed flag).
+- `activeRounds` in `server/games/avoidTheWord.ts` keeps the per-room round data (the question, the
+  anchor id, the hidden anchor answer, every submitted answer, the alive set, per-player statuses and
+  skip streaks, the turn order, the host overrules, the anchor rotation bag and the elimination
+  history). The round's question is written into `player:private-state` for the player whose input is
+  open only, and the answers join the public state only once `avoid-reveal` opens.
 - `activeRounds` in `server/games/mafia.ts` keeps the per-room Mafia state (role assignment, living
   players, night picks, investigation results, elimination history, and scoring).
 - `activeRounds` in `server/games/guessTheLink.ts` keeps the per-room Guess the Link state (the
@@ -342,13 +395,22 @@ The engine follows a **server-authoritative, Socket.IO-based** architecture:
 - `data/common-words-frequency.txt` — the 10,000 most common English words, used only as the
   "is this word common?" filter for AI output.
 - `data/blocklist.txt` — the moderation list applied to AI-generated content.
-- `shared/data/avoidTheWordPrompts.ts` — 40 original subjects, each with exactly 3 trap words.
+- `shared/data/questions/avoidTheWordQuestions.json` — 123 original Avoid the Word questions
+  (text / choice / number / player), each with its tone, category and minimum table size.
 - `shared/data/games.ts` — the six available game metadata entries.
 - `shared/theme/tokens.ts` — player color palette, spacing, radii, typography tokens.
 - `client/src/services/sound.ts` — Web Audio notifications and haptic feedback with a mute
   preference.
-- `client/src/screens/AtwRevealScreen.tsx`, `AtwDescriberScreen.tsx`, `AtwListenerScreen.tsx`,
-  `AtwResultsScreen.tsx` — the Avoid the Word views (reveal, describer, listener, results).
+- `server/games/avoidTheWord.match.ts` — the pure answer-matching module (normalisation, stems,
+  typos, and per-answer-type comparison), unit-tested by `npm run test:avoid`.
+- `server/content/avoidQuestionProvider.ts` — the Avoid the Word question provider (answer-space
+  eligibility, per-room shuffle bag, validated background AI top-up).
+- `shared/data/questions/avoidTheWordQuestions.json` — 123 questions across the four answer types.
+- `client/src/screens/avoidTheWord/` — the Avoid the Word views: `AvoidAnchorRevealScreen` (the
+  anchor's private briefing), `AvoidTurnScreen` (anchor input, turn input and the waiting screen),
+  `AvoidAnswerForm` (text / number / choice / player inputs), `AvoidStatusStrip`, `AvoidMatchedBanner`,
+  `AvoidRoundRevealScreen` (answers grid, host overrules, Continue) and `AvoidResultsScreen`
+  (placements, winners, team leaderboard).
 - `server/games/mafia.ts` — the Mafia engine (role deal, night actions, win conditions, scoring).
 - `client/src/screens/MafiaRevealScreen.tsx`, `MafiaNightActionScreen.tsx`,
   `MafiaTownSleepsScreen.tsx`, `MafiaMorningScreen.tsx`, `MafiaResultsScreen.tsx` — the Mafia
@@ -425,9 +487,6 @@ Every new game must:
 
 Native team rules planned for the existing games (implemented as follow-ups, not shipped yet):
 
-- **Avoid the Word** — describing turns rotate across teams; the describer's teammates guess, the
-  other teams buzz taboo words; success scores for the describing team, valid buzzes for the buzzing
-  team.
 - **Guess the Link** — each team submits ONE shared guess via a rotating captain; teams score
   separately.
 - **Top 100** — each team orders the full example set via a rotating captain; teams score by
@@ -443,14 +502,16 @@ Native team rules planned for the existing games (implemented as follow-ups, not
 - The core "Impostor" game is **functionally present** and aligns with the classic imposter-word
   social-deduction rules.
 - **Avoid the Word**, **Mafia**, **Guess the Link**, **Top 100**, and **Reverse Categories** also run
-  on dedicated engines (taboo turns with buzz confirmation, hidden roles with night/day elimination
-  loops, hidden concepts with per-player hint angles and simultaneous guessing, 1-to-100 spectra
-  with unique secret numbers and a host-authoritative ranking phase, and unrelated item triplets
+  on dedicated engines (a rotating anchor with a hidden answer, one timed turn per player and live
+  match announcements with host-overruled eliminations; hidden roles with night/day elimination
+  loops; hidden concepts with per-player hint angles and simultaneous guessing; 1-to-100 spectra
+  with unique secret numbers and a host-authoritative ranking phase; and unrelated item triplets
   with invented categories scored by the standard ballot respectively).
 - **Rooms** now run in **solo** or **team** mode, with host-managed teams, a central
   `awardPoints()` scoring path, and team leaderboards on the results and post-game screens.
 - **Per-game settings** live behind a gear on each game-select card (Impostor mode/difficulty/tone/
-  theme, Guess the Link's custom concept) and **room settings** (play mode, teams, rounds) behind a
-  gear in the lobby — no settings are shared between games any more.
+  theme, Avoid the Word's two timers, round cap and question tone, Guess the Link's custom concept)
+  and **room settings** (play mode, teams, rounds) behind a gear in the lobby — no settings are
+  shared between games any more.
 - **Production readiness** is not yet reached: no DB, no rate limiting, no room persistence, no
   persistence of rooms on restart, and no formal hardening pass.

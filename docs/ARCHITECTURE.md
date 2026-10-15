@@ -87,9 +87,13 @@ word list, and no room repeats content:
 
 - **`ContentProvider<T>`** — `next(roomId, opts?)` and `release(roomId)`. Providers are async
   because they may top themselves up from the AI client in the background, but bundled content is
-  answered immediately: a round never waits on the network. Two providers ship today
-  (`wordProvider.ts` for words, `questionProvider.ts` for Impostor question pairs), and each gets
-  its own bag and history per room, so switching modes mid-session cannot replay content.
+  answered immediately: a round never waits on the network. Three providers ship today
+  (`wordProvider.ts` for Impostor words, `questionProvider.ts` for Impostor question pairs, and
+  `avoidQuestionProvider.ts` for Avoid the Word questions), and each gets its own bag and history
+  per room, so switching games or modes mid-session cannot replay content. The Avoid the Word
+  provider additionally filters by the round's **tone** and **table size**, because a question whose
+  answer space is small (few options, a short numeric range, a "who here" pick at a tiny table)
+  would make accidental matches meaningless.
 - **Bonus content on the side** — both providers expose a `prefetch(roomId, opts)` hook that runs
   the AI top-up check off the round's critical path (word mode calls it when the discussion phase
   starts; question mode does the same) so the next round's word or pair is already waiting.
@@ -172,6 +176,13 @@ sequenceDiagram
 - `select-game` — host picks a game.
 - `advance-phase` — host progresses the phase state machine.
 - `submit-input` — player submits a clue or answer.
+- `avoid-answer` — the player whose Avoid the Word window is open submits (text, number, option or
+  chosen player); the server compares it to the hidden anchor answer immediately and broadcasts only
+  the resulting **status**.
+- `avoid-overrule` — during `avoid-reveal`, the host flips one answer between *match* and *safe* to
+  settle a close call before it applies.
+- `avoid-continue` — the host applies the round's eliminations and deals the next round (or lands on
+  `results`).
 - `cast-vote` — player votes in the vote phase.
 - `reset-to-lobby` — returns to lobby.
 - `add-bot` — host adds a test player.
@@ -290,6 +301,9 @@ lobby ──> game-select ──> reveal
 | `lobby`         | room code, player list, teams, start gate             | QR code, room code, player chips (+ team), start, settings gear |
 | `game-select`   | selected game id, per-game settings                   | selectable game cards, per-card settings gear  |
 | `reveal`        | assigned role/word, secret instructions, reveal timer | hidden role screen, "keep screen hidden"       |
+| `avoid-anchor`  | hidden anchor answer, anchor timer                    | the anchor's question + input, everyone else's waiting screen |
+| `avoid-turn`    | the open turn's question, one answer per player, turn timer | that player's input; everyone else sees "<name> is answering...", the status strip and live match banners |
+| `avoid-reveal`  | the question, the anchor's answer, every answer, overrules | the answers grid, host-only overrule toggles and Continue |
 | `input`         | submitted answers, input timer                        | single-word clue input, submission status      |
 | `reveal-answers`| randomized revealed answers, reveal timer             | rotating reveal cards                          |
 | `discussion`    | discussion timer, visible clues                       | clue list, discussion prompt                   |
@@ -368,8 +382,18 @@ Public (broadcast to room)
 Private (per player)
   role, secretWord, secretHint, isSpecialRole, specialAccentBg,
   secretInstructions, inputPlaceholder, inputSubmitted,
-  submittedAnswer, voteSubmitted, votedForPlayerId
+  submittedAnswer, voteSubmitted, votedForPlayerId,
+  avoidQuestion, avoidQuestionCategory, avoidAnswerType, avoidChoices,
+  avoidNumberRange, avoidIsAnchor, avoidIsActive, avoidAlive,
+  avoidRoundPoints
 ```
+
+**Scoped secrets.** The Avoid the Word question is written into exactly one player's private state
+at a time — the anchor during `avoid-anchor`, the current player during `avoid-turn` — and is
+deleted from everyone else's on every state build, so a stale payload can never carry it. The
+anchor's answer, and every submitted answer, live only in the engine's per-room state until
+`avoid-reveal` puts them in the public state. `getPlayerPrivateState()` re-derives the open window
+from the current phase, which is what makes a mid-turn reconnect restore the input.
 
 ---
 

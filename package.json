@@ -14,7 +14,9 @@
     "test:questions": "tsx scripts/testImpostorQuestionMode.ts",
     "test:teams": "tsx scripts/testTeamMode.ts",
     "test:avoid": "tsx scripts/testAvoidTheWord.ts",
-    "generate:words": "tsx scripts/generateCommonNouns.ts"
+    "generate:words": "tsx scripts/generateCommonNouns.ts",
+    "validate:top100": "tsx scripts/validateTop100Lists.ts",
+    "test:top100": "tsx scripts/testTop100.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -5,16 +5,19 @@ import {
   ImpostorSettings,
   Player,
   RoomPublicState,
+  Top100Settings,
 } from '@shared/types';
 import { AvoidSettingsPanel } from './AvoidSettingsPanel';
 import { GameSettingsPanel } from './GameSettingsPanel';
 import { GtlCustomPromptPanel } from './GtlCustomPromptPanel';
 import { SettingsSheet } from './SettingsSheet';
 import { TeamSupportBadge } from './TeamSupportBadge';
+import { Top100SettingsPanel } from './Top100SettingsPanel';
 
 type SettingsPatch = {
   impostor?: Partial<ImpostorSettings>;
   avoidTheWord?: Partial<AvoidSettings>;
+  top100?: Partial<Top100Settings>;
 };
 
 interface GameSettingsSheetProps {
@@ -85,6 +88,16 @@ export function GameSettingsSheet({
           room={room}
           myPlayer={myPlayer}
           onSaveGtlPrompt={onSaveGtlPrompt}
+        />
+      );
+    }
+
+    if (game.id === 'top-100') {
+      return (
+        <Top100SettingsPanel
+          room={room}
+          myPlayer={myPlayer}
+          onSaveGameSettings={onSaveGameSettings}
         />
       );
     }

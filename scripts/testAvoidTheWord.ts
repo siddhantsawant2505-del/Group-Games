@@ -24,6 +24,7 @@ import {
   readAvoidSettings,
   recordAvoidSkip,
   setAvoidOverrule,
+  type AvoidAnswerInput,
   type AvoidRoundState,
 } from '../server/games/avoidTheWord';
 import {
@@ -196,11 +197,6 @@ function sameAnswer(state: AvoidRoundState): AvoidAnswerInput {
     : { raw: answer.value };
 }
 
-/** The answer currently stored for a player on the server (test-only peek). */
-function storedAnswer(state: AvoidRoundState, playerId: string): string {
-  if (playerId === state.anchorId) return state.anchorAnswer?.display || '';
-  return state.answers[playerId]?.display || '';
-}
 
 async function main(): Promise<void> {
   // ------------------------------------------------------------- matching rules
