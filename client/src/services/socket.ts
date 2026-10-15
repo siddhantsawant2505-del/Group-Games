@@ -4,8 +4,9 @@ let socket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
-    // In browser, connect to same origin
-    socket = io({
+    // In browser, connect to VITE_SERVER_URL if configured, else same origin
+    const serverUrl = import.meta.env.VITE_SERVER_URL;
+    socket = io(serverUrl || undefined, {
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 10,
