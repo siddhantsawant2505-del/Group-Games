@@ -1,11 +1,21 @@
 import { Settings, Sparkles } from 'lucide-react';
-import { GameMetadata, ImpostorSettings, Player, RoomPublicState } from '@shared/types';
+import {
+  AvoidSettings,
+  GameMetadata,
+  ImpostorSettings,
+  Player,
+  RoomPublicState,
+} from '@shared/types';
+import { AvoidSettingsPanel } from './AvoidSettingsPanel';
 import { GameSettingsPanel } from './GameSettingsPanel';
 import { GtlCustomPromptPanel } from './GtlCustomPromptPanel';
 import { SettingsSheet } from './SettingsSheet';
 import { TeamSupportBadge } from './TeamSupportBadge';
 
-type SettingsPatch = { impostor?: Partial<ImpostorSettings> };
+type SettingsPatch = {
+  impostor?: Partial<ImpostorSettings>;
+  avoidTheWord?: Partial<AvoidSettings>;
+};
 
 interface GameSettingsSheetProps {
   game: GameMetadata | null;
@@ -55,6 +65,16 @@ export function GameSettingsSheet({
           myPlayer={myPlayer}
           onSaveGameSettings={onSaveGameSettings}
           questionModeAvailable={QUESTION_MODE_AVAILABLE}
+        />
+      );
+    }
+
+    if (game.id === 'avoid-the-word') {
+      return (
+        <AvoidSettingsPanel
+          room={room}
+          myPlayer={myPlayer}
+          onSaveGameSettings={onSaveGameSettings}
         />
       );
     }

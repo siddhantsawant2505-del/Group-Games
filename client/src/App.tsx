@@ -18,6 +18,7 @@ import {
   PlayerPrivateState,
   GamePhase,
   ImpostorSettings,
+  AvoidSettings,
   PlayMode,
 } from '@shared/types';
 import type { RoomSettingsActions } from './screens/LobbyScreen';
@@ -35,10 +36,10 @@ import { RevealAnswersScreen } from './screens/RevealAnswersScreen';
 import { DiscussionPhaseScreen } from './screens/DiscussionPhaseScreen';
 import { VotePhaseScreen } from './screens/VotePhaseScreen';
 import { ResultsPhaseScreen } from './screens/ResultsPhaseScreen';
-import { AtwRevealScreen } from './screens/AtwRevealScreen';
-import { AtwDescriberScreen } from './screens/AtwDescriberScreen';
-import { AtwListenerScreen } from './screens/AtwListenerScreen';
-import { AtwResultsScreen } from './screens/AtwResultsScreen';
+import { AvoidAnchorRevealScreen } from './screens/avoidTheWord/AvoidAnchorRevealScreen';
+import { AvoidTurnScreen } from './screens/avoidTheWord/AvoidTurnScreen';
+import { AvoidRoundRevealScreen } from './screens/avoidTheWord/AvoidRoundRevealScreen';
+import { AvoidResultsScreen } from './screens/avoidTheWord/AvoidResultsScreen';
 import { MafiaRevealScreen } from './screens/MafiaRevealScreen';
 import { MafiaNightActionScreen } from './screens/MafiaNightActionScreen';
 import { MafiaTownSleepsScreen } from './screens/MafiaTownSleepsScreen';
@@ -332,7 +333,7 @@ export default function App() {
   // Host updates the selected game's public settings (Impostor difficulty/theme)
   const handleSaveGameSettings = useCallback(
     (
-      patch: { impostor?: Partial<ImpostorSettings> },
+      patch: { impostor?: Partial<ImpostorSettings>; avoidTheWord?: Partial<AvoidSettings> },
       callback: (res: { success: boolean; error?: string }) => void
     ) => {
       if (!room || !myPlayer) return;
@@ -429,41 +430,47 @@ export default function App() {
     });
   }, [room, myPlayer]);
 
-  // Avoid the Word: toggle a buzz on the active describer
-  const handleAtwBuzz = useCallback(() => {
-    if (!room || !myPlayer) return;
-    playNotificationSound('timer-warning');
-    triggerHaptic('heavy');
-    const socket = getSocket();
-    socket.emit('atw-buzz', {
-      roomCode: room.roomCode,
-      playerId: myPlayer.id,
-    });
-  }, [room, myPlayer]);
-
-  // Avoid the Word: host confirms (ends the turn) or dismisses a pending buzz
-  const handleAtwResolveBuzz = useCallback(
-    (confirm: boolean) => {
+  // Avoid the Word: the player whose input is open (anchor or turn) locks it in
+  const handleAvoidAnswer = useCallback(
+    (answer: string, targetPlayerId?: string) => {
       if (!room || !myPlayer) return;
-      playNotificationSound(confirm ? 'submit-lock' : 'tick');
-      triggerHaptic(confirm ? 'medium' : 'light');
+      playNotificationSound('submit-lock');
+      triggerHaptic('success');
       const socket = getSocket();
-      socket.emit('atw-resolve-buzz', {
+      socket.emit('avoid-answer', {
         roomCode: room.roomCode,
         playerId: myPlayer.id,
-        confirm,
+        answer,
+        ...(targetPlayerId ? { targetPlayerId } : {}),
       });
     },
     [room, myPlayer]
   );
 
-  // Avoid the Word: describer (or host) hands the turn over early
-  const handleAtwEndTurn = useCallback(() => {
+  // Avoid the Word: the host overrules a close call during the round reveal
+  const handleAvoidOverrule = useCallback(
+    (targetPlayerId: string, countAsMatch: boolean) => {
+      if (!room || !myPlayer) return;
+      playNotificationSound(countAsMatch ? 'submit-lock' : 'tick');
+      triggerHaptic('light');
+      const socket = getSocket();
+      socket.emit('avoid-overrule', {
+        roomCode: room.roomCode,
+        playerId: myPlayer.id,
+        targetPlayerId,
+        countAsMatch,
+      });
+    },
+    [room, myPlayer]
+  );
+
+  // Avoid the Word: the host applies the round's eliminations
+  const handleAvoidContinue = useCallback(() => {
     if (!room || !myPlayer) return;
-    playNotificationSound('success');
-    triggerHaptic('success');
+    playNotificationSound('phase-change');
+    triggerHaptic('medium');
     const socket = getSocket();
-    socket.emit('atw-end-turn', {
+    socket.emit('avoid-continue', {
       roomCode: room.roomCode,
       playerId: myPlayer.id,
     });
@@ -646,9 +653,6 @@ export default function App() {
   const isGuessTheLink = room?.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
   const isTop100 = room?.selectedGame?.id === TOP_100_GAME_ID;
   const isReverseCategories = room?.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
-  const isAtwDescriber = Boolean(
-    privateState.atwIsDescriber || room?.atwState?.describerPlayerId === myPlayer?.id
-  );
   // Impostor runs two modes: 'word' (the classic round) and 'question'.
   const isImpostorQuestionMode =
     room?.selectedGame?.id === 'impostor' && room.gameSettings?.impostor?.mode === 'question';
@@ -720,11 +724,11 @@ export default function App() {
         />
       ) : room.phase === 'reveal' ? (
         isAvoidTheWord ? (
-          <AtwRevealScreen
+          <AvoidAnchorRevealScreen
             room={room}
             myPlayer={myPlayer}
             privateState={privateState}
-            onAdvance={() => handleAdvancePhase('atw-describe')}
+            onAdvance={() => handleAdvancePhase('avoid-anchor')}
           />
         ) : isMafia ? (
           <MafiaRevealScreen
@@ -768,23 +772,20 @@ export default function App() {
             onAdvance={() => handleAdvancePhase('input')}
           />
         )
-      ) : room.phase === 'atw-describe' ? (
-        isAtwDescriber ? (
-          <AtwDescriberScreen
-            room={room}
-            myPlayer={myPlayer}
-            privateState={privateState}
-            onEndTurn={handleAtwEndTurn}
-            onResolveBuzz={handleAtwResolveBuzz}
-          />
-        ) : (
-          <AtwListenerScreen
-            room={room}
-            myPlayer={myPlayer}
-            onBuzz={handleAtwBuzz}
-            onResolveBuzz={handleAtwResolveBuzz}
-          />
-        )
+      ) : room.phase === 'avoid-anchor' || room.phase === 'avoid-turn' ? (
+        <AvoidTurnScreen
+          room={room}
+          myPlayer={myPlayer}
+          privateState={privateState}
+          onSubmitAnswer={handleAvoidAnswer}
+        />
+      ) : room.phase === 'avoid-reveal' ? (
+        <AvoidRoundRevealScreen
+          room={room}
+          myPlayer={myPlayer}
+          onOverrule={handleAvoidOverrule}
+          onContinue={handleAvoidContinue}
+        />
       ) : room.phase === 'night' ? (
         privateState.mafiaCanAct ? (
           <MafiaNightActionScreen
@@ -925,7 +926,7 @@ export default function App() {
         />
       ) : room.phase === 'results' ? (
         isAvoidTheWord ? (
-          <AtwResultsScreen
+          <AvoidResultsScreen
             room={room}
             myPlayer={myPlayer}
             onNextRound={() => handleAdvancePhase('next-round')}

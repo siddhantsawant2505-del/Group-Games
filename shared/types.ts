@@ -23,7 +23,9 @@ export type GamePhase =
   | 'game-select'
   | 'reveal'
   | 'input'
-  | 'atw-describe'
+  | 'avoid-anchor'
+  | 'avoid-turn'
+  | 'avoid-reveal'
   | 'night'
   | 'day'
   | 'reveal-answers'
@@ -167,6 +169,7 @@ export interface ImpostorQuestionState {
 /** Room-wide per-game settings (only Impostor uses them today). */
 export interface GameSettings {
   impostor: ImpostorSettings;
+  avoidTheWord: AvoidSettings;
 }
 
 export const PLAY_MODE_LABELS: Record<PlayMode, string> = {
@@ -240,30 +243,171 @@ export interface VoteBreakdownItem {
   isCorrect: boolean;
 }
 
-export interface AtwTurnResult {
-  playerId: string;
-  playerName: string;
-  playerColor: string;
-  colorIndex: number;
-  subject: string;
-  forbidden: [string, string, string];
-  success: boolean; // true = timer ran out without confirmed buzz; false = buzzed out
-  buzzCount: number;
-  pointsAdded: number;
-  buzzedByNames?: string[]; // players whose buzzes were confirmed
+/* ─────────────────────────── Avoid the Word ─────────────────────────────── */
+
+export type AvoidAnswerType = 'text' | 'choice' | 'number' | 'player';
+
+/**
+ * One Avoid the Word question. Answer spaces must be comfortably bigger than the
+ * table, otherwise everyone matches by accident: `minPlayers` plus the
+ * answer-space rules enforced by the provider decide eligibility each round.
+ */
+export interface AvoidQuestion {
+  id: string;
+  text: string;
+  answerType: AvoidAnswerType;
+  category: string;
+  tone: QuestionTone;
+  /** Alive players needed before this question may be served. */
+  minPlayers: number;
+  /** 'choice' only: at least 8 options. */
+  choices?: string[];
+  /** 'number' only: the range must span at least 20 values. */
+  numberRange?: { min: number; max: number };
+  /** 'text' only: plausible answers used by simulated bots. */
+  botAnswers?: string[];
 }
 
-export interface AtwPublicState {
-  describerIndex: number;        // index into room.players of current describer
-  describerPlayerId: string;     // empty string when the round has no turns left
-  turnResults: AtwTurnResult[];  // completed turns this round
-  buzzedPlayerIds: string[];     // who has buzzed this turn (cleared per turn)
-  buzzConfirmed: boolean;        // majority or host override confirmed the buzz
-  totalTurns: number;            // number of players who will describe this round
-  turnNumber: number;            // 1-based index of the active turn
-  requiredBuzzes: number;        // buzzes needed to auto-confirm the active turn
-  turnActive: boolean;           // a describing turn is currently running
-  turnSeconds: number;           // seconds each describer gets on their turn
+/** Host settings for Avoid the Word (public state: strategy, never secrets). */
+export interface AvoidSettings {
+  anchorSeconds: number;
+  turnSeconds: number;
+  roundCap: number;
+  tone: QuestionTone;
+}
+
+/**
+ * Host-editable bounds for Avoid the Word, shared so the settings UI and the
+ * server clamp identically. The answer-space minimums below are the contract the
+ * question seed bank and the AI validator both have to satisfy.
+ */
+export const AVOID_SETTINGS_LIMITS = {
+  anchorSeconds: { min: 10, max: 60 },
+  turnSeconds: { min: 10, max: 60 },
+  roundCap: { min: 3, max: 20 },
+} as const;
+
+/** Smallest choice answer space, shared by the data and the validator. */
+export const AVOID_CHOICE_MIN_OPTIONS = 8;
+/** Smallest numeric answer space. */
+export const AVOID_NUMBER_MIN_RANGE = 20;
+/** 'player' questions need this many alive players to be interesting. */
+export const AVOID_PLAYER_MIN_ALIVE = 5;
+
+export const DEFAULT_AVOID_SETTINGS: AvoidSettings = {
+  anchorSeconds: 30,
+  turnSeconds: 20,
+  roundCap: 10,
+  tone: 'clean',
+};
+
+/**
+ * A player's state during the round.
+ * waiting   — has not had their turn yet
+ * safe      — answered and did not match the anchor
+ * matched   — answered and matched the anchor (eliminated on Continue)
+ * skipped   — timed out; counts as safe, but two in a row is an AFK elimination
+ * eliminated— out of the game (spectator)
+ */
+export type AvoidTurnStatus = 'waiting' | 'safe' | 'matched' | 'skipped' | 'eliminated';
+
+export const AVOID_STATUS_LABELS: Record<AvoidTurnStatus, string> = {
+  waiting: 'Waiting',
+  safe: 'Safe',
+  matched: 'Matched',
+  skipped: 'Skipped',
+  eliminated: 'Out',
+};
+
+/** One row of the public status strip (never carries an answer before the reveal). */
+export interface AvoidPlayerStatus {
+  playerId: string;
+  playerName: string;
+  colorIndex: number;
+  status: AvoidTurnStatus;
+  /** Consecutive skipped turns; reaching 2 eliminates the player as AFK. */
+  skippedStreak: number;
+  /** Round the player was eliminated in (null while still alive). */
+  eliminatedRound: number | null;
+}
+
+/** One player's answer inside the round reveal (public once revealed). */
+export interface AvoidAnswerRow {
+  playerId: string;
+  playerName: string;
+  colorIndex: number;
+  answer: string;
+  /** 'player' answers: who they named. */
+  answeredPlayerId?: string;
+  answeredPlayerName?: string;
+  /** True when the answer matched the anchor (before any host overrule). */
+  matched: boolean;
+  overruled?: boolean;
+  skipped: boolean;
+  isAnchor: boolean;
+  pointsAdded: number;
+}
+
+/** Players eliminated together in one round (they tie on placement). */
+export interface AvoidEliminationRound {
+  round: number;
+  playerIds: string[];
+}
+
+/**
+ * Public Avoid the Word state. It never carries the round's question or anybody's
+ * answer before the round reveal — only who is answering, the status strip and the
+ * live match announcements (which name the player, never the answer).
+ */
+export interface AvoidPublicState {
+  roundNumber: number;
+  roundCap: number;
+  anchorPlayerId: string;
+  anchorPlayerName: string;
+  /** Whose input is open right now ('' when no turn is running). */
+  activePlayerId: string;
+  activePlayerName: string;
+  statuses: AvoidPlayerStatus[];
+  alivePlayerIds: string[];
+  aliveCount: number;
+  /** Alive non-anchor players, in this round's randomized turn order. */
+  turnOrder: string[];
+  turnNumber: number;
+  totalTurns: number;
+  matchedPlayerIds: string[];
+  /** Most recent match this round — drives the live banner (never the answer). */
+  lastMatchedPlayerId: string;
+  /** Public because it shapes the input the table expects, not the question. */
+  answerType: AvoidAnswerType;
+  overrules: Record<string, boolean>;
+  revealed: boolean;
+  /** Round reveal only. */
+  questionText?: string;
+  anchorAnswer?: string;
+  rows?: AvoidAnswerRow[];
+  eliminations: AvoidEliminationRound[];
+  /** True once the game has ended (the results phase shows the placements). */
+  gameOver: boolean;
+  winnerPlayerIds: string[];
+  winnerTeamIds: string[];
+  anchorSeconds: number;
+  turnSeconds: number;
+  eligiblePlayerCount: number;
+}
+
+/** One line of the final placement table (by elimination order, ties shared). */
+export interface AvoidPlacement {
+  playerId: string;
+  playerName: string;
+  colorIndex: number;
+  placement: number;
+  /** Round they were eliminated in; null when they survived to the end. */
+  eliminatedRound: number | null;
+  pointsAdded: number;
+  totalScore: number;
+  isWinner: boolean;
+  teamName?: string;
+  teamIcon?: string;
 }
 
 export interface GtlGuessResult {
@@ -404,8 +548,13 @@ export interface PhaseResultsData {
   roleReveals?: RoleRevealInfo[];
   standings: PlayerResultStanding[];
   winnerTitle?: string;
-  // ATW-specific
-  atwTurnResults?: AtwTurnResult[];
+  // Avoid the Word-specific
+  avoidPlacements?: AvoidPlacement[];
+  avoidWinnerNames?: string[];
+  avoidWinnerTeamNames?: string[];
+  avoidEliminations?: AvoidEliminationRound[];
+  avoidRoundsPlayed?: number;
+  avoidAnchorNames?: string[];
   // Guess the Link-specific
   gtlConcept?: string;
   gtlCategory?: string;
@@ -462,7 +611,7 @@ export interface RoomPublicState {
   revealedAnswers: RevealedAnswer[];
   voteTallies: Record<string, number>; // targetPlayerId -> count
   results: PhaseResultsData | null;
-  atwState: AtwPublicState | null; // Avoid the Word game state
+  avoidState: AvoidPublicState | null; // Avoid the Word round state
   mafiaState: MafiaPublicState | null; // Mafia game state
   gtlState: GtlPublicState | null; // Guess the Link game state
   top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
@@ -498,13 +647,20 @@ export interface PlayerPrivateState {
   submittedAnswer?: string;
   voteSubmitted?: boolean;
   votedForPlayerId?: string;
-  // Avoid the Word
-  atwSubject?: string;
-  atwForbidden?: [string, string, string];
-  atwCategory?: string;
-  atwIsDescriber?: boolean;
-  atwBuzzed?: boolean;
-  atwRoundPoints?: number;
+  // Avoid the Word — the question only ever reaches the player whose input is open
+  avoidQuestion?: string;
+  avoidQuestionCategory?: string;
+  avoidAnswerType?: AvoidAnswerType;
+  avoidChoices?: string[];
+  avoidNumberRange?: { min: number; max: number };
+  avoidIsAnchor?: boolean;
+  avoidIsActive?: boolean;
+  avoidAlive?: boolean;
+  avoidAnswerSubmitted?: boolean;
+  avoidMyAnswer?: string;
+  avoidAnswerPlayerId?: string;
+  avoidAnswerPlayerName?: string;
+  avoidRoundPoints?: number;
   // Mafia
   mafiaRole?: MafiaRole;
   mafiaRoleLabel?: string;

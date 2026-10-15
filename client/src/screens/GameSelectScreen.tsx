@@ -4,6 +4,7 @@ import {
   RoomPublicState,
   Player,
   ImpostorSettings,
+  AvoidSettings,
   DIFFICULTY_LABELS,
   IMPOSTOR_MODE_LABELS,
   TONE_LABELS,
@@ -15,9 +16,15 @@ import { ActionButton } from '../components/ActionButton';
 import { GameSettingsSheet } from '../components/GameSettingsSheet';
 
 const IMPOSTOR_GAME_ID = 'impostor';
+const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
 
 /** One-line summary of the settings a game card is currently running. */
 function settingsSummaryFor(game: GameMetadata, room: RoomPublicState): string | undefined {
+  if (game.id === AVOID_THE_WORD_GAME_ID) {
+    const avoid = room.gameSettings.avoidTheWord;
+    return `${avoid.anchorSeconds}s anchor · ${avoid.turnSeconds}s turns · ${TONE_LABELS[avoid.tone]}`;
+  }
+
   if (game.id !== IMPOSTOR_GAME_ID) return undefined;
   const settings = room.gameSettings.impostor;
   return settings.mode === 'question'
@@ -37,9 +44,9 @@ interface GameSelectScreenProps {
     input: { concept: string; category?: string; hints?: string[] },
     callback: (res: { success: boolean; error?: string; prompt?: { concept: string; category: string; hints: string[] } | null }) => void
   ) => void;
-  /** Impostor only: host updates the public round settings. */
+  /** Impostor / Avoid the Word: host updates the public round settings. */
   onSaveGameSettings?: (
-    patch: { impostor?: Partial<ImpostorSettings> },
+    patch: { impostor?: Partial<ImpostorSettings>; avoidTheWord?: Partial<AvoidSettings> },
     callback: (res: { success: boolean; error?: string }) => void
   ) => void;
 }

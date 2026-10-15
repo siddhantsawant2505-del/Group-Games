@@ -374,7 +374,15 @@ async function startServer() {
           // Games with a dedicated engine follow their own phase chain.
           const phases: string[] =
             room.selectedGame?.id === 'avoid-the-word'
-              ? ['lobby', 'game-select', 'reveal', 'atw-describe', 'results']
+              ? [
+                  'lobby',
+                  'game-select',
+                  'reveal',
+                  'avoid-anchor',
+                  'avoid-turn',
+                  'avoid-reveal',
+                  'results',
+                ]
               : room.selectedGame?.id === 'mafia'
               ? ['lobby', 'game-select', 'reveal', 'night', 'day', 'discussion', 'vote', 'results']
               : room.selectedGame?.id === 'guess-the-link'
@@ -447,49 +455,71 @@ async function startServer() {
       }
     );
 
-    // 8. Avoid the Word: listener toggles a buzz on the active describer
+    // 8. Avoid the Word: the player whose input is open submits their answer
+    // ('player' answers pass the tapped player's id as well as the raw value).
     socket.on(
-      'atw-buzz',
-      ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
-        const upperCode = (roomCode || '').toUpperCase().trim();
-        const room = roomManager.getRoom(upperCode);
-        if (!room) return;
-
-        roomManager.submitAtwBuzz(room, playerId, () => broadcastRoom(upperCode));
-      }
-    );
-
-    // 9. Avoid the Word: host confirms (ends the turn) or dismisses a pending buzz
-    socket.on(
-      'atw-resolve-buzz',
+      'avoid-answer',
       ({
         roomCode,
         playerId,
-        confirm,
+        answer,
+        targetPlayerId,
       }: {
         roomCode: string;
         playerId: string;
-        confirm: boolean;
+        answer: string;
+        targetPlayerId?: string;
       }) => {
         const upperCode = (roomCode || '').toUpperCase().trim();
         const room = roomManager.getRoom(upperCode);
         if (!room) return;
 
-        roomManager.resolveAtwBuzz(room, playerId, Boolean(confirm), () =>
-          broadcastRoom(upperCode)
+        roomManager.submitAvoidAnswer(
+          room,
+          playerId,
+          { raw: String(answer ?? ''), ...(targetPlayerId ? { playerId: targetPlayerId } : {}) },
+          () => broadcastRoom(upperCode)
         );
       }
     );
 
-    // 10. Avoid the Word: describer (or host) ends the active turn early
+    // 9. Avoid the Word: the host overrules a close call during the reveal
     socket.on(
-      'atw-end-turn',
+      'avoid-overrule',
+      ({
+        roomCode,
+        playerId,
+        targetPlayerId,
+        countAsMatch,
+      }: {
+        roomCode: string;
+        playerId: string;
+        targetPlayerId: string;
+        countAsMatch: boolean;
+      }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.hostOverruleAvoidMatch(
+          room,
+          playerId,
+          targetPlayerId,
+          Boolean(countAsMatch),
+          () => broadcastRoom(upperCode)
+        );
+      }
+    );
+
+    // 10. Avoid the Word: the host applies the eliminations and moves the round on
+    socket.on(
+      'avoid-continue',
       ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
         const upperCode = (roomCode || '').toUpperCase().trim();
         const room = roomManager.getRoom(upperCode);
         if (!room) return;
 
-        roomManager.endAtwTurn(room, playerId, () => broadcastRoom(upperCode));
+        roomManager.hostContinueAvoidReveal(room, playerId, () => broadcastRoom(upperCode));
       }
     );
 
@@ -641,7 +671,10 @@ async function startServer() {
 
     // 16. Handle socket disconnect
     socket.on('disconnect', () => {
-      const { room } = roomManager.handleDisconnect(socket.id);
+      // Avoid the Word resolves an open answer window when the player who owes
+      // an answer drops (so the round never stalls on a ghost); the room is
+      // broadcast right below, and a no-op notifier avoids a double broadcast.
+      const { room } = roomManager.handleDisconnect(socket.id, () => undefined);
       if (room) {
         broadcastRoom(room.code);
       }

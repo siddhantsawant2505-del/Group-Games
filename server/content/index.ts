@@ -7,12 +7,14 @@
  */
 
 import { releaseAiRoom } from './aiClient';
+import { avoidQuestionProvider } from './avoidQuestionProvider';
 import { questionProvider } from './questionProvider';
 import { wordProvider } from './wordProvider';
 
 export function releaseRoomContent(roomId: string): void {
   wordProvider.release(roomId);
   questionProvider.release(roomId);
+  avoidQuestionProvider.release(roomId);
   releaseAiRoom(roomId);
 }
 
@@ -39,6 +41,20 @@ export {
   QUESTION_AI_BATCH_SIZE,
   resetQuestionProviderForTests,
 } from './questionProvider';
+export {
+  avoidQuestionProvider,
+  prefetchAvoidContent,
+  validateAvoidQuestion,
+  validateAiAvoidQuestions,
+  isAnswerSpaceLargeEnough,
+  isQuestionEligible,
+  avoidPoolSizeFor,
+  seedCounts as avoidSeedCounts,
+  SEED_AVOID_QUESTIONS,
+  AVOID_AI_BATCH_SIZE,
+  AVOID_BAG_LOW_WATER_MARK,
+  resetAvoidProviderForTests,
+} from './avoidQuestionProvider';
 export { ShuffleBag, shuffle, RECENT_GUARD } from './contentBag';
 export { getAiStatus, isAiAvailable, reportAiUnavailableOnce, AI_LIMITS } from './aiClient';
 export {

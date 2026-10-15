@@ -21,19 +21,19 @@ export const PARTY_GAMES: GameMetadata[] = [
   {
     id: 'avoid-the-word',
     title: 'Avoid the Word',
-    tagline: 'Speak freely, but mind your traps!',
+    tagline: "Don't say what they said!",
     minPlayers: 3,
     maxPlayers: 10,
     icon: 'ban',
     description:
-      'Describe secret topics to your friends without accidentally saying any of the forbidden trap words on your card.',
+      'One anchor answers a hidden question. Everyone else answers the same question and is knocked out if their answer matches — guess what the group would say, or be the last one standing.',
     rules: [
-      'Each player privately receives a target subject and 3 forbidden taboo words.',
-      'Describers rotate one at a time and get 45 seconds to talk their subject through.',
-      'Everyone else listens and buzzes if a taboo word slips — a majority confirms it.',
-      'Score points for clean describes and for buzzes your group confirms.',
+      'Each round an anchor is picked and privately answers a question.',
+      'The same question then goes to every other alive player, one turn at a time.',
+      'Any answer that matches the anchor is announced live and knocks that player out when the host continues.',
+      'The anchor scores a point per match; the last player (or team) standing wins, and winners score 3.',
     ],
-    // Native team rules are planned (rotating team turns); scores aggregate for now.
+    // Team mode is native: a team survives while it has any alive member.
     teamSupport: 'native',
   },
   {

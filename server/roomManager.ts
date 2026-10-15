@@ -13,7 +13,8 @@ import {
   RevealedAnswer,
   RoleRevealInfo,
   PlayerResultStanding,
-  AtwPublicState,
+  AvoidPublicState,
+  AvoidSettings,
   MafiaPublicState,
   GtlPublicState,
   Top100PublicState,
@@ -38,7 +39,11 @@ import {
   buildGtlCustomPrompt,
   isBlankGtlCustomPrompt,
 } from '../shared/data/guessTheLinkPrompts';
-import { DEFAULT_IMPOSTOR_SETTINGS, GameSettings } from '../shared/types';
+import {
+  DEFAULT_AVOID_SETTINGS,
+  DEFAULT_IMPOSTOR_SETTINGS,
+  GameSettings,
+} from '../shared/types';
 import { sanitizeTheme } from './content/types';
 import { prefetchWordContent, randomCorpusWord, wordProvider } from './content/wordProvider';
 import { isAiAvailable, prefetchQuestionContent, questionProvider, releaseRoomContent } from './content';
@@ -58,19 +63,27 @@ import {
   cleanupImpostorQuestionRound,
 } from './games/impostor';
 import {
-  ATW_TURN_SECONDS,
-  setupAvoidTheWordRound,
-  beginAtwTurn,
-  toggleAtwBuzz,
-  resolveAtwBuzz,
-  completeAtwTurn,
-  hasMoreAtwTurns,
-  simulateAtwBotBuzzes,
-  decideAtwBotDescribeOutcome,
-  calculateAtwResults,
+  ATW_SETTINGS_LIMITS,
+  advanceAvoidTurn,
+  applyAvoidEliminations,
+  beginAvoidAnchorPhase,
+  beginAvoidReveal,
+  beginAvoidTurn,
+  calculateAvoidResults,
+  checkAvoidGameOver,
   cleanupAvoidTheWordRound,
-  AtwTurnOutcome,
+  getAvoidRound,
+  hasMoreAvoidTurns,
+  nextAvoidTurnPlayerId,
+  pickAvoidBotAnswer,
+  readAvoidSettings,
+  recordAvoidAnswer,
+  recordAvoidSkip,
+  setAvoidOverrule,
+  setupAvoidRound,
+  syncAvoidPrivateState,
 } from './games/avoidTheWord';
+import { avoidQuestionProvider } from './content/avoidQuestionProvider';
 import {
   MAFIA_DAY_SECONDS,
   MAFIA_NIGHT_SECONDS,
@@ -137,6 +150,43 @@ import {
  */
 export { awardPoints } from './scoring';
 
+/**
+ * Clamps a host-authored Avoid the Word settings patch into its legal ranges.
+ * Settings are public strategy (durations, cap, tone), never round secrets.
+ */
+function sanitizeAvoidSettingsPatch(
+  patch: Partial<AvoidSettings>,
+  current: AvoidSettings
+): AvoidSettings {
+  const clamp = (value: unknown, min: number, max: number, fallback: number) => {
+    const parsed = Math.floor(Number(value));
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+  };
+
+  return {
+    anchorSeconds: clamp(
+      patch.anchorSeconds,
+      ATW_SETTINGS_LIMITS.anchorSeconds.min,
+      ATW_SETTINGS_LIMITS.anchorSeconds.max,
+      current.anchorSeconds
+    ),
+    turnSeconds: clamp(
+      patch.turnSeconds,
+      ATW_SETTINGS_LIMITS.turnSeconds.min,
+      ATW_SETTINGS_LIMITS.turnSeconds.max,
+      current.turnSeconds
+    ),
+    roundCap: clamp(
+      patch.roundCap,
+      ATW_SETTINGS_LIMITS.roundCap.min,
+      ATW_SETTINGS_LIMITS.roundCap.max,
+      current.roundCap
+    ),
+    tone: patch.tone === 'spicy' || patch.tone === 'clean' ? patch.tone : current.tone,
+  };
+}
+
 /** Rooms with no connected player are dropped after this much inactivity. */
 export const ROOM_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
@@ -172,7 +222,7 @@ export interface InternalRoom {
   playerVotes: Record<string, string>; // voterPlayerId -> targetPlayerId
   privateData: Record<string, PlayerPrivateState>;
   results: RoomPublicState['results'];
-  atwState: AtwPublicState | null; // Avoid the Word turn state
+  avoidState: AvoidPublicState | null; // Avoid the Word round state
   mafiaState: MafiaPublicState | null; // Mafia night/day state
   gtlState: GtlPublicState | null; // Guess the Link round state
   top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
@@ -271,13 +321,16 @@ export class RoomManager {
       playerVotes: {},
       privateData: {},
       results: null,
-      atwState: null,
+      avoidState: null,
       mafiaState: null,
       gtlState: null,
       top100State: null,
       revCatState: null,
       impostorQuestionState: null,
-      gameSettings: { impostor: { ...DEFAULT_IMPOSTOR_SETTINGS } },
+      gameSettings: {
+        impostor: { ...DEFAULT_IMPOSTOR_SETTINGS },
+        avoidTheWord: { ...DEFAULT_AVOID_SETTINGS },
+      },
       playMode: 'solo',
       teams: [],
       scoreLog: [],
@@ -433,7 +486,10 @@ export class RoomManager {
   /**
    * Handles player disconnection
    */
-  public handleDisconnect(socketId: string): {
+  public handleDisconnect(
+    socketId: string,
+    broadcastState?: () => void
+  ): {
     room?: InternalRoom;
     player?: InternalPlayer;
   } {
@@ -453,10 +509,45 @@ export class RoomManager {
           }
         }
 
+        // Avoid the Word: a player dropping during their own answer window is
+        // treated as a timeout (skip), so the round never stalls on a ghost.
+        this.resolveAvoidDisconnect(room, player.id, broadcastState);
+
         return { room, player };
       }
     }
     return {};
+  }
+
+  /**
+   * Avoid the Word: resolves an open answer window when its player drops out.
+   */
+  private resolveAvoidDisconnect(
+    room: InternalRoom,
+    playerId: string,
+    broadcastState?: () => void
+  ) {
+    if (room.selectedGame?.id !== AVOID_THE_WORD_GAME_ID) return;
+    const phase = room.phase;
+    if (phase !== 'avoid-anchor' && phase !== 'avoid-turn') return;
+
+    const state = getAvoidRound(room.code);
+    if (!state) return;
+
+    const activeId = phase === 'avoid-anchor' ? state.anchorId : nextAvoidTurnPlayerId(state);
+    if (activeId !== playerId) return;
+
+    const notify = broadcastState || (() => undefined);
+    this.clearBotTimeouts(room);
+    recordAvoidSkip(room, playerId, phase);
+
+    if (phase === 'avoid-anchor') {
+      this.transitionToPhase(room, 'avoid-turn', notify);
+      return;
+    }
+
+    advanceAvoidTurn(state);
+    this.advanceAvoid(room, notify);
   }
 
   /**
@@ -527,6 +618,7 @@ export class RoomManager {
         tone?: string;
         theme?: string;
       };
+      avoidTheWord?: Partial<AvoidSettings>;
     }
   ): { success: boolean; error?: string } {
     const room = this.getRoom(code);
@@ -556,6 +648,10 @@ export class RoomManager {
     room.gameSettings = {
       ...room.gameSettings,
       impostor: { mode, difficulty, tone, ...(theme ? { theme } : {}) },
+      avoidTheWord: sanitizeAvoidSettingsPatch(
+        patch?.avoidTheWord || {},
+        room.gameSettings.avoidTheWord
+      ),
     };
     room.lastActivityAt = Date.now();
     return { success: true };
@@ -978,7 +1074,7 @@ export class RoomManager {
         room.playerVotes = {};
         room.privateData = {};
         room.results = null;
-        room.atwState = null;
+        room.avoidState = null;
         room.mafiaState = null;
         room.gtlState = null;
         room.top100State = null;
@@ -1010,10 +1106,15 @@ export class RoomManager {
           return;
         }
 
-        // Prepare private roles/words based on selected game
+        // Avoid the Word draws its question the same way: async provider, so the
+        // reveal (anchor + hidden question) finishes in its own method.
         if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) {
-          setupAvoidTheWordRound(room);
-        } else if (room.selectedGame?.id === MAFIA_GAME_ID) {
+          void this.startAvoidReveal(room, broadcastState);
+          return;
+        }
+
+        // Prepare private roles/words based on selected game
+        if (room.selectedGame?.id === MAFIA_GAME_ID) {
           setupMafiaRound(room);
         } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
           setupGtlRound(room);
@@ -1082,15 +1183,34 @@ export class RoomManager {
         break;
       }
 
-      case 'atw-describe': {
-        // Avoid the Word replaces the single-shot input phase with a rotation of
-        // live describing turns (one describer at a time, everyone else listens).
+      case 'avoid-anchor': {
+        // The anchor privately receives the round's question and answers it. The
+        // anchor can never be eliminated in their own round.
         if (room.selectedGame?.id !== AVOID_THE_WORD_GAME_ID) {
           this.transitionToPhase(room, 'input', broadcastState);
           return;
         }
-        this.runAtwTurn(room, broadcastState);
-        return; // runAtwTurn performs its own broadcast
+        this.runAvoidAnchorPhase(room, broadcastState);
+        break;
+      }
+
+      case 'avoid-turn': {
+        // One alive player answers at a time; the phase repeats until every turn
+        // this round has been played, then the round reveal opens.
+        if (room.selectedGame?.id !== AVOID_THE_WORD_GAME_ID) {
+          this.transitionToPhase(room, 'input', broadcastState);
+          return;
+        }
+        this.runAvoidTurn(room, broadcastState);
+        return; // runAvoidTurn performs its own broadcast
+      }
+
+      case 'avoid-reveal': {
+        if (room.selectedGame?.id !== AVOID_THE_WORD_GAME_ID) break;
+        beginAvoidReveal(room);
+        room.phasePrompt = 'Round Reveal';
+        room.phaseSubprompt = 'The host can overrule a close call, then Continue';
+        break;
       }
 
       case 'input': {
@@ -1344,7 +1464,7 @@ export class RoomManager {
         if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
           this.calculateImpostorRoundResults(room);
         } else if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) {
-          calculateAtwResults(room);
+          calculateAvoidResults(room);
         } else if (room.selectedGame?.id === MAFIA_GAME_ID) {
           calculateMafiaResults(room);
         } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
@@ -1472,7 +1592,7 @@ export class RoomManager {
    * Games with a dedicated engine leave the reveal phase into their own phase.
    */
   private phaseAfterReveal(room: InternalRoom): GamePhase {
-    if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) return 'atw-describe';
+    if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) return 'avoid-anchor';
     if (room.selectedGame?.id === MAFIA_GAME_ID) return 'night';
     return 'input';
   }
@@ -1531,88 +1651,199 @@ export class RoomManager {
   }
 
   /**
-   * Avoid the Word: runs the current describing turn and arms the turn timer.
-   * Bots are simulated because they cannot actually talk out loud.
+   * Avoid the Word: draws the round's question and opens the reveal phase.
+   * The question is served by the content engine (no repeats inside a room) and
+   * is only ever written into the anchor's private state.
    */
-  private runAtwTurn(room: InternalRoom, broadcastState: () => void) {
-    const info = beginAtwTurn(room);
-    if (!info) {
+  private async startAvoidReveal(room: InternalRoom, broadcastState: () => void) {
+    const settings = readAvoidSettings(room);
+    const storedState = getAvoidRound(room.code);
+    // A finished game is not continued: "play another game" brings everybody back
+    // in and the round counter restarts at one.
+    const previous = storedState && !storedState.gameOver ? storedState : undefined;
+    if (!previous) room.roundNumber = 1;
+
+    // Players who left the room drop out of the alive set; if that leaves fewer
+    // than two, the game is decided rather than restarted.
+    const aliveIds = previous
+      ? [...previous.alive].filter((id) => room.players.some((player) => player.id === id))
+      : room.players.map((player) => player.id);
+
+    if (aliveIds.length < 2) {
+      if (previous) {
+        previous.alive = new Set(aliveIds);
+        previous.winnerPlayerIds = aliveIds;
+        previous.gameOver = true;
+      }
       this.transitionToPhase(room, 'results', broadcastState);
       return;
     }
 
-    room.phasePrompt = `${info.describerName} is Describing`;
-    room.phaseSubprompt = `Turn ${info.turnNumber} of ${info.totalTurns} — buzz the second a taboo word slips!`;
+    const question = await avoidQuestionProvider.next(room.code, {
+      tone: settings.tone,
+      aliveCount: aliveIds.length,
+    });
+
+    // A host skip or a disconnect may have moved the room on while we waited.
+    if (room.phase !== 'reveal' || room.selectedGame?.id !== AVOID_THE_WORD_GAME_ID) return;
+
+    const info = setupAvoidRound(room, question, {
+      alive: aliveIds,
+      ...(previous ? { previousState: previous } : {}),
+    });
+
+    this.startRevealTimer(room, broadcastState, {
+      prompt: `Round ${info.roundNumber}: ${info.anchorName} is the Anchor`,
+      subprompt:
+        'Only the anchor sees the question — everyone else answers it on their turn',
+    });
+    broadcastState();
+  }
+
+  /**
+   * Avoid the Word: opens the anchor's private answer window and arms its timer.
+   */
+  private runAvoidAnchorPhase(room: InternalRoom, broadcastState: () => void) {
+    const settings = readAvoidSettings(room);
+    const info = beginAvoidAnchorPhase(room);
+
+    if (!info) {
+      this.transitionToPhase(room, 'avoid-turn', broadcastState);
+      return;
+    }
+
+    room.phasePrompt = `${info.anchorName} is Answering`;
+    room.phaseSubprompt =
+      'The anchor picks what the group is most likely to say — the answer stays hidden';
 
     this.startPhaseTimer(
       room,
-      ATW_TURN_SECONDS,
+      settings.anchorSeconds,
       () => broadcastState(),
-      () => this.finishAtwTurn(room, 'timeout', broadcastState)
+      () => this.resolveAvoidTimeout(room, broadcastState)
     );
 
-    const describer = room.players.find((p) => p.id === info.describerId);
-
-    if (describer?.isBot) {
-      // A bot turn resolves itself after a short beat so the room can follow along.
-      this.scheduleBotAction(room, 4000, () => {
-        if (!this.isActiveAtwTurn(room, info.describerId, info.turnNumber)) return;
-        const outcome = decideAtwBotDescribeOutcome();
-        if (outcome === 'buzzed') {
-          simulateAtwBotBuzzes(room, true);
-        }
-        this.finishAtwTurn(room, outcome, broadcastState);
-      });
-    } else {
-      // Bot listeners may call out a slip partway through a human turn.
-      this.scheduleBotAction(room, 12000, () => {
-        if (!this.isActiveAtwTurn(room, info.describerId, info.turnNumber)) return;
-        const buzzes = simulateAtwBotBuzzes(room);
-        if (buzzes === 0) return;
-        if (room.atwState?.buzzConfirmed) {
-          this.finishAtwTurn(room, 'buzzed', broadcastState);
-          return;
-        }
-        broadcastState();
-      });
+    if (this.isAvoidBot(room, info.anchorId)) {
+      this.scheduleAvoidBotAnswer(room, info.anchorId, broadcastState);
     }
 
     broadcastState();
   }
 
   /**
-   * Avoid the Word: scores the active turn and moves on to the next describer.
+   * Avoid the Word: one alive player answers at a time. The phase re-enters
+   * itself until every turn this round has been played.
    */
-  private finishAtwTurn(
-    room: InternalRoom,
-    outcome: AtwTurnOutcome,
-    broadcastState: () => void
-  ) {
-    if (room.phase !== 'atw-describe') return;
-
-    this.clearBotTimeouts(room);
-    completeAtwTurn(room, outcome);
-
-    if (hasMoreAtwTurns(room)) {
-      this.runAtwTurn(room, broadcastState);
-    } else {
-      this.transitionToPhase(room, 'results', broadcastState);
+  private runAvoidTurn(room: InternalRoom, broadcastState: () => void) {
+    const state = getAvoidRound(room.code);
+    if (!state) {
+      this.transitionToPhase(room, 'avoid-reveal', broadcastState);
+      return;
     }
+    if (state.gameOver) {
+      this.transitionToPhase(room, 'results', broadcastState);
+      return;
+    }
+
+    const activeId = nextAvoidTurnPlayerId(state);
+    if (!activeId) {
+      this.transitionToPhase(room, 'avoid-reveal', broadcastState);
+      return;
+    }
+
+    const settings = readAvoidSettings(room);
+    const info = beginAvoidTurn(room, activeId);
+
+    room.phasePrompt = `${info.playerName}'s Turn`;
+    room.phaseSubprompt = `Turn ${info.turnNumber} of ${info.totalTurns} — everyone else waits`;
+
+    this.startPhaseTimer(
+      room,
+      settings.turnSeconds,
+      () => broadcastState(),
+      () => this.resolveAvoidTimeout(room, broadcastState)
+    );
+
+    if (this.isAvoidBot(room, activeId)) {
+      this.scheduleAvoidBotAnswer(room, activeId, broadcastState);
+    }
+
+    broadcastState();
+  }
+
+  /** True when the player is a simulated bot (bots answer from bundled content). */
+  private isAvoidBot(room: InternalRoom, playerId: string): boolean {
+    return Boolean(room.players.find((player) => player.id === playerId)?.isBot);
   }
 
   /**
-   * Guards late bot actions so they never fire against a later turn.
+   * Simulated bot answers: a plausible answer a beat after the window opens. Bots
+   * never call the AI and never see the anchor's answer.
    */
-  private isActiveAtwTurn(
+  private scheduleAvoidBotAnswer(
     room: InternalRoom,
-    describerId: string,
-    turnNumber: number
-  ): boolean {
-    return (
-      room.phase === 'atw-describe' &&
-      room.atwState?.describerPlayerId === describerId &&
-      room.atwState?.turnNumber === turnNumber
-    );
+    playerId: string,
+    broadcastState: () => void
+  ) {
+    const phase = room.phase;
+    const state = getAvoidRound(room.code);
+    if (!state) return;
+
+    this.scheduleBotAction(room, 1400 + Math.floor(Math.random() * 1600), () => {
+      if (room.phase !== phase) return;
+      const live = getAvoidRound(room.code);
+      if (!live) return;
+      const activeId =
+        phase === 'avoid-anchor' ? live.anchorId : nextAvoidTurnPlayerId(live);
+      if (activeId !== playerId) return;
+      this.submitAvoidAnswer(room, playerId, pickAvoidBotAnswer(room, live), broadcastState);
+    });
+  }
+
+  /**
+   * Avoid the Word: the open answer window ran out (or the player dropped). The
+   * turn is recorded as a skip, which counts as safe, and two skips in a row
+   * eliminate the player as AFK.
+   */
+  private resolveAvoidTimeout(room: InternalRoom, broadcastState: () => void) {
+    const phase = room.phase;
+    if (phase !== 'avoid-anchor' && phase !== 'avoid-turn') return;
+    const state = getAvoidRound(room.code);
+    if (!state) return;
+
+    const activeId = phase === 'avoid-anchor' ? state.anchorId : nextAvoidTurnPlayerId(state);
+    if (!activeId) return;
+
+    recordAvoidSkip(room, activeId, phase);
+
+    if (phase === 'avoid-anchor') {
+      this.transitionToPhase(room, 'avoid-turn', broadcastState);
+      return;
+    }
+
+    advanceAvoidTurn(state);
+    this.advanceAvoid(room, broadcastState);
+  }
+
+  /**
+   * Avoid the Word: moves on to the next turn, the round reveal, or the end of
+   * the game, whichever comes first.
+   */
+  private advanceAvoid(room: InternalRoom, broadcastState: () => void) {
+    const state = getAvoidRound(room.code);
+    if (!state) {
+      this.transitionToPhase(room, 'avoid-reveal', broadcastState);
+      return;
+    }
+    if (state.gameOver) {
+      this.transitionToPhase(room, 'results', broadcastState);
+      return;
+    }
+    if (hasMoreAvoidTurns(state)) {
+      this.transitionToPhase(room, 'avoid-turn', broadcastState);
+      return;
+    }
+    this.transitionToPhase(room, 'avoid-reveal', broadcastState);
   }
 
   /**
@@ -1865,57 +2096,81 @@ export class RoomManager {
   }
 
   /**
-   * Avoid the Word: toggles a listener's buzz on the active describer.
-   * A strict majority auto-confirms and ends the turn immediately.
+   * Avoid the Word: the player whose input is open submits their answer.
+   * Matching the anchor's hidden answer is decided here, immediately, so the room
+   * gets a live announcement (never the answer itself).
    */
-  public submitAtwBuzz(room: InternalRoom, playerId: string, broadcastState: () => void) {
-    if (room.phase !== 'atw-describe') return;
-
-    const outcome = toggleAtwBuzz(room, playerId);
-    if (!outcome.accepted) return;
-
-    if (outcome.confirmed) {
-      this.finishAtwTurn(room, 'buzzed', broadcastState);
-      return;
-    }
-
-    broadcastState();
-  }
-
-  /**
-   * Avoid the Word: host override on a pending buzz.
-   * confirm=true ends the turn as a failure, confirm=false dismisses the buzzes.
-   */
-  public resolveAtwBuzz(
+  public submitAvoidAnswer(
     room: InternalRoom,
     playerId: string,
-    confirm: boolean,
+    input: { raw: string; playerId?: string },
     broadcastState: () => void
   ) {
-    if (room.phase !== 'atw-describe') return;
-    if (playerId !== room.hostId) return;
+    if (room.selectedGame?.id !== AVOID_THE_WORD_GAME_ID) return;
+    const phase = room.phase;
+    if (phase !== 'avoid-anchor' && phase !== 'avoid-turn') return;
 
-    const endsTurn = resolveAtwBuzz(room, confirm);
-    if (endsTurn) {
-      this.finishAtwTurn(room, 'buzzed', broadcastState);
+    const outcome = recordAvoidAnswer(room, playerId, input, phase);
+    if (!outcome.accepted) {
+      broadcastState();
       return;
     }
 
+    this.clearBotTimeouts(room);
+
+    if (phase === 'avoid-anchor') {
+      this.transitionToPhase(room, 'avoid-turn', broadcastState);
+      return;
+    }
+
+    const state = getAvoidRound(room.code);
+    if (state) advanceAvoidTurn(state);
+    this.advanceAvoid(room, broadcastState);
+  }
+
+  /**
+   * Avoid the Word: the host overrules a close call (synonyms, typos) during the
+   * round reveal. countAsMatch=true eliminates the player, false keeps them safe.
+   */
+  public hostOverruleAvoidMatch(
+    room: InternalRoom,
+    playerId: string,
+    targetPlayerId: string,
+    countAsMatch: boolean,
+    broadcastState: () => void
+  ) {
+    if (room.selectedGame?.id !== AVOID_THE_WORD_GAME_ID) return;
+    if (room.phase !== 'avoid-reveal') return;
+    if (playerId !== room.hostId) return;
+
+    const result = setAvoidOverrule(room, targetPlayerId, countAsMatch);
+    if (!result.success) return;
     broadcastState();
   }
 
   /**
-   * Avoid the Word: the describer (or host) ends the active turn early.
+   * Avoid the Word: the host applies the round's eliminations. When the game is
+   * decided it moves to results, otherwise it deals the next round.
    */
-  public endAtwTurn(room: InternalRoom, playerId: string, broadcastState: () => void) {
-    if (room.phase !== 'atw-describe') return;
+  public hostContinueAvoidReveal(
+    room: InternalRoom,
+    playerId: string,
+    broadcastState: () => void
+  ) {
+    if (room.selectedGame?.id !== AVOID_THE_WORD_GAME_ID) return;
+    if (room.phase !== 'avoid-reveal') return;
+    if (playerId !== room.hostId) return;
 
-    const describerId = room.atwState?.describerPlayerId;
-    const isDescriber = Boolean(describerId) && playerId === describerId;
-    if (!isDescriber && playerId !== room.hostId) return;
+    const settings = readAvoidSettings(room);
+    const { gameOver } = applyAvoidEliminations(room, settings);
 
-    // A confirmed buzz still fails the turn; an early stop otherwise counts as done.
-    this.finishAtwTurn(room, room.atwState?.buzzConfirmed ? 'buzzed' : 'timeout', broadcastState);
+    if (gameOver) {
+      this.transitionToPhase(room, 'results', broadcastState);
+      return;
+    }
+
+    room.roundNumber += 1;
+    this.transitionToPhase(room, 'reveal', broadcastState);
   }
 
   /**
@@ -2091,7 +2346,7 @@ export class RoomManager {
       revealedAnswers: room.revealedAnswers,
       voteTallies: room.voteTallies,
       results: room.results,
-      atwState: room.atwState,
+      avoidState: room.avoidState,
       mafiaState: room.mafiaState,
       gtlState: room.gtlState,
       top100State: room.top100State,
@@ -2112,6 +2367,12 @@ export class RoomManager {
     room: InternalRoom,
     playerId: string
   ): PlayerPrivateState {
+    // Avoid the Word keeps the round's question scoped to the player whose input
+    // is open, so a reconnect mid-turn gets the question (and the remaining time
+    // from the public timer) back.
+    if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) {
+      syncAvoidPrivateState(room, room.phase);
+    }
     return room.privateData[playerId] || {};
   }
 }
