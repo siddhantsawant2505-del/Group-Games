@@ -12,6 +12,7 @@
     "lint": "tsc --noEmit",
     "test:content": "tsx scripts/testContentEngine.ts",
     "test:questions": "tsx scripts/testImpostorQuestionMode.ts",
+    "test:teams": "tsx scripts/testTeamMode.ts",
     "generate:words": "tsx scripts/generateCommonNouns.ts"
   },
   "dependencies": {

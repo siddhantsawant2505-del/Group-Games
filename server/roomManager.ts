@@ -18,7 +18,18 @@ import {
   GtlPublicState,
   Top100PublicState,
   RevCatPublicState,
+  PlayMode,
+  Team,
+  TeamStanding,
 } from '../shared/types';
+import { MAX_ROUNDS, MIN_ROUNDS } from '../shared/types';
+import {
+  buildTeams,
+  clampTeamCount,
+  DEFAULT_TEAM_COUNT,
+  sanitizeTeamName,
+} from '../shared/data/teams';
+import { awardPoints, ScoreLogEntry } from './scoring';
 import { PLAYER_COLORS } from '../shared/theme/tokens';
 import { PARTY_GAMES } from '../shared/data/games';
 import {
@@ -120,6 +131,12 @@ import {
   cleanupRevCatRound,
 } from './games/reverseCategories';
 
+/**
+ * Central scoring entry point, re-exported here because awardPoints is the one
+ * sanctioned way for any game to change a score (see docs/GAME_rules.md).
+ */
+export { awardPoints } from './scoring';
+
 /** Rooms with no connected player are dropped after this much inactivity. */
 export const ROOM_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
@@ -163,6 +180,12 @@ export interface InternalRoom {
   impostorQuestionState: RoomPublicState['impostorQuestionState']; // Question mode only
   /** Host settings per game. Public: they never carry round secrets. */
   gameSettings: GameSettings;
+  /** Room-wide play mode. 'solo' is exactly the pre-team behaviour. */
+  playMode: PlayMode;
+  /** Room teams. Empty in solo mode. */
+  teams: Team[];
+  /** Bounded audit trail of every awardPoints() call this room made. */
+  scoreLog: ScoreLogEntry[];
   /** Host-authored Guess the Link prompt, consumed by the next round.
    *  Kept off public state so the concept never leaks before results. */
   gtlCustomPrompt: GuessTheLinkPrompt | null;
@@ -255,6 +278,9 @@ export class RoomManager {
       revCatState: null,
       impostorQuestionState: null,
       gameSettings: { impostor: { ...DEFAULT_IMPOSTOR_SETTINGS } },
+      playMode: 'solo',
+      teams: [],
+      scoreLog: [],
       gtlCustomPrompt: null,
       botTimeouts: [],
       createdAt: Date.now(),
@@ -358,6 +384,8 @@ export class RoomManager {
     };
 
     room.players.push(newPlayer);
+    // Team mode: players who join after teams exist land on the smallest team.
+    this.assignPlayerToSmallestTeam(room, newPlayer);
     return {
       success: true,
       room,
@@ -398,6 +426,7 @@ export class RoomManager {
     };
 
     room.players.push(bot);
+    this.assignPlayerToSmallestTeam(room, bot);
     return { success: true, bot };
   }
 
@@ -530,6 +559,299 @@ export class RoomManager {
     };
     room.lastActivityAt = Date.now();
     return { success: true };
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Room play mode (solo / team)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /** Settings are only editable before a round starts. */
+  private teammatesEditable(room: InternalRoom): boolean {
+    return room.phase === 'lobby' || room.phase === 'game-select';
+  }
+
+  /**
+   * Team membership is authoritative on `player.teamId`; `team.memberIds` is
+   * rebuilt from it in join order, dropping ids that no longer exist. Totals
+   * are re-derived too, so a switch carries a player's points to their new team.
+   * Unassigned players are left alone here — seatUnassignedPlayers() deals them.
+   */
+  private syncTeamMembership(room: InternalRoom) {
+    if (room.playMode !== 'team' || room.teams.length === 0) return;
+    const validTeamIds = new Set(room.teams.map((t) => t.id));
+    room.teams.forEach((team) => {
+      team.memberIds = [];
+    });
+    room.players.forEach((player) => {
+      if (player.teamId && !validTeamIds.has(player.teamId)) {
+        player.teamId = undefined;
+      }
+      const team = room.teams.find((t) => t.id === player.teamId);
+      if (team) team.memberIds.push(player.id);
+    });
+    this.recomputeTeamScores(room);
+  }
+
+  /**
+   * Seats anyone still without a team (a fresh joiner, or a player whose team
+   * was removed) on the smallest team, one at a time so the sizes stay even.
+   */
+  private seatUnassignedPlayers(room: InternalRoom): void {
+    if (room.playMode !== 'team' || room.teams.length === 0) return;
+    for (const player of room.players) {
+      if (player.teamId) continue;
+      const target = this.smallestTeam(room);
+      if (!target) return;
+      player.teamId = target.id;
+      target.memberIds.push(player.id);
+    }
+  }
+
+  private smallestTeam(room: InternalRoom): Team | undefined {
+    let smallest: Team | undefined;
+    for (const team of room.teams) {
+      if (!smallest || team.memberIds.length < smallest.memberIds.length) smallest = team;
+    }
+    return smallest;
+  }
+
+  /** Assigns a newly joined player (or bot) to the smallest team. */
+  private assignPlayerToSmallestTeam(room: InternalRoom, player: InternalPlayer) {
+    if (room.playMode !== 'team' || room.teams.length === 0) return;
+    // Rebuild the existing split first so the newcomer is measured against the
+    // real sizes (the just-added player has no team yet, so it is not counted).
+    this.syncTeamMembership(room);
+    this.seatUnassignedPlayers(room);
+  }
+
+  /**
+   * Switches the room between solo and team play. Scoring stops being
+   * individual-only the moment team mode is on: totals already earned are
+   * folded into the teams, so the leaderboard is never inconsistent.
+   */
+  public setPlayMode(
+    code: string,
+    playerId: string,
+    mode: PlayMode
+  ): { success: boolean; error?: string } {
+    const room = this.getRoom(code);
+    if (!room) return { success: false, error: 'Room not found.' };
+    if (playerId !== room.hostId) return { success: false, error: 'Only the host can change the room mode.' };
+    if (!this.teammatesEditable(room)) {
+      return { success: false, error: 'Play mode is locked once a round starts.' };
+    }
+    if (mode !== 'solo' && mode !== 'team') {
+      return { success: false, error: 'Unknown play mode.' };
+    }
+    if (mode === room.playMode) return { success: true };
+
+    if (mode === 'solo') {
+      room.playMode = 'solo';
+      room.teams = [];
+      room.players.forEach((player) => {
+        player.teamId = undefined;
+      });
+      room.lastActivityAt = Date.now();
+      return { success: true };
+    }
+
+    room.playMode = 'team';
+    room.teams = buildTeams(DEFAULT_TEAM_COUNT);
+    // Deal everyone (and each team's share of the running total) out evenly.
+    room.players.forEach((player, index) => {
+      player.teamId = room.teams[index % room.teams.length].id;
+    });
+    this.syncTeamMembership(room);
+    this.recomputeTeamScores(room);
+    room.lastActivityAt = Date.now();
+    return { success: true };
+  }
+
+  /** Grows or shrinks the team list (2-4). Dropped teams hand their players over. */
+  public setTeamCount(
+    code: string,
+    playerId: string,
+    count: number
+  ): { success: boolean; error?: string } {
+    const room = this.getRoom(code);
+    if (!room) return { success: false, error: 'Room not found.' };
+    if (playerId !== room.hostId) return { success: false, error: 'Only the host can change the teams.' };
+    if (!this.teammatesEditable(room)) {
+      return { success: false, error: 'Teams are locked once a round starts.' };
+    }
+    if (room.playMode !== 'team') {
+      return { success: false, error: 'Turn team mode on first.' };
+    }
+
+    const target = clampTeamCount(count);
+    if (target === room.teams.length) return { success: true };
+
+    if (target > room.teams.length) {
+      const fresh = buildTeams(target).slice(room.teams.length);
+      room.teams = [...room.teams, ...fresh];
+    } else {
+      room.teams = room.teams.slice(0, target);
+    }
+    // Members of a removed team are reseated on the smallest surviving team.
+    this.syncTeamMembership(room);
+    this.seatUnassignedPlayers(room);
+    this.recomputeTeamScores(room);
+    room.lastActivityAt = Date.now();
+    return { success: true };
+  }
+
+  /** A player taps a team to join or switch (solo rooms have no teams). */
+  public joinTeam(
+    code: string,
+    playerId: string,
+    teamId: string
+  ): { success: boolean; error?: string } {
+    const room = this.getRoom(code);
+    if (!room) return { success: false, error: 'Room not found.' };
+    if (room.playMode !== 'team') return { success: false, error: 'This room is playing solo.' };
+    if (!this.teammatesEditable(room)) {
+      return { success: false, error: 'Teams are locked once a round starts.' };
+    }
+    const player = room.players.find((p) => p.id === playerId);
+    if (!player) return { success: false, error: 'Player not found.' };
+    const team = room.teams.find((t) => t.id === teamId);
+    if (!team) return { success: false, error: 'Team not found.' };
+    if (player.teamId === teamId) return { success: true };
+
+    player.teamId = teamId;
+    this.syncTeamMembership(room);
+    room.lastActivityAt = Date.now();
+    return { success: true };
+  }
+
+  public renameTeam(
+    code: string,
+    playerId: string,
+    teamId: string,
+    name: string
+  ): { success: boolean; error?: string } {
+    const room = this.getRoom(code);
+    if (!room) return { success: false, error: 'Room not found.' };
+    if (playerId !== room.hostId) return { success: false, error: 'Only the host can rename teams.' };
+    const team = room.teams.find((t) => t.id === teamId);
+    if (!team) return { success: false, error: 'Team not found.' };
+    team.name = sanitizeTeamName(name, team.name);
+    room.lastActivityAt = Date.now();
+    return { success: true };
+  }
+
+  /**
+   * Auto-balance: keeps the current team order but refills the smallest team
+   * first, so sizes never differ by more than one.
+   */
+  public balanceTeams(code: string, playerId: string): { success: boolean; error?: string } {
+    return this.distributeTeams(code, playerId, false);
+  }
+
+  /** Shuffle teams: random draw across the existing teams, same even split. */
+  public shuffleTeams(code: string, playerId: string): { success: boolean; error?: string } {
+    return this.distributeTeams(code, playerId, true);
+  }
+
+  private distributeTeams(
+    code: string,
+    playerId: string,
+    shuffle: boolean
+  ): { success: boolean; error?: string } {
+    const room = this.getRoom(code);
+    if (!room) return { success: false, error: 'Room not found.' };
+    if (playerId !== room.hostId) {
+      return { success: false, error: 'Only the host can sort the teams.' };
+    }
+    if (room.playMode !== 'team') return { success: false, error: 'This room is playing solo.' };
+    if (!this.teammatesEditable(room)) {
+      return { success: false, error: 'Teams are locked once a round starts.' };
+    }
+
+    const players = [...room.players];
+    if (shuffle) {
+      for (let i = players.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [players[i], players[j]] = [players[j], players[i]];
+      }
+    }
+
+    room.teams.forEach((team) => {
+      team.memberIds = [];
+    });
+    players.forEach((player, index) => {
+      const team = room.teams[index % room.teams.length];
+      player.teamId = team.id;
+      team.memberIds.push(player.id);
+    });
+    this.recomputeTeamScores(room);
+    room.lastActivityAt = Date.now();
+    return { success: true };
+  }
+
+  /** Host control for how many rounds a session runs (1-7). */
+  public setRoundCount(
+    code: string,
+    playerId: string,
+    rounds: number
+  ): { success: boolean; error?: string } {
+    const room = this.getRoom(code);
+    if (!room) return { success: false, error: 'Room not found.' };
+    if (playerId !== room.hostId) return { success: false, error: 'Only the host can change the rounds.' };
+    if (!this.teammatesEditable(room)) {
+      return { success: false, error: 'Round count is locked once a round starts.' };
+    }
+    const parsed = Math.floor(Number(rounds));
+    if (!Number.isFinite(parsed)) return { success: false, error: 'Unknown round count.' };
+    room.totalRounds = Math.min(MAX_ROUNDS, Math.max(MIN_ROUNDS, parsed));
+    room.lastActivityAt = Date.now();
+    return { success: true };
+  }
+
+  /**
+   * Team totals are derived from member scores, so they stay correct even when
+   * a player switches teams after scoring.
+   */
+  private recomputeTeamScores(room: InternalRoom) {
+    room.teams.forEach((team) => {
+      team.score = room.players
+        .filter((player) => player.teamId === team.id)
+        .reduce((sum, player) => sum + player.score, 0);
+    });
+  }
+
+  /** Builds the round's team leaderboard (team mode only). */
+  private buildTeamStandings(room: InternalRoom, standings: PlayerResultStanding[]): TeamStanding[] {
+    this.recomputeTeamScores(room);
+    const byId = new Map(standings.map((entry) => [entry.playerId, entry]));
+    const rows = room.teams.map((team) => {
+      const members = team.memberIds
+        .map((id) => byId.get(id))
+        .filter((entry): entry is PlayerResultStanding => Boolean(entry))
+        .map((entry) => ({
+          playerId: entry.playerId,
+          playerName: entry.playerName,
+          colorIndex: entry.colorIndex,
+          pointsAdded: entry.pointsAdded,
+          totalScore: entry.totalScore,
+        }))
+        .sort((a, b) => b.totalScore - a.totalScore);
+      return {
+        teamId: team.id,
+        name: team.name,
+        icon: team.icon,
+        accentIndex: team.accentIndex,
+        total: team.score,
+        members,
+        rank: 0,
+      };
+    });
+
+    rows.sort((a, b) => b.total - a.total);
+    rows.forEach((row, index) => {
+      row.rank = index + 1;
+    });
+    return rows;
   }
 
   /**
@@ -1033,6 +1355,14 @@ export class RoomManager {
           calculateReverseCategoriesResults(room);
         } else {
           this.calculateResults(room);
+        }
+        // Team mode: the round resolves into a team leaderboard built from the
+        // individual standings, in one central place for every game.
+        if (room.results) {
+          room.results.teamStandings =
+            room.playMode === 'team'
+              ? this.buildTeamStandings(room, room.results.standings)
+              : undefined;
         }
         room.phasePrompt = 'Round Results';
         room.phaseSubprompt = 'Points awarded and secrets unmasked!';
@@ -1700,7 +2030,7 @@ export class RoomManager {
         if (isImpostor) points = 250;
       }
 
-      player.score += points;
+      awardPoints(room, player.id, points, 'impostor:round');
 
       return {
         playerId: player.id,
@@ -1730,6 +2060,9 @@ export class RoomManager {
    * Returns clean public state safe to broadcast to everyone in the room
    */
   public getPublicRoomState(room: InternalRoom): RoomPublicState {
+    // Keep derived team membership (and every team total) in step before exposing.
+    this.syncTeamMembership(room);
+    this.seatUnassignedPlayers(room);
     return {
       roomCode: room.code,
       hostId: room.hostId,
@@ -1744,6 +2077,7 @@ export class RoomManager {
         score: p.score,
         sessionToken: p.sessionToken,
         joinedAt: p.joinedAt,
+        ...(p.teamId ? { teamId: p.teamId } : {}),
       })),
       phase: room.phase,
       selectedGame: room.selectedGame,
@@ -1764,6 +2098,8 @@ export class RoomManager {
       revCatState: room.revCatState,
       impostorQuestionState: room.impostorQuestionState,
       gameSettings: room.gameSettings,
+      playMode: room.playMode,
+      teams: room.teams,
       aiContentAvailable: isAiAvailable(),
       gtlCustomReady: Boolean(room.gtlCustomPrompt),
     };

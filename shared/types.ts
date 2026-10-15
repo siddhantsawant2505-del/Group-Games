@@ -13,6 +13,9 @@ export interface Player {
   score: number;
   sessionToken: string;
   joinedAt: number;
+  /** Team-mode only: the team this player plays for. Keyed by sessionToken,
+   *  so reconnecting restores it. */
+  teamId?: string;
 }
 
 export type GamePhase =
@@ -41,6 +44,12 @@ export interface GameMetadata {
   icon: 'mask' | 'ban' | 'detective' | 'link' | 'list-ordered' | 'shuffle';
   description: string;
   rules: string[];
+  /**
+   * How the game behaves in room team mode. `aggregate` plays exactly as it
+   * does in solo and its points roll up to teams; `native` has team-specific
+   * rules planned, so until they ship it is treated as `aggregate`.
+   */
+  teamSupport: 'aggregate' | 'native';
 }
 
 export interface PhaseTimer {
@@ -48,6 +57,50 @@ export interface PhaseTimer {
   endsAtTimestamp: number;
   remainingSeconds: number;
 }
+
+export type PlayMode = 'solo' | 'team';
+
+/**
+ * A room-level team. Team totals are derived from individual scores and are
+ * maintained centrally by awardPoints(), never by a game module.
+ */
+export interface Team {
+  id: string;
+  name: string;
+  /** Emoji shown next to the team name (team identity is never colour-only). */
+  icon: string;
+  /** Index into TEAM_ACCENTS in shared/theme/tokens.ts. */
+  accentIndex: number;
+  score: number;
+  memberIds: string[];
+}
+
+/** One team member's contribution inside a round's team leaderboard. */
+export interface TeamStandingMember {
+  playerId: string;
+  playerName: string;
+  colorIndex: number;
+  pointsAdded: number;
+  totalScore: number;
+}
+
+/** Public team leaderboard entry, built server-side when a round resolves. */
+export interface TeamStanding {
+  teamId: string;
+  name: string;
+  icon: string;
+  accentIndex: number;
+  total: number;
+  members: TeamStandingMember[];
+  rank: number;
+}
+
+export const MIN_TEAMS = 2;
+export const MAX_TEAMS = 4;
+
+/** Host-round settings, editable from the lobby settings sheet. */
+export const MIN_ROUNDS = 1;
+export const MAX_ROUNDS = 7;
 
 export type ImpostorMode = 'word' | 'question';
 export type ContentDifficultySetting = 'easy' | 'medium' | 'any';
@@ -115,6 +168,11 @@ export interface ImpostorQuestionState {
 export interface GameSettings {
   impostor: ImpostorSettings;
 }
+
+export const PLAY_MODE_LABELS: Record<PlayMode, string> = {
+  solo: 'Solo',
+  team: 'Team',
+};
 
 export const DEFAULT_IMPOSTOR_SETTINGS: ImpostorSettings = {
   mode: 'word',
@@ -375,6 +433,9 @@ export interface PhaseResultsData {
   impostorImpostorQuestion?: string;
   /** One-line explanation of how the two questions differ. */
   impostorQuestionNote?: string;
+  /** Team mode only: the round's team leaderboard (individual standings still
+   *  carry every player's contribution underneath). */
+  teamStandings?: TeamStanding[];
   // Reverse Categories-specific
   revCatItems?: string[];
   revCatCategories?: RevCatCategoryResult[];
@@ -408,6 +469,10 @@ export interface RoomPublicState {
   revCatState: RevCatPublicState | null; // Reverse Categories items/board state
   /** Public host settings per game (how a round plays, never its secrets). */
   gameSettings: GameSettings;
+  /** Room-wide play mode: solo (default) or team. */
+  playMode: PlayMode;
+  /** Room teams. Empty in solo mode. */
+  teams: Team[];
   /** Impostor question mode's public round state (null in word mode). */
   impostorQuestionState: ImpostorQuestionState | null;
   /**

@@ -108,7 +108,33 @@ word list, and no room repeats content:
   when a room resets to the lobby and when the idle-room sweeper deletes a room (no connected
   player for two hours).
 
-### 2.5 Event-driven input, state-driven output
+### 2.5 Room settings, play modes and central scoring
+
+- **Two kinds of settings, two places.** Room-wide settings (play mode, teams, rounds) live behind
+  a **gear in the lobby**, next to the player list; per-game settings (Impostor mode/difficulty/
+  tone/theme, Guess the Link's custom concept) live behind a **gear on that game's card** in
+  game-select. Nothing is shared between games, so tuning one never disturbs another.
+- **`RoomSettingsSheet` is generic.** Both gears open the same bottom-sheet shell
+  (`client/src/components/SettingsSheet.tsx`); the lobby mounts `RoomSettingsPanel`, the game cards
+  mount `GameSettingsSheet`, which dispatches on the game id. Host-editable controls are disabled
+  for everyone else, who still see the current choices read-only.
+- **Play mode.** `room.playMode` is `solo` (default, unchanged behaviour) or `team`, and
+  `room.teams` holds 2–4 teams. `player.teamId` is authoritative; `team.memberIds` is rebuilt from
+  it (in join order) and each team's total is re-derived from its members' scores, so switching
+  teams carries points with them. Membership is keyed by `sessionToken`, so a reconnect restores it.
+- **Seating.** Team creation, auto-balance and shuffle all distribute players one at a time onto the
+  smallest team, so no split is ever more than one player out of balance. Late joiners (and bots)
+  are seated the same way; anyone whose team disappeared is reseated on the next sync.
+- **Central scoring.** `awardPoints(room, playerId, points, reason?)` in `server/scoring.ts`
+  (re-exported from `server/roomManager.ts`) is the only place a score changes: it updates the
+  individual total and, in team mode, the team total, and appends to a bounded in-memory score log.
+  Every game module imports it, so no game owns its own scoreboard arithmetic.
+- **Team leaderboards.** When a round resolves, the room manager attaches `results.teamStandings`
+  (rank, icon, name, total, member contributions) for every game at once, and the results and
+  post-game screens render it above the individual standings. Solo rounds keep exactly the old
+  payload — `teamStandings` stays undefined.
+
+### 2.6 Event-driven input, state-driven output
 
 Clients emit commands; the server mutates state; the server emits state. This prevents clients
 from diverging.
@@ -154,6 +180,20 @@ sequenceDiagram
 
 - `room:update` — full public room state.
 - `player:private-state` — private state for one player.
+
+#### Room settings and teams
+
+| Event | Payload | Who |
+| --- | --- | --- |
+| `set-play-mode` | `{ roomCode, playerId, mode }` | Host, lobby/game-select |
+| `set-team-count` | `{ roomCode, playerId, count }` | Host, team mode |
+| `join-team` | `{ roomCode, playerId, teamId }` | Any player |
+| `rename-team` | `{ roomCode, playerId, teamId, name }` | Host |
+| `balance-teams` | `{ roomCode, playerId, shuffle }` | Host (`shuffle: true` = shuffle) |
+| `set-round-count` | `{ roomCode, playerId, rounds }` | Host, clamped 1-7 |
+
+All of them answer through a callback with `{ success, error? }` and broadcast the new room state
+on success.
 
 ### 3.3 Room scoping
 
@@ -247,8 +287,8 @@ lobby ──> game-select ──> reveal
 
 | Phase           | Server owns                                            | Client shows                                   |
 |-----------------|-------------------------------------------------------|------------------------------------------------|
-| `lobby`         | room code, player list, start gate                    | QR code, room code, player chips, start       |
-| `game-select`   | selected game id                                      | selectable game cards                          |
+| `lobby`         | room code, player list, teams, start gate             | QR code, room code, player chips (+ team), start, settings gear |
+| `game-select`   | selected game id, per-game settings                   | selectable game cards, per-card settings gear  |
 | `reveal`        | assigned role/word, secret instructions, reveal timer | hidden role screen, "keep screen hidden"       |
 | `input`         | submitted answers, input timer                        | single-word clue input, submission status      |
 | `reveal-answers`| randomized revealed answers, reveal timer             | rotating reveal cards                          |
@@ -271,7 +311,9 @@ Room
   phase: Phase
   selectedGame: GameMetadata | null
   roundNumber: number
-  totalRounds: number
+  totalRounds: number          # host-editable 1-7 in the lobby settings sheet
+  playMode: 'solo' | 'team'    # room-wide, solo is the original behaviour
+  teams[]: Team                # empty in solo; 2-4 teams in team mode
   timer: PhaseTimer | null
   phasePrompt: string
   phaseSubprompt?: string
@@ -300,17 +342,28 @@ Player
   score: number
   sessionToken: string
   joinedAt: number
+  teamId?: string       # team mode only; sessionToken keeps it across reconnects
   socketId: string | null
   isBot?: boolean
+
+Team
+  id: string
+  name: string          # host-renamable, sanitized (20 chars, no control chars)
+  icon: string          # emoji identity, so colour is never the only cue
+  accentIndex: number (0–3 → TEAM_ACCENTS)
+  score: number         # derived from member scores by awardPoints()
+  memberIds: string[]   # derived from player.teamId on every sync
 ```
 
 ### 6.3 Private vs public split
 
 ```text
 Public (broadcast to room)
-  roomCode, hostId, players (no secrets), phase, selectedGame,
+  roomCode, hostId, players (no secrets, includes teamId), phase, selectedGame,
+  playMode, teams (name/icon/accent/members/total), gameSettings,
   roundNumber, totalRounds, timer, phasePrompt, phaseSubprompt,
   hasSubmittedInput, hasVoted, revealedAnswers, voteTallies, results
+  (results.teamStandings in team mode)
 
 Private (per player)
   role, secretWord, secretHint, isSpecialRole, specialAccentBg,

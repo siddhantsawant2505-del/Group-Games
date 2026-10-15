@@ -9,6 +9,7 @@
 
 import { AvoidTheWordPrompt, getRandomAtwPrompt } from '../../shared/data/avoidTheWordPrompts';
 import { InternalRoom } from '../roomManager';
+import { awardPoints } from '../scoring';
 import { AtwPublicState, AtwTurnResult, PlayerResultStanding } from '../../shared/types';
 
 /** Seconds a describer gets before their turn is scored as a success. */
@@ -287,14 +288,14 @@ export function completeAtwTurn(
   const buzzerIds = success ? [] : Array.from(state.buzzedPlayerIds);
 
   const describerPoints = success ? ATW_POINTS_DESCRIBE_SUCCESS : 0;
-  describer.score += describerPoints;
+  awardPoints(room, describerId, describerPoints, 'atw:describe');
   state.roundPoints[describerId] = (state.roundPoints[describerId] || 0) + describerPoints;
 
   // Everyone whose buzz the group confirmed scores for calling it out.
   buzzerIds.forEach((buzzerId) => {
     const buzzer = room.players.find((p) => p.id === buzzerId);
     if (!buzzer) return;
-    buzzer.score += ATW_POINTS_CORRECT_BUZZ;
+    awardPoints(room, buzzerId, ATW_POINTS_CORRECT_BUZZ, 'atw:buzz');
     state.roundPoints[buzzerId] = (state.roundPoints[buzzerId] || 0) + ATW_POINTS_CORRECT_BUZZ;
   });
 

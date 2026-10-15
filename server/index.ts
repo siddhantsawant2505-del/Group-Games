@@ -270,6 +270,97 @@ async function startServer() {
       }
     );
 
+    // 4c. Room play mode: solo <-> team (host only, before a round starts)
+    socket.on(
+      'set-play-mode',
+      (
+        { roomCode, playerId, mode }: { roomCode: string; playerId: string; mode: 'solo' | 'team' },
+        callback
+      ) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const result = roomManager.setPlayMode(upperCode, playerId, mode);
+        if (typeof callback === 'function') callback(result);
+        if (result.success) broadcastRoom(upperCode);
+      }
+    );
+
+    // 4d. Team count 2-4 (host only)
+    socket.on(
+      'set-team-count',
+      (
+        { roomCode, playerId, count }: { roomCode: string; playerId: string; count: number },
+        callback
+      ) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const result = roomManager.setTeamCount(upperCode, playerId, count);
+        if (typeof callback === 'function') callback(result);
+        if (result.success) broadcastRoom(upperCode);
+      }
+    );
+
+    // 4e. A player joins or switches teams
+    socket.on(
+      'join-team',
+      (
+        { roomCode, playerId, teamId }: { roomCode: string; playerId: string; teamId: string },
+        callback
+      ) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const result = roomManager.joinTeam(upperCode, playerId, teamId);
+        if (typeof callback === 'function') callback(result);
+        if (result.success) broadcastRoom(upperCode);
+      }
+    );
+
+    // 4f. Host renames a team
+    socket.on(
+      'rename-team',
+      (
+        {
+          roomCode,
+          playerId,
+          teamId,
+          name,
+        }: { roomCode: string; playerId: string; teamId: string; name: string },
+        callback
+      ) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const result = roomManager.renameTeam(upperCode, playerId, teamId, name);
+        if (typeof callback === 'function') callback(result);
+        if (result.success) broadcastRoom(upperCode);
+      }
+    );
+
+    // 4g. Host auto-balances or shuffles the teams
+    socket.on(
+      'balance-teams',
+      (
+        { roomCode, playerId, shuffle }: { roomCode: string; playerId: string; shuffle?: boolean },
+        callback
+      ) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const result = shuffle
+          ? roomManager.shuffleTeams(upperCode, playerId)
+          : roomManager.balanceTeams(upperCode, playerId);
+        if (typeof callback === 'function') callback(result);
+        if (result.success) broadcastRoom(upperCode);
+      }
+    );
+
+    // 4h. Host sets how many rounds the session runs (1-7)
+    socket.on(
+      'set-round-count',
+      (
+        { roomCode, playerId, rounds }: { roomCode: string; playerId: string; rounds: number },
+        callback
+      ) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const result = roomManager.setRoundCount(upperCode, playerId, rounds);
+        if (typeof callback === 'function') callback(result);
+        if (result.success) broadcastRoom(upperCode);
+      }
+    );
+
     // 5. Host advances phase or starts game
     socket.on(
       'advance-phase',

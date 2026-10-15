@@ -1,16 +1,41 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Users, Copy, Check, Play, UserPlus, Share2, QrCode } from 'lucide-react';
-import { RoomPublicState, Player } from '@shared/types';
+import {
+  Users,
+  Copy,
+  Check,
+  Play,
+  UserPlus,
+  Share2,
+  QrCode,
+  Settings2,
+  TriangleAlert,
+} from 'lucide-react';
+import { RoomPublicState, Player, PlayMode } from '@shared/types';
+import { getTeamStartReadiness } from '@shared/data/teams';
+import { getTeamAccent } from '@shared/theme/tokens';
 import { PlayerChip } from '../components/PlayerChip';
 import { ActionButton } from '../components/ActionButton';
 import { RoomQRCodeModal, InlineRoomQR } from '../components/RoomQRCode';
+import { SettingsSheet } from '../components/SettingsSheet';
+import { RoomSettingsPanel } from '../components/RoomSettingsPanel';
+
+/** Room-wide settings actions owned by App and passed straight through. */
+export interface RoomSettingsActions {
+  onSetPlayMode: (mode: PlayMode) => void;
+  onSetTeamCount: (count: number) => void;
+  onJoinTeam: (teamId: string) => void;
+  onRenameTeam: (teamId: string, name: string) => void;
+  onBalanceTeams: (shuffle: boolean) => void;
+  onSetRoundCount: (rounds: number) => void;
+}
 
 interface LobbyScreenProps {
   room: RoomPublicState;
   myPlayer: Player;
   onStartGame: () => void;
   onAddBot: () => void;
+  roomSettings: RoomSettingsActions;
 }
 
 export function LobbyScreen({
@@ -18,12 +43,18 @@ export function LobbyScreen({
   myPlayer,
   onStartGame,
   onAddBot,
+  roomSettings,
 }: LobbyScreenProps) {
   const [copied, setCopied] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const isHost = myPlayer.isHost;
   const playerCount = room.players.length;
-  const canStart = playerCount >= 3;
+  // Solo keeps today's hard gate of 3 players; team mode adds its own rules.
+  const minPlayers = 3;
+  const readiness = getTeamStartReadiness(room.playMode, room.teams, playerCount, minPlayers);
+  const canStart = room.playMode === 'team' ? readiness.ready : playerCount >= minPlayers;
+  const myTeam = room.teams.find((team) => team.id === myPlayer.teamId);
 
   const copyCode = async () => {
     try {
@@ -141,30 +172,95 @@ export function LobbyScreen({
                 Players in Room
               </h2>
             </div>
-            <span
-              className={`px-2.5 py-1 rounded-full text-xs font-extrabold ${
-                canStart
-                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                  : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
-              }`}
-            >
-              {playerCount} / 12 Joined
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`px-2.5 py-1 rounded-full text-xs font-extrabold ${
+                  canStart
+                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+                }`}
+              >
+                {playerCount} / 12 Joined
+              </span>
+
+              {/* Room settings (play mode, teams, rounds) live behind this gear. */}
+              <button
+                type="button"
+                onClick={() => setShowSettings(true)}
+                title="Room settings — play mode, teams and rounds"
+                aria-label="Room settings"
+                className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <Settings2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Room mode summary: what the gear is currently set to */}
+          <div className="mb-3">
+            {room.playMode === 'solo' ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                <Users className="w-3 h-3" />
+                <span>Solo — everyone scores alone</span>
+              </span>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {room.teams.map((team) => {
+                    const accent = getTeamAccent(team.accentIndex);
+                    const isMine = team.id === myTeam?.id;
+                    return (
+                      <span
+                        key={team.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border"
+                        style={{
+                          borderColor: accent.hex,
+                          backgroundColor: `${accent.hex}18`,
+                          color: 'var(--text-primary)',
+                        }}
+                      >
+                        <span aria-hidden="true">{team.icon}</span>
+                        <span>{team.name}</span>
+                        <span className="opacity-60">{team.memberIds.length}</span>
+                        {isMine && <Check className="w-3 h-3" />}
+                      </span>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSettings(true)}
+                  className="text-[11px] font-bold text-neutral-500 dark:text-neutral-400 underline underline-offset-2 cursor-pointer"
+                >
+                  {myTeam ? `You are on ${myTeam.name} — change team or balance` : 'Pick your team'}
+                </button>
+                {readiness.sizeWarning && (
+                  <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-start gap-1.5" role="status">
+                    <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>{readiness.sizeWarning}</span>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Chips grid */}
           <div className="flex flex-wrap gap-2.5">
-            {room.players.map((p) => (
-              <PlayerChip
-                key={p.id}
-                name={p.name}
-                colorIndex={p.colorIndex}
-                isHost={p.isHost}
-                isYou={p.id === myPlayer.id}
-                connected={p.connected}
-                size="md"
-              />
-            ))}
+            {room.players.map((p) => {
+              const team = room.teams.find((entry) => entry.id === p.teamId);
+              return (
+                <PlayerChip
+                  key={p.id}
+                  name={p.name}
+                  colorIndex={p.colorIndex}
+                  isHost={p.isHost}
+                  isYou={p.id === myPlayer.id}
+                  connected={p.connected}
+                  size="md"
+                  badge={team ? `${team.icon} ${team.name}` : undefined}
+                />
+              );
+            })}
           </div>
 
           {/* Host helper: add bot player for instant preview testing */}
@@ -202,10 +298,16 @@ export function LobbyScreen({
               icon={<Play className="w-5 h-5 fill-current" />}
               subtext={
                 canStart
-                  ? 'Choose game and start round'
-                  : `Need ${3 - playerCount} more player${
-                      3 - playerCount === 1 ? '' : 's'
-                    } to start (min 3)`
+                  ? room.playMode === 'team'
+                    ? `Choose game and start — teams: ${room.teams
+                        .map((team) => `${team.icon} ${team.name}`)
+                        .join(' vs ')}`
+                    : 'Choose game and start round'
+                  : room.playMode === 'team' && readiness.message
+                  ? readiness.message
+                  : `Need ${minPlayers - playerCount} more player${
+                      minPlayers - playerCount === 1 ? '' : 's'
+                    } to start (min ${minPlayers})`
               }
             >
               Start Game
@@ -220,6 +322,22 @@ export function LobbyScreen({
           </div>
         )}
       </div>
+
+      {/* Room settings sheet — the gear above the player list opens this */}
+      <SettingsSheet
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        title="Room settings"
+        subtitle={
+          isHost
+            ? 'Play mode, teams and rounds'
+            : room.playMode === 'team'
+            ? 'Tap a team below to join it'
+            : 'Set by the host'
+        }
+      >
+        <RoomSettingsPanel room={room} myPlayer={myPlayer} {...roomSettings} />
+      </SettingsSheet>
     </div>
   );
 }

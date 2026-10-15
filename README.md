@@ -57,6 +57,9 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 - **QR + room-code join** — scan a phone camera to open the exact room.
 - **Session reconnect** — reconnect by previous name or session token.
 - **Host controls** — game selection, phase advancement, skip timers, and bot injection for solo testing.
+- **Room settings gear (lobby)** — one gear next to the player list opens the room-wide settings: **Solo / Team** play mode, team count (2-4), tap-to-join teams, team rename, auto-balance and shuffle, and the number of rounds per session.
+- **Per-game settings gear (game select)** — every game card carries its own gear, so each game is tuned separately: Impostor mode/difficulty/tone/theme, Guess the Link's custom round, and a read-only summary for everyone else.
+- **Team mode** — individual scores are kept and every award also rolls up to the player's team through one central `awardPoints()`; team totals survive team switches and reconnects, the lobby blocks a bad split (and warns about lopsided ones), and results/post-game lead with the team leaderboard.
 - **Six built-in games** — Impostor, Avoid the Word, Mafia, Guess the Link, Top 100, Reverse Categories.
 - **Two Impostor modes** — *Word* (the classic secret word) and *Question*: everyone privately receives the same question, one player was quietly asked a related but different one, and the difference only surfaces on the answer board.
 - **Content engine (`server/content/`)** — a reusable provider layer. Words are served from a 2,059-noun corpus through a per-room shuffle bag, so nothing repeats until a room has seen the whole pool; an optional AI top-up is validated locally (commonness, shape, blocklist, room history) before it can ever be used.
@@ -76,6 +79,9 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 | Metric | Status | Details |
 |---|---|---|
 | TypeScript / TypeCheck | `PASSING` | `npm run lint` exits with 0 errors |
+| Content engine suite | `PASSING` | `npm run test:content` — 500 rounds, no repeats before pool exhaustion |
+| Question-mode suite | `PASSING` | `npm run test:questions` — four answer types, `{target}` dealing, leak checks |
+| Team-mode suite | `PASSING` | `npm run test:teams` — play modes, team seating, start gate, team scoring |
 | Vite Client Build | `PASSING` | React 19 SPA bundled to `dist/` with Tailwind CSS v4 |
 | Server Build | `PASSING` | Bundled into standalone CommonJS executable `dist/server.cjs` via esbuild |
 | Dev Runtime | `OPERATIONAL` | Express + Socket.IO + Vite middleware on `0.0.0.0:3000` |
@@ -96,6 +102,18 @@ Party Games features a collection of six multiplayer party games designed for ph
 | **Guess the Link** | 3–8 | Word Association | Link | 🟢 **Fully Working & Playable** — Dedicated engine with one hidden concept, per-player private hint angles, shuffled board, simultaneous guessing, and scoring |
 | **Top 100** | 3–10 | Ranking / Spectrum | List-Ordered | 🟢 **Fully Working & Playable** — Dedicated engine with a unique secret number per player, private example writing, a host-authoritative drag-to-rank phase broadcast live, and adjacent-pair accuracy scoring |
 | **Reverse Categories** | 3–8 | Trivia / Creative | Shuffle | 🟢 **Fully Working & Playable** — Dedicated engine with unrelated-item triplets, public items (no secrets), privately invented categories, a shuffled attributed board, and a best-category ballot with author and voter scoring |
+
+**Room modes.** Every room runs in **solo** (default) or **team** mode, chosen by the host from the
+lobby's settings gear. In team mode individual scores are kept and each award also counts for the
+player's team; results and the post-game screen lead with the team leaderboard. Impostor and Mafia
+are **aggregate** today (their points simply roll up — badged "Teams: scores combine"); Avoid the
+Word, Guess the Link, Top 100 and Reverse Categories are **Team-ready** — they play as in solo for
+now and gain native team rules next (see `docs/GAME_rules.md` → "Adding a game").
+
+**Per-game settings.** Each game-select card has its own gear: Impostor (mode, difficulty, tone,
+custom theme), Guess the Link (a host-authored round), and a read-only summary of the current
+choices for everyone else. The lobby gear covers the room-wide settings instead: play mode, teams
+and rounds per session.
 
 ---
 
@@ -332,7 +350,28 @@ One provider layer feeds every word-based game, and later the taboo/link/spectru
 
 **Room cleanup.** Rooms are released when they reset to the lobby and when the idle sweeper drops them (no connected player for two hours); `release(roomId)` clears the bag, the served history and the AI counters.
 
-### 4. Game Phase State Machine
+### 4. Room Modes & Team Mode (`server/scoring.ts`, `shared/data/teams.ts`)
+
+- **Two settings surfaces.** Room-wide settings (play mode, teams, rounds) sit behind the gear in
+  the lobby; per-game settings sit behind the gear on each game-select card. Both open the same
+  bottom-sheet shell (`client/src/components/SettingsSheet.tsx`), and non-hosts see everything
+  read-only.
+- **Play mode.** `solo` (default, exactly the original behaviour) or `team`. In team mode a room
+  holds 2-4 teams, each with an icon, name and accent (four team accents, distinct from the six
+  player colours). `player.teamId` is authoritative and keyed by session token, so reconnecting
+  restores membership; late joiners land on the smallest team.
+- **Central scoring.** `awardPoints(room, playerId, points, reason?)` in `server/scoring.ts`
+  (re-exported from `roomManager`) is the only place a score changes — individual total plus, in
+  team mode, the team total. Every game module already routes through it, and future games must too
+  (see `docs/GAME_rules.md` → "Adding a game").
+- **Team leaderboards.** When any round resolves, the room manager attaches `results.teamStandings`
+  (rank, icon, name, total, member contributions) and the results and post-game screens render it
+  above the individual standings. Solo rounds keep exactly the old payload.
+- **Native team rules** for Avoid the Word, Guess the Link, Top 100, Reverse Categories and Mafia are
+  planned and documented, not implemented; until they ship those games play as they do in solo and
+  their points aggregate, which the game cards badge as "Team-ready".
+
+### 5. Game Phase State Machine
 
 1. **`lobby`** — players join via room code/QR; host configures bots and launches.
 2. **`game-select`** — host chooses a party game.
@@ -415,7 +454,7 @@ The application is structured into three distinct layers: `client/` (React SPA),
 ├── client/                    # React 19 frontend SPA (Vite root)
 │   ├── index.html             # Client HTML entry point
 │   └── src/
-│       ├── components/        # UI components (QR modal, header, player badges, game settings panel)
+│       ├── components/        # UI components (QR modal, header, player badges, settings sheets/panels, team leaderboard)
 │       ├── screens/           # Phase screens (incl. Atw*, Mafia*, Gtl*, Top100*, RevCat*, and the Impostor question-mode screens)
 │       ├── services/
 │       │   ├── socket.ts      # Client-side Socket.IO singleton
@@ -447,11 +486,13 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   │   ├── guessTheLink.ts    # Link engine: concept hiding, hint dealing, guessing, scoring
 │   │   ├── top100.ts          # Spectrum engine: secret numbers, ordering, pair accuracy
 │   │   └── reverseCategories.ts # Item-triplet engine: categories, attribution, best-category ballot
-│   ├── roomManager.ts         # In-memory room manager, sessions, & state masks
+│   ├── scoring.ts             # awardPoints(): the single scoring path (solo + team roll-up)
+│   ├── roomManager.ts         # In-memory room manager, sessions, teams, play mode, & state masks
 │   └── index.ts               # Server entry point with Vite middleware / static serving
 ├── shared/                    # Code imported by BOTH client and server (@shared/*)
 │   ├── data/
-│   │   ├── games.ts           # Game catalog definitions
+│   │   ├── games.ts           # Game catalog definitions (incl. teamSupport per game)
+│   │   ├── teams.ts           # Team templates, name sanitizing, and the team start gate
 │   │   ├── words/
 │   │   │   └── commonNouns.json    # 2,059-noun corpus, generated (27 categories, tiers 1-3)
 │   │   ├── avoidTheWordPrompts.ts  # 40 subjects × 3 forbidden trap words
@@ -461,13 +502,14 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   │   │   └── impostorQuestions.json # 160 question pairs (6 kinds, 34 with {target})
 │   │   └── reverseCategoriesItems.ts # 66 items across 22 themes
 │   ├── theme/
-│   │   └── tokens.ts          # Player color tokens & palette
+│   │   └── tokens.ts          # Player colour tokens, team accents, & palette
 │   └── types.ts               # Shared TypeScript models and interfaces
 ├── scripts/                   # Development-time tooling (not bundled into the app)
 │   ├── commonNouns.source.txt # Authored vocabulary source for the corpus
 │   ├── generateCommonNouns.ts # Regenerates commonNouns.json + lints it
 │   ├── testContentEngine.ts   # `npm run test:content`
-│   └── testImpostorQuestionMode.ts # `npm run test:questions`
+│   ├── testImpostorQuestionMode.ts # `npm run test:questions`
+│   └── testTeamMode.ts        # `npm run test:teams`
 ├── data/
 │   ├── common-words-frequency.txt # 10k most common English words (MIT, FrequencyWords)
 │   └── blocklist.txt          # Moderation list applied to AI-generated content
@@ -499,6 +541,9 @@ npm run test:content
 
 # Impostor question-mode suite: all four answer types, {target} dealing, leak checks, scoring
 npm run test:questions
+
+# Room team-mode suite: play modes, seating, balance/shuffle, start gate, and team leaderboard scoring
+npm run test:teams
 
 # Regenerate shared/data/words/commonNouns.json from scripts/commonNouns.source.txt
 npm run generate:words

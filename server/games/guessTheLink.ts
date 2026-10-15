@@ -15,6 +15,7 @@ import {
   gtlConceptWordCount,
 } from '../../shared/data/guessTheLinkPrompts';
 import { InternalRoom } from '../roomManager';
+import { awardPoints } from '../scoring';
 import {
   GtlGuessResult,
   GtlHintShare,
@@ -424,7 +425,7 @@ export function calculateGtlResults(room: InternalRoom): void {
     const guessText = state?.guesses[player.id] || '(No guess)';
     const correct = prompt ? isCorrectGtlGuess(prompt, guessText) : false;
     const points = correct ? GTL_POINTS_CORRECT_GUESS : 0;
-    player.score += points;
+    awardPoints(room, player.id, points, 'gtl:guess');
 
     if (!room.privateData[player.id]) room.privateData[player.id] = {};
     room.privateData[player.id].gtlConcept = prompt?.concept;

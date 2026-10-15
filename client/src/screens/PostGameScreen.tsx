@@ -5,6 +5,7 @@ import { Trophy, RotateCcw, LogOut, Sparkles, Grid } from 'lucide-react';
 import { RoomPublicState, Player } from '@shared/types';
 import { ActionButton } from '../components/ActionButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';
+import { TeamLeaderboard, teamRowsFromRoom } from '../components/TeamLeaderboard';
 
 interface PostGameScreenProps {
   room: RoomPublicState;
@@ -41,6 +42,8 @@ export function PostGameScreen({
   const rankedPlayers = [...room.players].sort((a, b) => b.score - a.score);
   const highestScore = rankedPlayers[0]?.score ?? 0;
   const winners = rankedPlayers.filter((p) => p.score === highestScore && highestScore > 0);
+  // Team mode shows the session's team totals above the individual board.
+  const teamRows = room.playMode === 'team' ? teamRowsFromRoom(room) : [];
 
   return (
     <div className="flex-1 flex flex-col justify-between p-5 max-w-md mx-auto w-full">
@@ -60,13 +63,26 @@ export function PostGameScreen({
             Final Standings
           </h2>
           <p className="text-xs font-semibold text-neutral-400 mt-1">
-            {winners.length === 1
+            {teamRows.length > 0
+              ? `🏆 Top team: ${
+                  [...teamRows].sort((a, b) => b.total - a.total)[0].name
+                } — individual scores below`
+              : winners.length === 1
               ? `🏆 ${winners[0].name} takes the crown!`
               : winners.length > 1
               ? `🏆 Tie for victory between ${winners.map((w) => w.name).join(' & ')}!`
               : 'Great games all around!'}
           </p>
         </motion.div>
+
+        {/* Team mode: team totals first, then the individual leaderboard */}
+        {teamRows.length > 0 && (
+          <TeamLeaderboard
+            rows={teamRows}
+            myTeamId={myPlayer.teamId}
+            title="Final Team Totals"
+          />
+        )}
 
         {/* Podium / Final Scoreboard Card */}
         <motion.div

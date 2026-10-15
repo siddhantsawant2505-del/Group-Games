@@ -12,7 +12,15 @@ import {
   loadUserProfile,
 } from './services/socket';
 import { playNotificationSound, triggerHaptic } from './services/sound';
-import { RoomPublicState, Player, PlayerPrivateState, GamePhase, ImpostorSettings } from '@shared/types';
+import {
+  RoomPublicState,
+  Player,
+  PlayerPrivateState,
+  GamePhase,
+  ImpostorSettings,
+  PlayMode,
+} from '@shared/types';
+import type { RoomSettingsActions } from './screens/LobbyScreen';
 import { Header } from './components/Header';
 import { LoadingScreen } from './screens/LoadingScreen';
 import { NameEntryScreen } from './screens/NameEntryScreen';
@@ -338,6 +346,46 @@ export default function App() {
     [room, myPlayer]
   );
 
+  // Room settings: one emit helper for the whole lobby settings sheet.
+  const emitRoomAction = useCallback(
+    (event: string, payload: Record<string, unknown>, callback?: (res: any) => void) => {
+      if (!room || !myPlayer) {
+        callback?.({ success: false, error: 'Room is not ready.' });
+        return;
+      }
+      const socket = getSocket();
+      socket.emit(event, { roomCode: room.roomCode, playerId: myPlayer.id, ...payload }, callback);
+    },
+    [room, myPlayer]
+  );
+
+  const roomSettingsActions: RoomSettingsActions = {
+    onSetPlayMode: useCallback(
+      (mode: PlayMode) => emitRoomAction('set-play-mode', { mode }),
+      [emitRoomAction]
+    ),
+    onSetTeamCount: useCallback(
+      (count: number) => emitRoomAction('set-team-count', { count }),
+      [emitRoomAction]
+    ),
+    onJoinTeam: useCallback(
+      (teamId: string) => emitRoomAction('join-team', { teamId }),
+      [emitRoomAction]
+    ),
+    onRenameTeam: useCallback(
+      (teamId: string, name: string) => emitRoomAction('rename-team', { teamId, name }),
+      [emitRoomAction]
+    ),
+    onBalanceTeams: useCallback(
+      (shuffle: boolean) => emitRoomAction('balance-teams', { shuffle }),
+      [emitRoomAction]
+    ),
+    onSetRoundCount: useCallback(
+      (rounds: number) => emitRoomAction('set-round-count', { rounds }),
+      [emitRoomAction]
+    ),
+  };
+
   // Host moves to game-select phase
   const handleGoToGameSelect = useCallback(() => {
     if (!room) return;
@@ -659,6 +707,7 @@ export default function App() {
           myPlayer={myPlayer}
           onStartGame={handleGoToGameSelect}
           onAddBot={handleAddBot}
+          roomSettings={roomSettingsActions}
         />
       ) : room.phase === 'game-select' ? (
         <GameSelectScreen
@@ -938,6 +987,7 @@ export default function App() {
           myPlayer={myPlayer}
           onStartGame={handleGoToGameSelect}
           onAddBot={handleAddBot}
+          roomSettings={roomSettingsActions}
         />
       )}
     </div>

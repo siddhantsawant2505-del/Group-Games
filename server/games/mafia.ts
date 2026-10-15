@@ -8,6 +8,7 @@
  */
 
 import { InternalRoom } from '../roomManager';
+import { awardPoints } from '../scoring';
 import {
   MafiaElimination,
   MafiaInvestigation,
@@ -622,7 +623,7 @@ export function calculateMafiaResults(room: InternalRoom): void {
 
     if (onWinningSide && survived) {
       pointsAwarded[player.id] = 1;
-      player.score += 1;
+      awardPoints(room, player.id, 1, 'mafia:win');
     }
   });
 

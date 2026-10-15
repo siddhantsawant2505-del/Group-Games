@@ -18,6 +18,7 @@ import {
 } from '../../shared/data/top100Prompts';
 import { InternalRoom } from '../roomManager';
 import { PlayerResultStanding, RevealedAnswer, Top100OrderEntry, Top100PublicState } from '../../shared/types';
+import { awardPoints } from '../scoring';
 
 /** Seconds players get to write an example that fits their secret number. */
 export const TOP100_INPUT_SECONDS = 45;
@@ -376,7 +377,7 @@ export function calculateTop100Results(room: InternalRoom): void {
 
   // The ordering is collaborative, so the accuracy score is shared by everyone.
   players.forEach((player) => {
-    player.score += points;
+    awardPoints(room, player.id, points, 'top100:order');
     if (!room.privateData[player.id]) room.privateData[player.id] = {};
     room.privateData[player.id].top100PointsAwarded = points;
     room.privateData[player.id].top100CanRank = false;

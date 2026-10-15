@@ -23,6 +23,7 @@ import {
   VoteBreakdownItem,
 } from '../../shared/types';
 import { InternalPlayer, InternalRoom } from '../roomManager';
+import { awardPoints } from '../scoring';
 import { shuffle } from '../content/contentBag';
 
 export const QUESTION_INPUT_SECONDS = 30;
@@ -417,7 +418,7 @@ export function calculateImpostorQuestionResults(room: InternalRoom): void {
   if (impostorEvaded && impostorId) pointsAwarded[impostorId] = (pointsAwarded[impostorId] || 0) + 1;
 
   room.players.forEach((player) => {
-    player.score += pointsAwarded[player.id] || 0;
+    awardPoints(room, player.id, pointsAwarded[player.id] || 0, 'impostor-question:round');
   });
 
   const roleReveals: RoleRevealInfo[] = room.players.map((player) => {

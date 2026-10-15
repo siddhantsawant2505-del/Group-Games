@@ -19,6 +19,31 @@ export const PLAYER_COLORS: readonly PlayerColorToken[] = [
   { index: 5, label: 'Hot Pink', hex: '#FF6FB0', contrastText: '#FFFFFF' },
 ] as const;
 
+/**
+ * Team accents. Deliberately deeper than the six player identity colours so a
+ * team bar and a player avatar never read as the same swatch, and they are
+ * always paired with a team icon + name because colour is never the only cue.
+ */
+export interface TeamAccentToken {
+  index: number;
+  label: string;
+  hex: string;
+  contrastText: string;
+}
+
+export const TEAM_ACCENTS: readonly TeamAccentToken[] = [
+  { index: 0, label: 'Deep Teal', hex: '#0B7285', contrastText: '#FFFFFF' },
+  { index: 1, label: 'Burnt Orange', hex: '#E8590C', contrastText: '#FFFFFF' },
+  { index: 2, label: 'Forest Green', hex: '#087F5B', contrastText: '#FFFFFF' },
+  { index: 3, label: 'Deep Indigo', hex: '#5F3DC4', contrastText: '#FFFFFF' },
+] as const;
+
+/** Get team accent info by slot (0 to 3, loops if more teams exist). */
+export function getTeamAccent(accentIndex: number): TeamAccentToken {
+  const normalized = Math.abs(accentIndex) % TEAM_ACCENTS.length;
+  return TEAM_ACCENTS[normalized];
+}
+
 export const THEME_COLORS = {
   light: {
     background: '#FAFAF7',
@@ -74,6 +99,7 @@ export const THEME_TYPOGRAPHY = {
 export const DESIGN_TOKENS = {
   colors: THEME_COLORS,
   playerColors: PLAYER_COLORS,
+  teamAccents: TEAM_ACCENTS,
   spacing: THEME_SPACING,
   radii: THEME_RADII,
   typography: THEME_TYPOGRAPHY,

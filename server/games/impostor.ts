@@ -7,6 +7,7 @@
 import { InternalRoom, InternalPlayer } from '../roomManager';
 import { RoleRevealInfo, PlayerResultStanding, VoteBreakdownItem, RevealedAnswer } from '../../shared/types';
 import { WordItem } from '../content/types';
+import { awardPoints } from '../scoring';
 
 export interface ImpostorRoundState {
   /** Served by the content engine (shipped corpus, or an AI top-up). */
@@ -289,10 +290,9 @@ export function calculateImpostorResults(room: InternalRoom): void {
     pointsAwarded[impostorId] = (pointsAwarded[impostorId] || 0) + 1;
   }
 
-  // Update running scoreboard
+  // Update running scoreboard (central scoring → solo total + team total)
   room.players.forEach((player) => {
-    const pts = pointsAwarded[player.id] || 0;
-    player.score += pts;
+    awardPoints(room, player.id, pointsAwarded[player.id] || 0, 'impostor:round');
   });
 
   // Build role reveals

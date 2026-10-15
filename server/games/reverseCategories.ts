@@ -17,6 +17,7 @@ import {
   pickUnrelatedTriplet,
 } from '../../shared/data/reverseCategoriesItems';
 import { InternalRoom } from '../roomManager';
+import { awardPoints } from '../scoring';
 import {
   PlayerResultStanding,
   RevCatCategoryResult,
@@ -292,7 +293,7 @@ export function calculateReverseCategoriesResults(room: InternalRoom): void {
 
   room.players.forEach((player) => {
     const points = pointsAwarded[player.id] || 0;
-    player.score += points;
+    awardPoints(room, player.id, points, 'revcat:round');
     if (!room.privateData[player.id]) room.privateData[player.id] = {};
     room.privateData[player.id].revCatPointsAwarded = points;
     room.privateData[player.id].revCatIsWinner = winningSet.has(player.id);

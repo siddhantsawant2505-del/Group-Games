@@ -16,6 +16,7 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Players submit private clues (or answers) to prove they belong, without giving the secret away.',
       'Discuss, find inconsistencies, and vote to eliminate the Impostor.',
     ],
+    teamSupport: 'aggregate',
   },
   {
     id: 'avoid-the-word',
@@ -32,6 +33,8 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Everyone else listens and buzzes if a taboo word slips — a majority confirms it.',
       'Score points for clean describes and for buzzes your group confirms.',
     ],
+    // Native team rules are planned (rotating team turns); scores aggregate for now.
+    teamSupport: 'native',
   },
   {
     id: 'mafia',
@@ -47,6 +50,7 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Night phase: Mafia secretly selects a target.',
       'Day phase: Discussion, accusations, and town vote to exile a suspect.',
     ],
+    teamSupport: 'aggregate',
   },
   {
     id: 'guess-the-link',
@@ -63,6 +67,7 @@ export const PARTY_GAMES: GameMetadata[] = [
       'All responses are revealed together in shuffled order.',
       'Everyone guesses the hidden concept at the same time — +1 point for every correct guess.',
     ],
+    teamSupport: 'native',
   },
   {
     id: 'top-100',
@@ -78,6 +83,7 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Provide an example matching that exact intensity on the spectrum.',
       'The group must arrange all submitted answers in ascending order.',
     ],
+    teamSupport: 'native',
   },
   {
     id: 'reverse-categories',
@@ -93,5 +99,6 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Invent the funniest or most accurate category linking them all.',
       'Players vote on the most clever category invention.',
     ],
+    teamSupport: 'native',
   },
 ];

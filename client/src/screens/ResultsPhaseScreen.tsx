@@ -5,6 +5,7 @@ import { Trophy, ArrowRight, RotateCcw, Award } from 'lucide-react';
 import { RoomPublicState, Player } from '@shared/types';
 import { ActionButton } from '../components/ActionButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';
+import { TeamLeaderboard, rowsFromStandings } from '../components/TeamLeaderboard';
 import { getPlayerColor } from '@shared/theme/tokens';
 
 interface ResultsPhaseScreenProps {
@@ -24,6 +25,8 @@ export function ResultsPhaseScreen({
 }: ResultsPhaseScreenProps) {
   const isHost = myPlayer.isHost;
   const results = room.results;
+  // Team mode leads with the team leaderboard; solo is unchanged.
+  const teamRows = rowsFromStandings(results?.teamStandings);
 
   useEffect(() => {
     // Launch celebratory party confetti
@@ -137,6 +140,11 @@ export function ResultsPhaseScreen({
             </div>
           )}
         </div>
+
+        {/* Team mode: the team leaderboard comes first, individual scores below */}
+        {teamRows.length > 0 && (
+          <TeamLeaderboard rows={teamRows} myTeamId={myPlayer.teamId} />
+        )}
 
         {/* Vote Tally Section */}
         {results?.voteTallies && (
