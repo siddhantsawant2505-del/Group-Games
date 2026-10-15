@@ -230,7 +230,7 @@ game-select
 reveal
 input
 reveal-answers
-rank            (Top 100 host-authoritative ordering)
+guess           (Guess the Link simultaneous guessing)
 discussion
 vote
 results

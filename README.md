@@ -71,7 +71,7 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 - **Hidden-answer elimination rounds** — one anchor answers a question privately, everyone else answers it one at a time, and any answer that matches the anchor is announced live (never the answer itself) and knocked out on the host's Continue.
 - **Dedicated Mafia engine** — privately dealt roles, timed night actions, day eliminations, win-condition checks, and scoring.
 - **Dedicated Guess the Link engine** — one hidden concept, a different private hint angle per player, a shuffled link board, and simultaneous concept guessing with per-correct points.
-- **Dedicated Top 100 engine** — one 1-to-100 spectrum, a unique secret number per player, private example writing, a host-authoritative drag-and-drop ranking phase broadcast live to everyone, and adjacent-pair accuracy scoring.
+- **Dedicated Top 100 engine** — a hidden 100-item ranked list per round, one free-text guess per player (or per team captain), position-exact scoring (a match at position N is worth N), host overrules, duplicate policies, region/category filters, and only positions 1-10 and 90-100 ever revealed.
 - **Dedicated Reverse Categories engine** — three deliberately unrelated items shown publicly (no secrets at all), privately invented category names, a shuffled attributed board, and the standard secret ballot repurposed to crown the best category.
 - **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, guess, rank, avoid-anchor, avoid-turn, avoid-reveal, discussion, vote, night, day, results, next-round.
 
@@ -85,6 +85,7 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 | Content engine suite | `PASSING` | `npm run test:content` — 500 rounds, no repeats before pool exhaustion |
 | Question-mode suite | `PASSING` | `npm run test:questions` — four answer types, `{target}` dealing, leak checks |
 | Avoid the Word suite | `PASSING` | `npm run test:avoid` — matching rules, question bank and answer-space rules, shuffle bag, a full bot game, leak/overrule/AFK/reconnect/placement checks |
+| Top 100 suite | `PASSING` | `npm run validate:top100` + `npm run test:top100` — list validation, normalisation/typo matching, position scoring, duplicate policy, host overrules, the shuffle bag, a 5-round bot game and a team game with captain rotation and private suggestions |
 | Team-mode suite | `PASSING` | `npm run test:teams` — play modes, team seating, start gate, team scoring |
 | Vite Client Build | `PASSING` | React 19 SPA bundled to `dist/` with Tailwind CSS v4 |
 | Server Build | `PASSING` | Bundled into standalone CommonJS executable `dist/server.cjs` via esbuild |
@@ -104,22 +105,24 @@ Party Games features a collection of six multiplayer party games designed for ph
 | **Avoid the Word** | 3–10 | Bluff / Elimination | Ban | 🟢 **Fully Working & Playable** — Dedicated elimination engine: rotating anchor with a hidden answer, one timed turn per player, live match announcements, a host-overruled round reveal, AFK skips, bot simulation, and placement/point scoring |
 | **Mafia** | 4–16 | Social Deduction | Detective | 🟢 **Fully Working & Playable** — Dedicated engine with private role deal, timed night actions, day eliminations, and win-condition scoring |
 | **Guess the Link** | 3–8 | Word Association | Link | 🟢 **Fully Working & Playable** — Dedicated engine with one hidden concept, per-player private hint angles, shuffled board, simultaneous guessing, and scoring |
-| **Top 100** | 3–10 | Ranking / Spectrum | List-Ordered | 🟢 **Fully Working & Playable** — Dedicated engine with a unique secret number per player, private example writing, a host-authoritative drag-to-rank phase broadcast live, and adjacent-pair accuracy scoring |
+| **Top 100** | 3–10 | Ranking / List Knowledge | List-Ordered | 🟢 **Fully Working & Playable** — Dedicated engine with a hidden 100-item list per round, one guess per player (or team), position-exact scoring, host overrules, duplicate/region/category settings, and only the 1-10 / 90-100 slices revealed |
 | **Reverse Categories** | 3–8 | Trivia / Creative | Shuffle | 🟢 **Fully Working & Playable** — Dedicated engine with unrelated-item triplets, public items (no secrets), privately invented categories, a shuffled attributed board, and a best-category ballot with author and voter scoring |
 
 **Room modes.** Every room runs in **solo** (default) or **team** mode, chosen by the host from the
 lobby's settings gear. In team mode individual scores are kept and each award also counts for the
 player's team; results and the post-game screen lead with the team leaderboard. Impostor and Mafia
 are **aggregate** today (their points simply roll up — badged "Teams: scores combine"); Avoid the
-Word, Guess the Link, Top 100 and Reverse Categories are **Team-ready** — they play as in solo for
-now and gain native team rules next (see `docs/GAME_rules.md` → "Adding a game"). Avoid the Word
+Word, Guess the Link and Reverse Categories are **Team-ready** — they play as in solo for now and
+gain native team rules next (see `docs/GAME_rules.md` → "Adding a game"). Avoid the Word
 already ends by team in team mode: a team survives while it has an alive member, and the last team
-standing takes the win.
+standing takes the win. **Top 100 is native**: each team locks exactly one guess through its
+rotating captain, and the team is scored through `awardTeamPoints()`, leaving individual totals alone.
 
 **Per-game settings.** Each game-select card has its own gear: Impostor (mode, difficulty, tone,
 custom theme), Avoid the Word (anchor answer time, turn time, round cap, question tone), Guess the
-Link (a host-authored round), and a read-only summary of the current choices for everyone else. The
-lobby gear covers the room-wide settings instead: play mode, teams and rounds per session.
+Link (a host-authored round), Top 100 (rounds, guess time, duplicate policy, region and category
+filters), and a read-only summary of the current choices for everyone else. The lobby gear covers
+the room-wide settings instead: play mode, teams and rounds per session.
 
 ---
 
@@ -264,28 +267,31 @@ Pick **Question** in the host settings and the same engine plays a different gam
 
 ---
 
-### 5. Top 100 — Dedicated Spectrum Ranking Engine (🟢 Fully Operational)
+### 5. Top 100 — Dedicated Hidden-List Engine (🟢 Fully Operational)
 
-**Top 100** ships a fully custom server engine (`server/games/top100.ts`) with its own phase chain (`reveal → input → reveal-answers → rank → results`), server-side spectrum picking, unique secret-number dealing, private example collection, a shuffled example board, and host-authoritative ordering validation. Spectra live in 22 original entries (`shared/data/top100Prompts.ts`).
+**Top 100** ships a fully custom server engine (`server/games/top100.ts`) on the shared phase chain (`reveal → input → reveal-answers → results`), with a hidden ranked list served by the content engine, a pure matcher/scorer of its own (`server/games/top100.match.ts`), host overrules and native team rules. The lists live in `shared/data/top100/*.json` (17 lists, 100 ranked items each, validated by `npm run validate:top100`).
 
-- **Objective**: Every player secretly owns a different number on the same 1-to-100 spectrum. Write an example that fits your number, then get the whole set of examples into the right order.
+- **Objective**: Name something that is on the round's hidden Top 100 list. The deeper it ranks, the more it is worth — miss the list and you score nothing.
 
 - **Game Rules & Mechanics**:
-  1. **Player Requirements**: 3 to 10 players (solo testing supported via "+ Add Bot").
-  2. **Number Reveal (`reveal` phase, 10s)**:
-     - The server picks one spectrum (e.g. *"1 = spotless, 100 = certified biohazard"*) and deals every player a **unique** secret number from 1 to 100. Numbers are never repeated within a round.
-     - Each player sees **only their own number** plotted on the spectrum, plus the category. Numbers never reach the public state before results.
-  3. **Example Submission (`input` phase, 45s)**:
-     - Each player privately writes **one short example/scenario** they believe sits at their own number, sanitized to a maximum of **9 words / 72 characters**.
-  4. **The Example Board (`reveal-answers` phase, 20s)**:
-     - Every example appears together in **Fisher-Yates shuffled order** (never join order) with the secret numbers still hidden — the table has to infer the order from the examples themselves.
-  5. **Ranking (`rank` phase, 120s)**:
-     - **Host-authoritative v1**: the host drags the example cards into ascending numeric order (pointer drag on the grip, with arrow-button nudges). The order broadcasts live, and everyone else watches it update read-only.
-     - The server only accepts a **complete permutation** of the round's examples, so one bad payload cannot drop or duplicate a card. The phase closes when the host locks the order in or the timer expires.
+  1. **Player Requirements**: 3 to 10 players in solo mode, or 2+ teams in team mode (solo testing supported via "+ Add Bot").
+  2. **The Question (`reveal` phase, 8s)**:
+     - The server draws one list through a per-room shuffle bag: nothing repeats until the room has seen every eligible list, consecutive rounds avoid the previous round's category whenever another one is available, and a mixed region setting alternates global and India lists when it can.
+     - Only the question, its category and its as-of date are public. The 100 ranked items stay on the server for the whole game — no client ever receives the list, an autocomplete or a suggestion derived from it.
+  3. **The Guess (`input` phase, 45s solo / 60s team)**:
+     - Every player (solo), or every team captain (team), privately types **one** free-text guess. There is no autocomplete; submitting locks it.
+     - The phase closes as soon as everyone who owes a guess has locked one. A missing guess is stored as `(no answer)` and scores 0.
+     - **Team mode** adds a private channel: teammates send up to five suggestions each (30 characters each) that only their own team's sockets receive, and a captain who runs out of time falls back to the team's newest suggestion (or `(no answer)`).
+  4. **The Guesses Board (`reveal-answers` phase, 90s)**:
+     - Every guess appears with the item it matched, that item's position and the points it will score, marked when two or more guesses landed on the same item.
+     - Points are not final yet: the host can **overrule** a guess onto any position, or mark it as not on the list, and the board updates before the host taps Continue.
+  5. **Scoring**: a guess matching position N scores exactly **N points** (position 100 = 100, position 1 = 1); anything else scores 0. Matching is exact on normalised names and aliases (case, punctuation, accents, a leading `@` and leading articles are ignored), with **typo tolerance** of one edit for 5+ character guesses and two for 10+ character guesses — accepted only when exactly one item sits inside that distance, so an ambiguous guess scores nothing unless the host overrules it. The `duplicatePolicy` setting decides whether two players (or teams) on the same item both score (`allow`, default) or neither does (`zero`).
   6. **Results (`results` phase)**:
-     - Every true number is revealed next to its example, along with its position in the real ascending order and the host's slot for it.
-     - Accuracy is measured in **correctly-placed adjacent pairs**: each neighbouring pair placed in the right relative order scores **+2**, and a flawless order adds a **+3** bonus. The ordering is collaborative, so the table shares the score.
-  7. **Next Round Loop (`next-round`)**: a fresh spectrum with new unique numbers, avoiding spectra already played in the room, with cumulative scores preserved.
+     - Points become final and are awarded through `awardPoints()` (solo) or `awardTeamPoints()` (team mode, which leaves individual scores untouched).
+     - Positions **1-10** and **90-100** are revealed as two separated blocks; the 79 middle positions are never sent. A player whose own guess sits outside those slices still sees that guess with its rank.
+     - The running leaderboard follows, with the team leaderboard first in team mode.
+  7. **Next Round Loop (`next-round`)**: a fresh list, repeated until `roundCount` (default 5) is reached, then the final standings and the post-game screen.
+  8. **Content maintenance**: every guess that matched nothing is counted in `data/unmatched-guesses.json` (list id + normalised text only, never a player identity) so aliases can be improved later.
 
 ---
 
@@ -373,7 +379,11 @@ One provider layer feeds every content-driven game: the Impostor word pool, the 
 - **Team leaderboards.** When any round resolves, the room manager attaches `results.teamStandings`
   (rank, icon, name, total, member contributions) and the results and post-game screens render it
   above the individual standings. Solo rounds keep exactly the old payload.
-- **Native team rules** for Guess the Link, Top 100, Reverse Categories and Mafia are planned and
+- **Team-only awards.** `awardTeamPoints(room, teamId, points, reason?)` scores a team without
+  touching any member's individual total (kept as the team's `bonusPoints` so a derived recompute or
+  a membership change can never erase it). **Top 100** uses it for its native team rules: one guess
+  per team, rotating captains, team-private suggestions.
+- **Native team rules** for Guess the Link, Reverse Categories and Mafia are planned and
   documented, not implemented; until they ship those games play as they do in solo and their points
   aggregate, which the game cards badge as "Team-ready". Avoid the Word already uses its own team
   end condition (a team survives while it has an alive member) on top of the central scoring roll-up.
@@ -382,12 +392,11 @@ One provider layer feeds every content-driven game: the Impostor word pool, the 
 
 1. **`lobby`** — players join via room code/QR; host configures bots and launches.
 2. **`game-select`** — host chooses a party game.
-3. **`reveal`** — private assignment (impostor role, the Avoid the Word anchor's question, Mafia roles, a Guess the Link hint angle, or a Top 100 secret number), or the public three items (Reverse Categories). The Impostor word and the Avoid the Word question are served asynchronously by the content engine, so those rounds finish in their own methods rather than blocking the state machine.
-4. **`input`** — players submit clues (Impostor), responses (Guess the Link), examples (Top 100), or invented categories (Reverse Categories).
-5. **`reveal-answers`** — clues revealed simultaneously (Impostor), the shuffled link board (Guess the Link), the shuffled example board with its numbers still hidden (Top 100), or the shuffled attributed category board (Reverse Categories).
+3. **`reveal`** — private assignment (impostor role, the Avoid the Word anchor's question, Mafia roles, or a Guess the Link hint angle), or public round content (the Reverse Categories items; the Top 100 question, whose ranked list stays on the server). The Impostor word, the Avoid the Word question and the Top 100 list are served asynchronously by the content engine, so those rounds finish in their own methods rather than blocking the state machine.
+4. **`input`** — players submit clues (Impostor), responses (Guess the Link), guesses (Top 100, plus team-private suggestions in team mode), or invented categories (Reverse Categories).
+5. **`reveal-answers`** — clues revealed simultaneously (Impostor), the shuffled link board (Guess the Link), the guesses board with its host overrules (Top 100), or the shuffled attributed category board (Reverse Categories).
 6. **`guess`** — simultaneous guessing at the hidden concept (Guess the Link).
-7. **`rank`** — the host drags the Top 100 examples into ascending numeric order while everyone else watches live.
-8. **`discussion`** — timed debate (Impostor; Mafia day phase).
+7. **`discussion`** — timed debate (Impostor; Mafia day phase).
 9. **`vote`** — secret ballot (Impostor; Mafia exile vote; Reverse Categories' best-category vote).
 10. **`avoid-anchor` → `avoid-turn` (repeats) → `avoid-reveal`** — Avoid the Word's private anchor answer, one timed turn per alive player, then the public round reveal with host overrules.
 11. **`night`** — Mafia and Detective act privately (Mafia).
@@ -493,7 +502,9 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   │   ├── avoidTheWord.match.ts # Pure answer matching: normalisation, stems, typos, per-type comparison
 │   │   ├── mafia.ts           # Mafia engine: roles, night actions, win conditions, scoring
 │   │   ├── guessTheLink.ts    # Link engine: concept hiding, hint dealing, guessing, scoring
-│   │   ├── top100.ts          # Spectrum engine: secret numbers, ordering, pair accuracy
+│   │   ├── top100.ts          # Top 100 engine: hidden list, guesses, overrules, slices, awards
+│   │   ├── top100.match.ts    # Top 100 matcher/scorer: normalisation, typo windows, position points
+│   │   ├── textNormalize.ts   # Shared text normalisation for Avoid the Word and Top 100
 │   │   └── reverseCategories.ts # Item-triplet engine: categories, attribution, best-category ballot
 │   ├── scoring.ts             # awardPoints(): the single scoring path (solo + team roll-up)
 │   ├── roomManager.ts         # In-memory room manager, sessions, teams, play mode, & state masks
@@ -508,7 +519,8 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   │   │   ├── impostorQuestions.json # 160 question pairs (6 kinds, 34 with {target})
 │   │   │   └── avoidTheWordQuestions.json # 123 Avoid the Word questions (text/choice/number/player)
 │   │   ├── guessTheLinkPrompts.ts  # 44 concepts × 6 hint angles each
-│   │   ├── top100Prompts.ts        # 22 spectra with sample examples
+│   │   ├── top100/            # Hidden ranked lists: 17 JSON files, 100 items each
+│   │   ├── top100Categories.ts # The eligible Top 100 categories
 │   │   └── reverseCategoriesItems.ts # 66 items across 22 themes
 │   ├── theme/
 │   │   └── tokens.ts          # Player colour tokens, team accents, & palette
@@ -519,7 +531,9 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   ├── testContentEngine.ts   # `npm run test:content`
 │   ├── testImpostorQuestionMode.ts # `npm run test:questions`
 │   ├── testTeamMode.ts        # `npm run test:teams`
-│   └── testAvoidTheWord.ts    # `npm run test:avoid`
+│   ├── testAvoidTheWord.ts    # `npm run test:avoid`
+│   ├── validateTop100Lists.ts # `npm run validate:top100`
+│   └── testTop100.ts          # `npm run test:top100`
 ├── data/
 │   ├── common-words-frequency.txt # 10k most common English words (MIT, FrequencyWords)
 │   └── blocklist.txt          # Moderation list applied to AI-generated content
@@ -558,6 +572,13 @@ npm run test:teams
 # Avoid the Word suite: matching rules, question bank/answer-space rules, shuffle bag, a full bot
 # game with leak, overrule, AFK, reconnect, team and placement checks
 npm run test:avoid
+
+# Top 100 list validation: 100 items per list, unique ranks, unique names and aliases, coverage report
+npm run validate:top100
+
+# Top 100 suite: matching, scoring, duplicates, host overrules, shuffle bag, a full bot game,
+# a team game (captain rotation, private suggestions, team scoring) and list-leak checks
+npm run test:top100
 
 # Regenerate shared/data/words/commonNouns.json from scripts/commonNouns.source.txt
 npm run generate:words

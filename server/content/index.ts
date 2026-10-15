@@ -9,12 +9,14 @@
 import { releaseAiRoom } from './aiClient';
 import { avoidQuestionProvider } from './avoidQuestionProvider';
 import { questionProvider } from './questionProvider';
+import { top100Provider } from './top100Provider';
 import { wordProvider } from './wordProvider';
 
 export function releaseRoomContent(roomId: string): void {
   wordProvider.release(roomId);
   questionProvider.release(roomId);
   avoidQuestionProvider.release(roomId);
+  top100Provider.release(roomId);
   releaseAiRoom(roomId);
 }
 
@@ -55,6 +57,13 @@ export {
   AVOID_BAG_LOW_WATER_MARK,
   resetAvoidProviderForTests,
 } from './avoidQuestionProvider';
+export {
+  top100Provider,
+  TOP100_LISTS,
+  top100Categories,
+  top100PoolSizeFor,
+  resetTop100ProviderForTests,
+} from './top100Provider';
 export { ShuffleBag, shuffle, RECENT_GUARD } from './contentBag';
 export { getAiStatus, isAiAvailable, reportAiUnavailableOnce, AI_LIMITS } from './aiClient';
 export {

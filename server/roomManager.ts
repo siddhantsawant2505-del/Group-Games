@@ -284,7 +284,7 @@ export interface InternalRoom {
   avoidState: AvoidPublicState | null; // Avoid the Word round state
   mafiaState: MafiaPublicState | null; // Mafia night/day state
   gtlState: GtlPublicState | null; // Guess the Link round state
-  top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
+  top100State: Top100PublicState | null; // Top 100 hidden-list state (never the list itself)
   revCatState: RevCatPublicState | null; // Reverse Categories items/board state
   impostorQuestionState: RoomPublicState['impostorQuestionState']; // Question mode only
   /** Host settings per game. Public: they never carry round secrets. */
@@ -1018,6 +1018,9 @@ export class RoomManager {
     if (!room) return false;
     this.clearPhaseTimer(room);
     releaseRoomContent(room.code);
+    // A deleted room must not keep its hidden round state (Top 100 holds the
+    // secret list, the guesses and the team suggestions) alive on the server.
+    cleanupTop100Round(room.code);
     this.rooms.delete(room.code);
     return true;
   }

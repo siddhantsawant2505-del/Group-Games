@@ -765,7 +765,7 @@ export interface RoomPublicState {
   avoidState: AvoidPublicState | null; // Avoid the Word round state
   mafiaState: MafiaPublicState | null; // Mafia game state
   gtlState: GtlPublicState | null; // Guess the Link game state
-  top100State: Top100PublicState | null; // Top 100 spectrum/ranking state
+  top100State: Top100PublicState | null; // Top 100 hidden-list state (never the list itself)
   revCatState: RevCatPublicState | null; // Reverse Categories items/board state
   /** Public host settings per game (how a round plays, never its secrets). */
   gameSettings: GameSettings;
