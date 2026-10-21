@@ -374,6 +374,10 @@ async function main(): Promise<void> {
   for (const mode of ['word', 'question'] as const) {
     const room = makeRoom(3);
     roomManager.setPlayMode(room.code, room.hostId, 'team');
+    // The catalogue now defaults to Top 100, so a test that scores an Impostor
+    // round must select Impostor explicitly (the UI only offers playable games,
+    // but the engine and suites can still drive every game).
+    roomManager.selectGame(room.code, 'impostor');
     roomManager.setGameSettings(room.code, room.hostId, { impostor: { mode } });
 
     // Question mode deliberately hides who the impostor is, even in private
@@ -461,6 +465,7 @@ async function main(): Promise<void> {
   // A solo room must keep exactly the old payload (no team leaderboard).
   section('solo rounds stay individual');
   const soloRound = makeRoom(3);
+  roomManager.selectGame(soloRound.code, 'impostor');
   roomManager.setGameSettings(soloRound.code, soloRound.hostId, { impostor: { mode: 'word' } });
   setupImpostorRound(soloRound, { id: 'test-word-2', word: 'kettle', category: 'Kitchen', difficulty: 1, source: 'corpus' });
   const soloImpostor = soloRound.players.find((p) => soloRound.privateData[p.id]?.isSpecialRole)!;
@@ -479,12 +484,22 @@ async function main(): Promise<void> {
   section('game capabilities');
   check(
     'every game declares its team support',
-    PARTY_GAMES.every((game) => game.teamSupport === 'aggregate' || game.teamSupport === 'native')
+    PARTY_GAMES.every((game) =>
+      ['aggregate', 'shipped', 'native'].includes(game.teamSupport)
+    )
+  );
+  check(
+    'Top 100 ships native team rules',
+    PARTY_GAMES.find((game) => game.id === 'top-100')?.teamSupport === 'shipped'
   );
   check(
     'Impostor and Mafia aggregate team scores',
     PARTY_GAMES.find((game) => game.id === 'impostor')?.teamSupport === 'aggregate' &&
       PARTY_GAMES.find((game) => game.id === 'mafia')?.teamSupport === 'aggregate'
+  );
+  check(
+    'only Top 100 is playable — the rest are marked Coming Soon',
+    PARTY_GAMES.filter((game) => !game.comingSoon).map((game) => game.id).join(',') === 'top-100'
   );
 
   // ------------------------------------------------------------------- cleanup

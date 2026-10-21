@@ -2,7 +2,7 @@
   "lists": {
     "olympic-gold-medals-all-time": {
       "something random": 1,
-      "no answer": 1,
+      "no answer": 2,
       "banana bread": 1
     },
     "india-baby-boy-names-2024": {
@@ -15,7 +15,8 @@
       "krishiv": 1,
       "fidget spinner": 1,
       "advik": 1,
-      "banana bread": 1
+      "banana bread": 1,
+      "no answer": 1
     },
     "india-baby-girl-names-2024": {
       "whatever": 4,
@@ -27,7 +28,8 @@
       "pineapple pizza": 2,
       "something random": 1,
       "kuhu": 1,
-      "mahi": 1
+      "mahi": 1,
+      "fidget spinner": 1
     },
     "most-subscribed-youtube-channels": {
       "no answer": 2,
@@ -53,7 +55,7 @@
     },
     "largest-restaurant-chains": {
       "whatever": 1,
-      "no answer": 1
+      "no answer": 2
     },
     "best-selling-books": {
       "banana bread": 1,
@@ -65,11 +67,13 @@
       "no answer": 1
     },
     "longest-rivers": {
-      "no answer": 1
+      "no answer": 2,
+      "banana bread": 1
     },
     "mens-international-football-goals": {
-      "whatever": 1
+      "whatever": 1,
+      "no answer": 1
     }
   },
-  "updatedAt": "2026-10-15T15:20:14.937Z"
+  "updatedAt": "2026-10-21T11:41:23.647Z"
 }

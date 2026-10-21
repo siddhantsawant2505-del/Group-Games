@@ -28,18 +28,22 @@ function getPlayerInitials(name?: string): string {
   const clean = name.trim();
   const parts = clean.split(/[\s_-]+/).filter(Boolean);
 
+  // Code-point aware so an emoji prefix ("🦊 Foxes") is never cut in half and
+  // rendered as a replacement character.
+  const firstOf = (part: string) => Array.from(part)[0] ?? '';
+
   if (parts.length >= 2) {
-    const first = parts[0].charAt(0);
-    const second = parts[1].charAt(0);
+    const first = firstOf(parts[0]);
+    const second = firstOf(parts[1]);
     return `${first}${second}`.toUpperCase();
   }
 
   // If single word, use first letter (or up to 2 letters if short like P1, J2)
-  if (clean.length <= 2 && /^[a-zA-Z0-9]+$/.test(clean)) {
+  if (Array.from(clean).length <= 2 && /^[a-zA-Z0-9]+$/.test(clean)) {
     return clean.toUpperCase();
   }
 
-  return clean.charAt(0).toUpperCase();
+  return firstOf(clean).toUpperCase();
 }
 
 export function PlayerAvatar({

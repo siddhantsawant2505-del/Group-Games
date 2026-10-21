@@ -47,10 +47,18 @@ export interface GameMetadata {
   rules: string[];
   /**
    * How the game behaves in room team mode. `aggregate` plays exactly as it
-   * does in solo and its points roll up to teams; `native` has team-specific
-   * rules planned, so until they ship it is treated as `aggregate`.
+   * does in solo and its points roll up to teams; `shipped` has team-specific
+   * rules live today (one guess per team, team-only scoring — Top 100);
+   * `native` has team-specific rules planned, so until they ship it is treated
+   * as `aggregate`.
    */
-  teamSupport: 'aggregate' | 'native';
+  teamSupport: 'aggregate' | 'shipped' | 'native';
+  /**
+   * Not playable yet: the card is listed with a "Coming Soon" badge, cannot be
+   * selected, and the room never launches it. Top 100 is the only shipped game;
+   * the rest are marked until they are re-verified against this engine.
+   */
+  comingSoon?: boolean;
 }
 
 export interface PhaseTimer {

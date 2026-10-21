@@ -143,6 +143,35 @@ word list, and no room repeats content:
 Clients emit commands; the server mutates state; the server emits state. This prevents clients
 from diverging.
 
+### 2.7 Worked example: Top 100's hidden-list engine
+
+**Top 100** is the reference implementation of a game whose answer key must never reach a
+client — useful whenever a future game ranks, orders or scores against hidden data:
+
+- **One secret, one owner.** `server/games/top100.ts` keeps the drawn list in a room-scoped
+  `activeRounds` map (`server/roomManager.ts` deletes it with the room). The public state carries
+  only the list's id, question, category and as-of date; the 100 items are never copied into
+  `room:update`, nor into `player:private-state`.
+- **Slices, not dumps.** Results publish `list.slices` (positions 1-10 and 90-100) plus the guesses
+  board, and the viewer adds their own guess as a separate row when it falls outside those slices.
+  The middle of the list is unreachable by design, so "don't reveal the list" is enforced by the
+  payload shape rather than by client discipline.
+- **Pure rules module.** `top100.match.ts` holds normalisation (shared with Avoid the Word in
+  `server/games/textNormalize.ts`), the exact/alias map, the one-or-two-edit typo windows, and
+  `scoreTop100Round(list, guesses, duplicatePolicy, overrules)` — all synchronous and unit-tested,
+  so the engine stays a thin phase/IO wrapper.
+- **Answers arrive as data, not as truth.** A guess is text; the matcher proposes a rank; the host
+  may overrule that rank (or mark the guess off-list) before Continue. The overrule map is applied
+  inside the same pure scorer, so it cannot diverge from the automatic path.
+- **Team privacy is a channel, not a filter.** In team mode the captain locks one team guess and
+  teammates trade suggestions over `emitToTeam(room, teamId, event, payload)`, which targets that
+  team's sockets only. Opponents' clients never receive the payload, so nothing is hidden by
+  client-side rendering.
+- **Content + test hooks.** Lists are served by `top100Provider` (same shuffle bag, no-repeat and
+  category-variety rules as every other provider, plus region/category filters), validated offline
+  by `npm run validate:top100`, and exercised end-to-end by `npm run test:top100`, including a
+  leak guard that scans every public and private payload a real broadcast would send.
+
 ---
 
 ## 3. Socket.IO communication model

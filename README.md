@@ -63,7 +63,7 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 - **Room settings gear (lobby)** — one gear next to the player list opens the room-wide settings: **Solo / Team** play mode, team count (2-4), tap-to-join teams, team rename, auto-balance and shuffle, and the number of rounds per session.
 - **Per-game settings gear (game select)** — every game card carries its own gear, so each game is tuned separately: Impostor mode/difficulty/tone/theme, Guess the Link's custom round, and a read-only summary for everyone else.
 - **Team mode** — individual scores are kept and every award also rolls up to the player's team through one central `awardPoints()`; team totals survive team switches and reconnects, the lobby blocks a bad split (and warns about lopsided ones), and results/post-game lead with the team leaderboard.
-- **Six built-in games** — Impostor, Avoid the Word, Mafia, Guess the Link, Top 100, Reverse Categories.
+- **One live game, more on the way** — Top 100 is playable today; Impostor, Avoid the Word, Mafia, Guess the Link and Reverse Categories are listed as **Coming Soon** and cannot be launched yet.
 - **Two Impostor modes** — *Word* (the classic secret word) and *Question*: everyone privately receives the same question, one player was quietly asked a related but different one, and the difference only surfaces on the answer board.
 - **Content engine (`server/content/`)** — a reusable provider layer. Words are served from a 2,059-noun corpus through a per-room shuffle bag, so nothing repeats until a room has seen the whole pool; an optional AI top-up is validated locally (commonness, shape, blocklist, room history) before it can ever be used.
 - **Host difficulty setting** — Easy / Medium / Any filter the Impostor word pool, plus an optional custom theme and an AI top-up once a real `GEMINI_API_KEY` is configured. Without a key everything silently falls back to the bundled pool.
@@ -97,16 +97,21 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 
 ## Games collection, rules & working state
 
-Party Games features a collection of six multiplayer party games designed for phone controllers. All six are 100% operational with dedicated server game engines.
+Party Games features a collection of six multiplayer party games designed for phone controllers. **Top 100 is the only shipped game**; the other five are listed as **Coming Soon** — their cards stay visible but cannot be selected or launched until their engines are re-verified. The dedicated engines for those games still live in the repo and in the test suites.
 
 | Game | Players | Category | Icon | Current Working State |
 |---|---|---|---|---|
-| **Impostor** | 3–12 | Social Deduction | Mask | 🟢 **Fully Working & Playable** — Dedicated engine with two modes (secret word / different question), clue and answer sanitizers, bot AI, host difficulty + tone settings, and scoring |
-| **Avoid the Word** | 3–10 | Bluff / Elimination | Ban | 🟢 **Fully Working & Playable** — Dedicated elimination engine: rotating anchor with a hidden answer, one timed turn per player, live match announcements, a host-overruled round reveal, AFK skips, bot simulation, and placement/point scoring |
-| **Mafia** | 4–16 | Social Deduction | Detective | 🟢 **Fully Working & Playable** — Dedicated engine with private role deal, timed night actions, day eliminations, and win-condition scoring |
-| **Guess the Link** | 3–8 | Word Association | Link | 🟢 **Fully Working & Playable** — Dedicated engine with one hidden concept, per-player private hint angles, shuffled board, simultaneous guessing, and scoring |
+| **Impostor** | 3–12 | Social Deduction | Mask | 🟡 **Coming Soon** — engine, bot AI and settings exist; not selectable in the app yet |
+| **Avoid the Word** | 3–10 | Bluff / Elimination | Ban | 🟡 **Coming Soon** — engine and settings exist; not selectable in the app yet |
+| **Mafia** | 4–16 | Social Deduction | Detective | 🟡 **Coming Soon** — engine exists; not selectable in the app yet |
+| **Guess the Link** | 3–8 | Word Association | Link | 🟡 **Coming Soon** — engine exists; not selectable in the app yet |
 | **Top 100** | 3–10 | Ranking / List Knowledge | List-Ordered | 🟢 **Fully Working & Playable** — Dedicated engine with a hidden 100-item list per round, one guess per player (or team), position-exact scoring, host overrules, duplicate/region/category settings, and only the 1-10 / 90-100 slices revealed |
-| **Reverse Categories** | 3–8 | Trivia / Creative | Shuffle | 🟢 **Fully Working & Playable** — Dedicated engine with unrelated-item triplets, public items (no secrets), privately invented categories, a shuffled attributed board, and a best-category ballot with author and voter scoring |
+| **Reverse Categories** | 3–8 | Trivia / Creative | Shuffle | 🟡 **Coming Soon** — engine exists; not selectable in the app yet |
+
+**Availability.** `PARTY_GAMES` marks the five unshipped games with `comingSoon: true`; the game-selection
+screen shows them dimmed with a **Coming Soon** badge, hides their settings gear, and refuses to select or
+launch them. `PLAYABLE_GAMES` / `DEFAULT_GAME` in `shared/data/games.ts` are the single source of truth, and
+the server falls back to `DEFAULT_GAME` when a room still points at a Coming Soon game.
 
 **Room modes.** Every room runs in **solo** (default) or **team** mode, chosen by the host from the
 lobby's settings gear. In team mode individual scores are kept and each award also counts for the

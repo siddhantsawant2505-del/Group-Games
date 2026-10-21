@@ -781,6 +781,41 @@ async function testSoloGame(): Promise<void> {
   check('a deleted room forgets its hidden round', getTop100Round(room.code) === undefined);
 }
 
+/* ───────────────── 4b. The no-immediate-repeat guard ───────────────────────── */
+
+async function testRepeatGuard(): Promise<void> {
+  section('a rebuilt bag can never replay the previous list');
+
+  const room = makeRoom(1);
+  roomManager.selectGame(room.code, TOP_100_GAME_ID);
+  const first = await openRound(room);
+
+  // Force the exact failure the guard exists for: the provider hands back the
+  // list that was just played (what a bag rebuilt from scratch could do). The
+  // engine must reject it and draw again instead of repeating the round.
+  const originalNext = top100Provider.next.bind(top100Provider);
+  let forcedRepeats = 0;
+  top100Provider.next = async (roomId, opts) => {
+    if (forcedRepeats === 0) {
+      forcedRepeats += 1;
+      return first.list;
+    }
+    return originalNext(roomId, opts);
+  };
+
+  try {
+    roomManager.transitionToPhase(room, 'next-round', noop);
+    const second = await openRound(room, first.list.id);
+    check('the engine redraws instead of replaying the list', second.list.id !== first.list.id);
+    check('the redraw publishes the new question', second.list.question !== first.list.question);
+  } finally {
+    top100Provider.next = originalNext;
+    resetTop100ProviderForTests();
+  }
+
+  roomManager.deleteRoom(room.code);
+}
+
 /* ───────────────────── 5. A team game through the RoomManager ──────────────── */
 
 async function testTeamGame(): Promise<void> {
@@ -1091,6 +1126,7 @@ async function main(): Promise<void> {
   testScoring();
   await testProvider();
   await testSoloGame();
+  await testRepeatGuard();
   await testTeamGame();
   resetTop100ProviderForTests();
 

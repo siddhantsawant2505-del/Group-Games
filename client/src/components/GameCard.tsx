@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Users, Check, Settings2 } from 'lucide-react';
+import { Users, Check, Settings2, Clock3 } from 'lucide-react';
 import { GameMetadata } from '@shared/types';
 import { GameIcon } from './GameIcon';
 import { TeamSupportBadge } from './TeamSupportBadge';
@@ -23,15 +23,24 @@ export function GameCard({
   onOpenSettings,
   settingsSummary,
 }: GameCardProps) {
+  const comingSoon = Boolean(game.comingSoon);
+
   return (
     <motion.div
-      whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onSelect}
-      className={`party-card p-4 rounded-2xl cursor-pointer transition-all border relative flex flex-col justify-between select-none ${
-        selected
-          ? 'ring-2 ring-offset-2 ring-neutral-900 dark:ring-neutral-100 border-neutral-800 dark:border-neutral-200 shadow-md'
-          : 'hover:border-neutral-400 dark:hover:border-neutral-600'
+      whileHover={comingSoon ? undefined : { y: -2 }}
+      whileTap={comingSoon ? undefined : { scale: 0.98 }}
+      onClick={() => {
+        if (!comingSoon) onSelect();
+      }}
+      aria-disabled={comingSoon}
+      className={`party-card p-4 rounded-2xl transition-all border relative flex flex-col justify-between select-none ${
+        comingSoon
+          ? 'cursor-not-allowed opacity-70'
+          : `cursor-pointer ${
+              selected
+                ? 'ring-2 ring-offset-2 ring-neutral-900 dark:ring-neutral-100 border-neutral-800 dark:border-neutral-200 shadow-md'
+                : 'hover:border-neutral-400 dark:hover:border-neutral-600'
+            }`
       }`}
       style={{
         backgroundColor: selected
@@ -47,6 +56,13 @@ export function GameCard({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {comingSoon && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200">
+                <Clock3 className="w-3 h-3" />
+                Coming Soon
+              </span>
+            )}
+
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
               <Users className="w-3 h-3" />
               <span>
@@ -55,8 +71,8 @@ export function GameCard({
             </span>
 
             {/* Per-game settings live behind this gear, so picking a game and
-                tuning it stay two separate taps. */}
-            {onOpenSettings && (
+                tuning it stay two separate taps. Coming Soon games have none. */}
+            {onOpenSettings && !comingSoon && (
               <button
                 type="button"
                 onClick={(event) => {

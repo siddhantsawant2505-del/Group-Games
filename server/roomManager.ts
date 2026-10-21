@@ -32,7 +32,7 @@ import {
 } from '../shared/data/teams';
 import { awardPoints, recomputeTeamScores as recomputeTeamScoreTotals, ScoreLogEntry } from './scoring';
 import { PLAYER_COLORS } from '../shared/theme/tokens';
-import { PARTY_GAMES } from '../shared/data/games';
+import { DEFAULT_GAME, PARTY_GAMES } from '../shared/data/games';
 import {
   GtlCustomPromptInput,
   GuessTheLinkPrompt,
@@ -366,7 +366,7 @@ export class RoomManager {
       hostId,
       players: [host],
       phase: 'lobby',
-      selectedGame: PARTY_GAMES[0], // Default selected game is Impostor
+      selectedGame: DEFAULT_GAME, // The first game that is actually playable today
       roundNumber: 1,
       totalRounds: 3,
       timer: null,
@@ -1156,6 +1156,11 @@ export class RoomManager {
       case 'game-select': {
         room.phasePrompt = 'Choose a Game';
         room.phaseSubprompt = 'Host picks the game collection for this round';
+        // A room created before the catalogue changed may still point at a
+        // Coming Soon game; never carry that selection into a launch.
+        if (!room.selectedGame || room.selectedGame.comingSoon) {
+          room.selectedGame = DEFAULT_GAME;
+        }
         break;
       }
 
@@ -1660,13 +1665,25 @@ export class RoomManager {
     // A finished game is not continued: the round counter restarts at one.
     if (!previous || previous.gameOver) room.roundNumber = 1;
 
-    const list = await top100Provider.next(room.code, {
+    let list = await top100Provider.next(room.code, {
       region: settings.region,
       categories: settings.categories,
     });
 
     // A host skip or a disconnect may have moved the room on while we waited.
     if (room.phase !== 'reveal' || room.selectedGame?.id !== TOP_100_GAME_ID) return;
+
+    // Hard guard on the round contract: consecutive rounds never show the same
+    // list. The bag already guarantees this; the guard covers a bag that was
+    // rebuilt (e.g. released by a lobby round-trip) and drew the last list again.
+    if (previous && list.id === previous.list.id) {
+      const redraw = await top100Provider.next(room.code, {
+        region: settings.region,
+        categories: settings.categories,
+      });
+      if (room.phase !== 'reveal' || room.selectedGame?.id !== TOP_100_GAME_ID) return;
+      if (redraw.id !== previous.list.id) list = redraw;
+    }
 
     const state = setupTop100Round(room, list);
     room.phasePrompt = `Round ${state.roundNumber} of ${state.roundCount}`;

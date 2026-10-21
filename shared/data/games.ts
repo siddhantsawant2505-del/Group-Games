@@ -17,6 +17,7 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Discuss, find inconsistencies, and vote to eliminate the Impostor.',
     ],
     teamSupport: 'aggregate',
+    comingSoon: true,
   },
   {
     id: 'avoid-the-word',
@@ -35,6 +36,7 @@ export const PARTY_GAMES: GameMetadata[] = [
     ],
     // Team mode is native: a team survives while it has any alive member.
     teamSupport: 'native',
+    comingSoon: true,
   },
   {
     id: 'mafia',
@@ -51,6 +53,7 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Day phase: Discussion, accusations, and town vote to exile a suspect.',
     ],
     teamSupport: 'aggregate',
+    comingSoon: true,
   },
   {
     id: 'guess-the-link',
@@ -68,6 +71,7 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Everyone guesses the hidden concept at the same time — +1 point for every correct guess.',
     ],
     teamSupport: 'native',
+    comingSoon: true,
   },
   {
     id: 'top-100',
@@ -85,7 +89,7 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Only positions 1-10 and 90-100 are ever revealed — the middle of the list stays a secret.',
       'Team mode: each team submits one guess, with rotating captains and team-only suggestions.',
     ],
-    teamSupport: 'native',
+    teamSupport: 'shipped',
   },
   {
     id: 'reverse-categories',
@@ -102,5 +106,12 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Players vote on the most clever category invention.',
     ],
     teamSupport: 'native',
+    comingSoon: true,
   },
 ];
+
+/** Games the room can actually launch today (everything without a Coming Soon badge). */
+export const PLAYABLE_GAMES: GameMetadata[] = PARTY_GAMES.filter((game) => !game.comingSoon);
+
+/** The fallback selection: the first playable game, or the catalogue's first entry. */
+export const DEFAULT_GAME: GameMetadata = PLAYABLE_GAMES[0] ?? PARTY_GAMES[0];

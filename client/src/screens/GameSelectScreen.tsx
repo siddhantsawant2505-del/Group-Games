@@ -5,24 +5,40 @@ import {
   Player,
   ImpostorSettings,
   AvoidSettings,
+  Top100Settings,
   DIFFICULTY_LABELS,
   IMPOSTOR_MODE_LABELS,
+  TOP100_TEAM_MIN_GUESS_SECONDS,
   TONE_LABELS,
   GameMetadata,
 } from '@shared/types';
-import { PARTY_GAMES } from '@shared/data/games';
+import { DEFAULT_GAME, PARTY_GAMES } from '@shared/data/games';
 import { GameCard } from '../components/GameCard';
 import { ActionButton } from '../components/ActionButton';
 import { GameSettingsSheet } from '../components/GameSettingsSheet';
 
 const IMPOSTOR_GAME_ID = 'impostor';
 const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
+const TOP_100_GAME_ID = 'top-100';
 
 /** One-line summary of the settings a game card is currently running. */
 function settingsSummaryFor(game: GameMetadata, room: RoomPublicState): string | undefined {
   if (game.id === AVOID_THE_WORD_GAME_ID) {
     const avoid = room.gameSettings.avoidTheWord;
     return `${avoid.anchorSeconds}s anchor · ${avoid.turnSeconds}s turns · ${TONE_LABELS[avoid.tone]}`;
+  }
+
+  if (game.id === TOP_100_GAME_ID) {
+    const top100 = room.gameSettings.top100;
+    // Team captains read suggestions first, so team rounds never run shorter
+    // than the server's floor — show the timer they will actually get.
+    const guessSeconds =
+      room.playMode === 'team'
+        ? Math.max(TOP100_TEAM_MIN_GUESS_SECONDS, top100.guessSeconds)
+        : top100.guessSeconds;
+    return `${top100.roundCount} rounds · ${guessSeconds}s guess · ${
+      top100.duplicatePolicy === 'zero' ? 'dupes score 0' : 'dupes score'
+    }`;
   }
 
   if (game.id !== IMPOSTOR_GAME_ID) return undefined;
@@ -46,7 +62,11 @@ interface GameSelectScreenProps {
   ) => void;
   /** Impostor / Avoid the Word: host updates the public round settings. */
   onSaveGameSettings?: (
-    patch: { impostor?: Partial<ImpostorSettings>; avoidTheWord?: Partial<AvoidSettings> },
+    patch: {
+      impostor?: Partial<ImpostorSettings>;
+      avoidTheWord?: Partial<AvoidSettings>;
+      top100?: Partial<Top100Settings>;
+    },
     callback: (res: { success: boolean; error?: string }) => void
   ) => void;
 }
@@ -60,12 +80,19 @@ export function GameSelectScreen({
   onSaveGameSettings,
 }: GameSelectScreenProps) {
   const isHost = myPlayer.isHost;
-  const currentSelectedId = room.selectedGame?.id || PARTY_GAMES[0].id;
+  // A Coming Soon game is never the active selection; fall back to the first
+  // playable game (Top 100) when the room still points at an old choice.
+  const currentSelectedId =
+    room.selectedGame && !room.selectedGame.comingSoon
+      ? room.selectedGame.id
+      : DEFAULT_GAME.id;
   const [localSelectedId, setLocalSelectedId] = useState(currentSelectedId);
   /** The game whose settings sheet is open (gear on that game's card). */
   const [settingsGameId, setSettingsGameId] = useState<string | null>(null);
 
   const handleSelect = (gameId: string) => {
+    const game = PARTY_GAMES.find((candidate) => candidate.id === gameId);
+    if (!game || game.comingSoon) return;
     setLocalSelectedId(gameId);
     if (isHost) {
       onSelectGame(gameId);
@@ -73,8 +100,10 @@ export function GameSelectScreen({
   };
 
   const selectedGame =
-    PARTY_GAMES.find((g) => g.id === (isHost ? localSelectedId : currentSelectedId)) ||
-    PARTY_GAMES[0];
+    PARTY_GAMES.find(
+      (g) =>
+        g.id === (isHost ? localSelectedId : currentSelectedId) && !g.comingSoon
+    ) || DEFAULT_GAME;
   const settingsGame = PARTY_GAMES.find((g) => g.id === settingsGameId) || null;
 
   return (
@@ -105,6 +134,7 @@ export function GameSelectScreen({
               key={game.id}
               game={game}
               selected={
+                !game.comingSoon &&
                 (isHost ? localSelectedId : currentSelectedId) === game.id
               }
               onSelect={() => handleSelect(game.id)}
@@ -115,9 +145,10 @@ export function GameSelectScreen({
           ))}
         </div>
 
-        {/* Each game's own settings live behind the gear on its card. */}
+        {/* Each playable game's settings live behind the gear on its card. */}
         <p className="text-[11px] font-semibold text-neutral-400 text-center">
-          Tap the gear on any card to tune just that game.
+          Tap the gear on a playable card to tune that game. Only {DEFAULT_GAME.title} is
+          available today — the rest are coming soon.
         </p>
 
       </div>

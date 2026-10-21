@@ -20,6 +20,12 @@ built with React 19, TypeScript, Tailwind CSS v4, Express, and Socket.IO.
 - A 4-character room code + QR code are used for joining.
 - A "next-round" loop lets a host replay a new round with a fresh role assignment.
 
+> **Availability.** Only **Top 100** is selectable in the app today. Impostor, Avoid the Word,
+> Mafia, Guess the Link and Reverse Categories are marked `comingSoon` in `shared/data/games.ts`:
+> their cards appear with a **Coming Soon** badge, cannot be selected or launched, and the server
+> falls back to `DEFAULT_GAME` when a room still points at one of them. Their rules below are kept
+> for the engines and test suites, not as a promise that the game is live.
+
 ---
 
 ## 2. Accepted rules for the system
