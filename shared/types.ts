@@ -28,6 +28,8 @@ export type GamePhase =
   | 'avoid-reveal'
   | 'night'
   | 'day'
+  | 'mafia-morning'
+  | 'mafia-exile'
   | 'reveal-answers'
   | 'guess'
   | 'discussion'
@@ -185,6 +187,7 @@ export interface GameSettings {
   impostor: ImpostorSettings;
   avoidTheWord: AvoidSettings;
   top100: Top100Settings;
+  mafia: MafiaSettings;
 }
 
 export const PLAY_MODE_LABELS: Record<PlayMode, string> = {
@@ -647,8 +650,71 @@ export interface GtlPublicState {
   correctPlayerIds: string[];  // empty until revealed
 }
 
-export type MafiaRole = 'mafia' | 'detective' | 'townsperson';
+export type MafiaRole = 'mafia' | 'detective' | 'doctor' | 'townsperson';
 export type MafiaSide = 'mafia' | 'town';
+
+/** Public rule info about the deal — never which player holds which role. */
+export interface MafiaRoleBreakdown {
+  mafia: number;
+  detective: boolean;
+  doctor: boolean;
+  townsperson: number;
+}
+
+/**
+ * Host settings for Mafia (public strategy, never round secrets). They decide how
+ * long each phase runs and how many special roles are dealt, so they can live in
+ * the broadcast room state.
+ */
+export interface MafiaSettings {
+  nightSeconds: number;
+  discussionSeconds: number;
+  voteSeconds: number;
+  /** 'auto' follows the player count; a number is a host override. */
+  mafiaCount: 'auto' | number;
+  detective: boolean;
+  doctor: boolean;
+  revealRoleOnDeath: boolean;
+}
+
+export const MAFIA_MIN_PLAYERS = 4;
+export const MAFIA_MAX_PLAYERS = 16;
+
+/** The Doctor is dealt from six players upwards. */
+export const MAFIA_DOCTOR_MIN_PLAYERS = 6;
+/** The Detective is dealt from four players upwards. */
+export const MAFIA_DETECTIVE_MIN_PLAYERS = 4;
+
+export const MAFIA_SETTINGS_LIMITS = {
+  nightSeconds: { min: 10, max: 90 },
+  discussionSeconds: { min: 30, max: 300 },
+  voteSeconds: { min: 10, max: 90 },
+} as const;
+
+export const DEFAULT_MAFIA_SETTINGS: MafiaSettings = {
+  nightSeconds: 30,
+  discussionSeconds: 120,
+  voteSeconds: 30,
+  mafiaCount: 'auto',
+  detective: true,
+  doctor: true,
+  revealRoleOnDeath: true,
+};
+
+export const MAFIA_ROLE_LABELS: Record<MafiaRole, string> = {
+  mafia: 'Mafia',
+  detective: 'Detective',
+  doctor: 'Doctor',
+  townsperson: 'Townsperson',
+};
+
+/** Which players a role has to hear from each night (for copy, never identities). */
+export const MAFIA_ROLE_TAGLINES: Record<MafiaRole, string> = {
+  mafia: 'Choose the night’s victim with your family.',
+  detective: 'Investigate one player and learn if they are Mafia.',
+  doctor: 'Protect one player from the night’s kill — yourself included.',
+  townsperson: 'You have no night action. Survive the night and hunt by day.',
+};
 
 export interface MafiaTeamSelection {
   playerName: string;
@@ -666,25 +732,71 @@ export interface MafiaElimination {
   playerName: string;
   night: number;
   cause: 'night-kill' | 'exile';
+  /** Day the exile happened (null for night kills). */
+  day?: number;
 }
 
+/** One player who is out, with the role if revealRoleOnDeath was on. */
+export interface MafiaDeathAnnouncement {
+  playerId: string;
+  playerName: string;
+  colorIndex: number;
+  cause: 'night-kill' | 'exile';
+  night: number;
+  day: number | null;
+  /** Only ever set for a dead player, and only when revealRoleOnDeath is on. */
+  role: MafiaRole | null;
+  roleLabel: string | null;
+}
+
+/** One resolved beat of the game-over recap timeline. */
+export interface MafiaRecapEntry {
+  kind: 'night' | 'day';
+  label: string;
+  lines: string[];
+}
+
+export type MafiaPublicPhase = 'reveal' | 'night' | 'morning' | 'day' | 'vote' | 'exile' | 'over';
+
 export interface MafiaPublicState {
+  phase: MafiaPublicPhase;
   nightNumber: number;        // 1-based night currently running (or last resolved)
   dayNumber: number;          // 1-based day currently running (or last resolved)
   mafiaCount: number;         // how many Mafia were dealt this game (public rule info)
   hasDetective: boolean;      // whether a Detective is in play
+  hasDoctor: boolean;         // whether a Doctor is in play
   alivePlayerIds: string[];
   eliminatedIds: string[];    // everyone out, in timeline order
   eliminations: MafiaElimination[];
+  deaths: MafiaDeathAnnouncement[];
   lastNightVictimId: string | null;
   lastNightVictimName: string | null;
+  lastNightVictimRole: MafiaRole | null;
   lastExiledId: string | null;
   lastExiledName: string | null;
+  lastExiledRole: MafiaRole | null;
+  /** Count only — never which player confirmed or which role they hold. */
+  nightConfirmedCount: number;
+  nightActorCount: number;
   pendingNightActions: number; // night actors who still owe a target
+  /** Public once the ballot closes (exile screen and game over). */
+  voteTally: Record<string, number>;
+  voteBreakdown: VoteBreakdownItem[];
+  skippedVoteCount: number;
+  readyToVoteIds: string[];
+  /** The narration line for the current beat (night falls, morning, exile, win). */
+  narration: string;
+  morningNarration: string;
+  exileNarration: string;
   nightSeconds: number;
-  daySeconds: number;
+  discussionSeconds: number;
+  voteSeconds: number;
+  revealRoleOnDeath: boolean;
+  roleBreakdown: MafiaRoleBreakdown;
   winningSide: MafiaSide | null;
   gameOver: boolean;
+  /** Populated only at game over: every night and day, start to finish. */
+  recap: MafiaRecapEntry[];
 }
 
 export interface PhaseResultsData {
@@ -721,6 +833,10 @@ export interface PhaseResultsData {
   mafiaWinningSide?: MafiaSide;
   mafiaLog?: string[];
   mafiaEliminations?: MafiaElimination[];
+  /** Night-by-night, day-by-day timeline shown on the game-over screen. */
+  mafiaRecap?: MafiaRecapEntry[];
+  mafiaDeathCount?: number;
+  mafiaExileCount?: number;
   // Top 100-specific
   top100Question?: string;
   top100Category?: string;
@@ -823,15 +939,31 @@ export interface PlayerPrivateState {
   // Mafia
   mafiaRole?: MafiaRole;
   mafiaRoleLabel?: string;
+  mafiaSide?: MafiaSide;
+  mafiaRoleTagline?: string;
   mafiaIsAlive?: boolean;
   mafiaTeammateNames?: string[];
   mafiaTeammateIds?: string[];
   mafiaTeamSelections?: MafiaTeamSelection[];
+  /** True while this living player owes a night confirmation. */
   mafiaCanAct?: boolean;
   mafiaActionLabel?: string;
+  /** Role-specific prompt (the decoy variant is identical in shape). */
+  mafiaActionPrompt?: string;
   mafiaActionSubmitted?: boolean;
+  mafiaActionTargetId?: string | null;
   mafiaActionTargetName?: string | null;
+  /** Mafia and Doctor may abstain; everybody else confirms a harmless decoy. */
+  mafiaCanSkip?: boolean;
+  mafiaLastProtectedName?: string | null;
   mafiaInvestigations?: MafiaInvestigation[];
+  /** The most recent finding, only while the Detective is alive. */
+  mafiaLastFinding?: MafiaInvestigation | null;
+  /** Remaining seconds of the running phase, for a reconnecting player. */
+  mafiaSecondsRemaining?: number;
+  mafiaReadyToVote?: boolean;
+  mafiaVoteSubmitted?: boolean;
+  mafiaVoteTargetName?: string | null;
   // Guess the Link
   gtlHint?: string;             // this player's own angle on the hidden concept
   gtlHintIndex?: number;        // 1-based position of their hint in the round's deal

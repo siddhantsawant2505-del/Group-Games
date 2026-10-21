@@ -6,6 +6,7 @@ import {
   ImpostorSettings,
   AvoidSettings,
   Top100Settings,
+  MafiaSettings,
   DIFFICULTY_LABELS,
   IMPOSTOR_MODE_LABELS,
   TOP100_TEAM_MIN_GUESS_SECONDS,
@@ -13,6 +14,7 @@ import {
   GameMetadata,
 } from '@shared/types';
 import { DEFAULT_GAME, PARTY_GAMES } from '@shared/data/games';
+import { validateMafiaSettings } from '@shared/data/mafiaSetup';
 import { GameCard } from '../components/GameCard';
 import { ActionButton } from '../components/ActionButton';
 import { GameSettingsSheet } from '../components/GameSettingsSheet';
@@ -20,6 +22,7 @@ import { GameSettingsSheet } from '../components/GameSettingsSheet';
 const IMPOSTOR_GAME_ID = 'impostor';
 const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
 const TOP_100_GAME_ID = 'top-100';
+const MAFIA_GAME_ID = 'mafia';
 
 /** One-line summary of the settings a game card is currently running. */
 function settingsSummaryFor(game: GameMetadata, room: RoomPublicState): string | undefined {
@@ -39,6 +42,12 @@ function settingsSummaryFor(game: GameMetadata, room: RoomPublicState): string |
     return `${top100.roundCount} rounds · ${guessSeconds}s guess · ${
       top100.duplicatePolicy === 'zero' ? 'dupes score 0' : 'dupes score'
     }`;
+  }
+
+  if (game.id === MAFIA_GAME_ID) {
+    const mafia = room.gameSettings.mafia;
+    const deal = validateMafiaSettings(room.players.length, mafia);
+    return `${deal.breakdown.mafia} Mafia · ${mafia.nightSeconds}s night · ${mafia.discussionSeconds}s day`;
   }
 
   if (game.id !== IMPOSTOR_GAME_ID) return undefined;
@@ -66,6 +75,7 @@ interface GameSelectScreenProps {
       impostor?: Partial<ImpostorSettings>;
       avoidTheWord?: Partial<AvoidSettings>;
       top100?: Partial<Top100Settings>;
+      mafia?: Partial<MafiaSettings>;
     },
     callback: (res: { success: boolean; error?: string }) => void
   ) => void;
@@ -105,6 +115,14 @@ export function GameSelectScreen({
         g.id === (isHost ? localSelectedId : currentSelectedId) && !g.comingSoon
     ) || DEFAULT_GAME;
   const settingsGame = PARTY_GAMES.find((g) => g.id === settingsGameId) || null;
+
+  // Mafia validates the deal against the current table, so Start is blocked with
+  // the exact reason instead of failing when the reveal begins.
+  const mafiaDeal =
+    selectedGame.id === MAFIA_GAME_ID
+      ? validateMafiaSettings(room.players.length, room.gameSettings.mafia)
+      : null;
+  const launchError = mafiaDeal && !mafiaDeal.valid ? mafiaDeal.error : undefined;
 
   return (
     <div className="flex-1 flex flex-col justify-between p-5 max-w-md mx-auto w-full">
@@ -147,8 +165,8 @@ export function GameSelectScreen({
 
         {/* Each playable game's settings live behind the gear on its card. */}
         <p className="text-[11px] font-semibold text-neutral-400 text-center">
-          Tap the gear on a playable card to tune that game. Only {DEFAULT_GAME.title} is
-          available today — the rest are coming soon.
+          Tap the gear on any playable card to tune that game. Cards marked Coming Soon
+          cannot be launched yet.
         </p>
 
       </div>
@@ -159,10 +177,11 @@ export function GameSelectScreen({
           <ActionButton
             variant="shared"
             onClick={onConfirmAndStart}
+            disabled={Boolean(launchError)}
             icon={<Play className="w-5 h-5 fill-current" />}
-            subtext={`Launch round with ${selectedGame.title}`}
+            subtext={launchError || `Launch round with ${selectedGame.title}`}
           >
-            Launch Round
+            {launchError ? 'Cannot Start Yet' : 'Launch Round'}
           </ActionButton>
         ) : (
           <div className="party-card p-4 rounded-2xl text-center">

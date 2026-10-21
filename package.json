@@ -16,7 +16,8 @@
     "test:avoid": "tsx scripts/testAvoidTheWord.ts",
     "generate:words": "tsx scripts/generateCommonNouns.ts",
     "validate:top100": "tsx scripts/validateTop100Lists.ts",
-    "test:top100": "tsx scripts/testTop100.ts"
+    "test:top100": "tsx scripts/testTop100.ts",
+    "test:mafia": "tsx scripts/testMafia.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -266,8 +266,8 @@ export function HomeScreen({
                 <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-[11px] font-semibold text-amber-800 dark:text-amber-200 text-left flex items-start gap-2">
                   <Clock3 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span>
-                    Coming soon — this game is not playable yet. Top 100 is the round you can
-                    launch today.
+                    Coming soon — this game is not playable yet. Any card without this badge
+                    can be launched from the host's game select.
                   </span>
                 </div>
               )}

@@ -46,14 +46,15 @@ export const PARTY_GAMES: GameMetadata[] = [
     maxPlayers: 16,
     icon: 'detective',
     description:
-      'Classic hidden-identity deduction with townspeople, detectives, and secret mafia members eliminating players in the dark.',
+      'Classic hidden-identity deduction: Townspeople, a Detective and a Doctor against a secret Mafia family. Every night the village acts in private; every day it argues and exiles someone.',
     rules: [
-      'Secret roles are assigned secretly on each phone screen.',
-      'Night phase: Mafia secretly selects a target.',
-      'Day phase: Discussion, accusations, and town vote to exile a suspect.',
+      'Secret roles are dealt on each phone: Mafia, Detective, Doctor and Townspeople.',
+      'Night: the Mafia agree on a victim, the Doctor protects someone, the Detective investigates, and everyone else confirms a harmless choice.',
+      'Morning: the server narrates what happened overnight; a Detective’s result stays private.',
+      'Day: discuss, then vote in secret. A tie or a Skip majority exiles nobody.',
+      'Town wins when every Mafia member is gone; Mafia wins at parity.',
     ],
     teamSupport: 'aggregate',
-    comingSoon: true,
   },
   {
     id: 'guess-the-link',

@@ -42,8 +42,11 @@ import {
 import {
   DEFAULT_AVOID_SETTINGS,
   DEFAULT_IMPOSTOR_SETTINGS,
+  DEFAULT_MAFIA_SETTINGS,
   DEFAULT_TOP100_SETTINGS,
   GameSettings,
+  MAFIA_SETTINGS_LIMITS,
+  MafiaSettings,
   TOP100_SETTINGS_LIMITS,
   Top100Settings,
 } from '../shared/types';
@@ -89,24 +92,30 @@ import {
 } from './games/avoidTheWord';
 import { avoidQuestionProvider } from './content/avoidQuestionProvider';
 import {
-  MAFIA_DAY_SECONDS,
-  MAFIA_NIGHT_SECONDS,
-  setupMafiaRound,
+  MAFIA_EXILE_SECONDS,
+  MAFIA_MORNING_SECONDS,
+  beginMafiaDiscussion,
   beginMafiaNight,
-  submitMafiaNightAction,
-  simulateMafiaBotNightActions,
-  resolveMafiaNight,
-  nightActionsPending,
-  beginMafiaDay,
-  resolveMafiaExile,
-  checkMafiaWin,
-  setMafiaWinningSide,
-  simulateMafiaBotVotes,
+  beginMafiaVote,
   calculateMafiaResults,
+  checkMafiaWin,
   cleanupMafiaRound,
   getLivingPlayerIds,
+  getMafiaRound,
   isPlayerAlive,
+  markMafiaReadyToVote,
+  pickMafiaBotNightAction,
+  pickMafiaBotVote,
+  readMafiaSettings,
+  resolveMafiaExile,
+  resolveMafiaNight,
+  setMafiaWinningSide,
+  setupMafiaRound,
+  submitMafiaNightAction,
+  submitMafiaVote,
+  syncMafiaPrivateState,
 } from './games/mafia';
+import { SKIP_VOTE } from './games/mafia.engine';
 import {
   GTL_INPUT_SECONDS,
   GTL_REVEAL_SECONDS,
@@ -210,6 +219,60 @@ function readTop100CategoriesPatch(value: unknown[]): string[] {
 }
 
 /**
+ * Clamps a host-authored Mafia settings patch into its legal ranges. The Mafia
+ * count is kept as requested even when it is too high for the current table, so
+ * the host sees a precise "why you cannot start" message instead of a silent
+ * rewrite. Settings are public strategy, never round secrets.
+ */
+function sanitizeMafiaSettingsPatch(
+  patch: Partial<MafiaSettings>,
+  current: MafiaSettings
+): MafiaSettings {
+  const clamp = (value: unknown, min: number, max: number, fallback: number) => {
+    const parsed = Math.floor(Number(value));
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+  };
+
+  const incoming = patch || {};
+  const requestedCount = incoming.mafiaCount;
+  const mafiaCount: 'auto' | number =
+    requestedCount === 'auto'
+      ? 'auto'
+      : requestedCount === undefined
+      ? current.mafiaCount
+      : clamp(requestedCount, 1, 7, typeof current.mafiaCount === 'number' ? current.mafiaCount : 1);
+
+  return {
+    nightSeconds: clamp(
+      incoming.nightSeconds,
+      MAFIA_SETTINGS_LIMITS.nightSeconds.min,
+      MAFIA_SETTINGS_LIMITS.nightSeconds.max,
+      current.nightSeconds
+    ),
+    discussionSeconds: clamp(
+      incoming.discussionSeconds,
+      MAFIA_SETTINGS_LIMITS.discussionSeconds.min,
+      MAFIA_SETTINGS_LIMITS.discussionSeconds.max,
+      current.discussionSeconds
+    ),
+    voteSeconds: clamp(
+      incoming.voteSeconds,
+      MAFIA_SETTINGS_LIMITS.voteSeconds.min,
+      MAFIA_SETTINGS_LIMITS.voteSeconds.max,
+      current.voteSeconds
+    ),
+    mafiaCount,
+    detective: typeof incoming.detective === 'boolean' ? incoming.detective : current.detective,
+    doctor: typeof incoming.doctor === 'boolean' ? incoming.doctor : current.doctor,
+    revealRoleOnDeath:
+      typeof incoming.revealRoleOnDeath === 'boolean'
+        ? incoming.revealRoleOnDeath
+        : current.revealRoleOnDeath,
+  };
+}
+
+/**
  * Clamps a host-authored Avoid the Word settings patch into its legal ranges.
  * Settings are public strategy (durations, cap, tone), never round secrets.
  */
@@ -245,6 +308,9 @@ function sanitizeAvoidSettingsPatch(
     tone: patch.tone === 'spicy' || patch.tone === 'clean' ? patch.tone : current.tone,
   };
 }
+
+/** Largest table a room can hold (Mafia is the widest game at 16). */
+export const MAX_ROOM_PLAYERS = 16;
 
 /** Rooms with no connected player are dropped after this much inactivity. */
 export const ROOM_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
@@ -390,6 +456,7 @@ export class RoomManager {
         impostor: { ...DEFAULT_IMPOSTOR_SETTINGS },
         avoidTheWord: { ...DEFAULT_AVOID_SETTINGS },
         top100: { ...DEFAULT_TOP100_SETTINGS },
+        mafia: { ...DEFAULT_MAFIA_SETTINGS },
       },
       playMode: 'solo',
       teams: [],
@@ -468,8 +535,8 @@ export class RoomManager {
       };
     }
 
-    if (room.players.length >= 12) {
-      return { success: false, error: 'Room is full (max 12 players).' };
+    if (room.players.length >= MAX_ROOM_PLAYERS) {
+      return { success: false, error: `Room is full (max ${MAX_ROOM_PLAYERS} players).` };
     }
 
     const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -513,7 +580,7 @@ export class RoomManager {
   public addBotPlayer(code: string): { success: boolean; bot?: InternalPlayer; error?: string } {
     const room = this.getRoom(code);
     if (!room) return { success: false, error: 'Room not found' };
-    if (room.players.length >= 12) return { success: false, error: 'Room full' };
+    if (room.players.length >= MAX_ROOM_PLAYERS) return { success: false, error: 'Room full' };
 
     const botNames = ['Sam', 'Alex', 'Taylor', 'Jordan', 'Riley', 'Morgan', 'Casey', 'Quinn'];
     const usedNames = new Set(room.players.map((p) => p.name));
@@ -573,6 +640,9 @@ export class RoomManager {
         // treated as a timeout (skip), so the round never stalls on a ghost.
         this.resolveAvoidDisconnect(room, player.id, broadcastState);
 
+        // Mafia: a disconnect during a timed phase is an abstention/abstain.
+        this.resolveMafiaDisconnect(room, player.id, broadcastState);
+
         return { room, player };
       }
     }
@@ -611,6 +681,35 @@ export class RoomManager {
   }
 
   /**
+   * Mafia: a player who drops during the night or the ballot abstains, so the
+   * phase can still complete on time. Their seat stays in the game for a
+   * reconnect; nothing about their role is exposed either way.
+   */
+  private resolveMafiaDisconnect(
+    room: InternalRoom,
+    playerId: string,
+    broadcastState?: () => void
+  ) {
+    if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
+    const notify = broadcastState || (() => undefined);
+
+    if (room.phase === 'night') {
+      const outcome = submitMafiaNightAction(room, playerId, null);
+      if (!outcome.accepted) return;
+      notify();
+      if (outcome.complete) this.scheduleMafiaNightResolution(room, notify);
+      return;
+    }
+
+    if (room.phase === 'vote') {
+      const outcome = submitMafiaVote(room, playerId, SKIP_VOTE);
+      if (!outcome.accepted) return;
+      notify();
+      if (outcome.complete) this.scheduleMafiaTrialResolution(room, notify);
+    }
+  }
+
+  /**
    * Selects a game on the game-select screen
    */
   public selectGame(code: string, gameId: string): boolean {
@@ -623,6 +722,12 @@ export class RoomManager {
     // when the host switches away stops it surprising a later round.
     if (gameId !== GUESS_THE_LINK_GAME_ID) {
       room.gtlCustomPrompt = null;
+    }
+    // Switching away from Mafia drops its secret roles and night state instead
+    // of leaving them attached to the room's public payload.
+    if (gameId !== MAFIA_GAME_ID) {
+      room.mafiaState = null;
+      cleanupMafiaRound(room.code);
     }
     return true;
   }
@@ -680,6 +785,7 @@ export class RoomManager {
       };
       avoidTheWord?: Partial<AvoidSettings>;
       top100?: Partial<Top100Settings>;
+      mafia?: Partial<MafiaSettings>;
     }
   ): { success: boolean; error?: string } {
     const room = this.getRoom(code);
@@ -714,6 +820,7 @@ export class RoomManager {
         room.gameSettings.avoidTheWord
       ),
       top100: sanitizeTop100SettingsPatch(patch?.top100 || {}, room.gameSettings.top100),
+      mafia: sanitizeMafiaSettingsPatch(patch?.mafia || {}, room.gameSettings.mafia),
     };
     room.lastActivityAt = Date.now();
     return { success: true };
@@ -1021,6 +1128,8 @@ export class RoomManager {
     // A deleted room must not keep its hidden round state (Top 100 holds the
     // secret list, the guesses and the team suggestions) alive on the server.
     cleanupTop100Round(room.code);
+    // Mafia holds roles, night actions, findings and ballots: drop them too.
+    cleanupMafiaRound(room.code);
     this.rooms.delete(room.code);
     return true;
   }
@@ -1188,10 +1297,25 @@ export class RoomManager {
           return;
         }
 
-        // Prepare private roles/words based on selected game
+        // Mafia deals secret roles from the host settings. A table that cannot
+        // legally play is sent straight back to game select with a reason.
         if (room.selectedGame?.id === MAFIA_GAME_ID) {
-          setupMafiaRound(room);
-        } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
+          if (!setupMafiaRound(room)) {
+            room.phasePrompt = 'Choose a Game';
+            room.phaseSubprompt = 'Mafia needs 4-16 players and a legal deal — adjust the table or settings';
+            this.transitionToPhase(room, 'game-select', broadcastState);
+            return;
+          }
+          this.startRevealTimer(room, broadcastState, {
+            prompt: 'Read Your Secret Role',
+            subprompt: 'Hold the card to reveal it — and keep your screen hidden',
+          });
+          broadcastState();
+          return;
+        }
+
+        // Prepare private roles/words based on selected game
+        if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
           setupGtlRound(room);
         } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
           setupReverseCategoriesRound(room);
@@ -1203,57 +1327,84 @@ export class RoomManager {
       }
 
       case 'night': {
-        // Mafia-specific: the Mafia pick a victim and the Detective investigates
-        // while everybody else waits out the night.
+        // Mafia-specific: every living player gets an identical night action —
+        // Mafia victim, Doctor protection, Detective investigation, or a decoy.
         if (room.selectedGame?.id !== MAFIA_GAME_ID) {
           this.transitionToPhase(room, 'input', broadcastState);
           return;
         }
 
         beginMafiaNight(room);
-        room.hasVoted.clear();
-        room.voteTallies = {};
-        room.playerVotes = {};
-        simulateMafiaBotNightActions(room);
+        const nightSettings = readMafiaSettings(room);
 
-        room.phasePrompt = 'The Town Sleeps';
-        room.phaseSubprompt = 'Mafia and the Detective are making their moves...';
+        room.phasePrompt = 'The Village Sleeps';
+        room.phaseSubprompt = 'Everyone chooses in private — then the sun comes up';
 
         this.startPhaseTimer(
           room,
-          MAFIA_NIGHT_SECONDS,
+          nightSettings.nightSeconds,
           () => broadcastState(),
           () => this.finishMafiaNight(room, broadcastState)
         );
 
-        // All night actions already locked in (bot-driven): give the table a beat
-        // on the sleeps screen before the sun comes up.
-        if (nightActionsPending(room) === 0) {
-          this.scheduleBotAction(room, 1800, () => {
-            if (room.phase === 'night') this.finishMafiaNight(room, broadcastState);
-          });
-        }
+        this.scheduleMafiaNightBots(room, broadcastState);
+        break;
+      }
+
+      case 'mafia-morning': {
+        if (room.selectedGame?.id !== MAFIA_GAME_ID) break;
+
+        room.phasePrompt = 'Morning Report';
+        room.phaseSubprompt = 'The night is resolved — who is still with the village?';
+
+        this.startPhaseTimer(
+          room,
+          MAFIA_MORNING_SECONDS,
+          () => broadcastState(),
+          () => {
+            const winner = checkMafiaWin(room);
+            if (winner) {
+              setMafiaWinningSide(room, winner);
+              this.transitionToPhase(room, 'results', broadcastState);
+              return;
+            }
+            this.transitionToPhase(room, 'discussion', broadcastState);
+          }
+        );
+        break;
+      }
+
+      case 'mafia-exile': {
+        if (room.selectedGame?.id !== MAFIA_GAME_ID) break;
+
+        room.phasePrompt = 'The Village Decides';
+        room.phaseSubprompt = 'The tally is in — then the village sleeps again';
+
+        this.startPhaseTimer(
+          room,
+          MAFIA_EXILE_SECONDS,
+          () => broadcastState(),
+          () => {
+            const winner = checkMafiaWin(room);
+            if (winner) {
+              setMafiaWinningSide(room, winner);
+              this.transitionToPhase(room, 'results', broadcastState);
+              return;
+            }
+            this.transitionToPhase(room, 'night', broadcastState);
+          }
+        );
         break;
       }
 
       case 'day': {
-        // Mafia-specific: morning report of the overnight elimination.
-        if (room.selectedGame?.id !== MAFIA_GAME_ID) {
-          this.transitionToPhase(room, 'discussion', broadcastState);
+        // Legacy alias: Mafia's morning now has its own phase.
+        if (room.selectedGame?.id === MAFIA_GAME_ID) {
+          this.transitionToPhase(room, 'mafia-morning', broadcastState);
           return;
         }
-
-        beginMafiaDay(room);
-        room.phasePrompt = 'Morning Report';
-        room.phaseSubprompt = 'The town wakes up to last night’s news';
-
-        this.startPhaseTimer(
-          room,
-          MAFIA_DAY_SECONDS,
-          () => broadcastState(),
-          () => this.transitionToPhase(room, 'discussion', broadcastState)
-        );
-        break;
+        this.transitionToPhase(room, 'discussion', broadcastState);
+        return;
       }
 
       case 'avoid-anchor': {
@@ -1452,6 +1603,29 @@ export class RoomManager {
       }
 
       case 'discussion': {
+        if (room.selectedGame?.id === MAFIA_GAME_ID) {
+          // The morning announcement is the only place a win can land before the
+          // day starts, so the check runs once more when the host skips ahead.
+          const winner = checkMafiaWin(room);
+          if (winner) {
+            setMafiaWinningSide(room, winner);
+            this.transitionToPhase(room, 'results', broadcastState);
+            return;
+          }
+
+          beginMafiaDiscussion(room);
+          const discussionSettings = readMafiaSettings(room);
+          room.phasePrompt = 'The Village Debates';
+          room.phaseSubprompt = 'Talk it out — more than half of the living can start the vote early';
+          this.startPhaseTimer(
+            room,
+            discussionSettings.discussionSeconds,
+            () => broadcastState(),
+            () => this.transitionToPhase(room, 'vote', broadcastState)
+          );
+          break;
+        }
+
         if (this.isImpostorQuestionMode(room)) {
           room.phasePrompt = 'Compare Answers';
           room.phaseSubprompt = 'Whose answer feels like it belongs to a different question?';
@@ -1480,6 +1654,23 @@ export class RoomManager {
       }
 
       case 'vote': {
+        if (room.selectedGame?.id === MAFIA_GAME_ID) {
+          beginMafiaVote(room);
+          const voteSettings = readMafiaSettings(room);
+          room.phasePrompt = 'Cast Your Vote';
+          room.phaseSubprompt = 'Secret ballots — the tally stays hidden until the exile';
+
+          this.startPhaseTimer(
+            room,
+            voteSettings.voteSeconds,
+            () => broadcastState(),
+            () => this.finishMafiaTrial(room, broadcastState)
+          );
+
+          this.scheduleMafiaVoteBots(room, broadcastState);
+          break;
+        }
+
         const voteIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
         room.phasePrompt = voteIsRevCat ? 'Vote Best Category' : 'Cast Your Accusation';
         room.phaseSubprompt = voteIsRevCat
@@ -1490,30 +1681,14 @@ export class RoomManager {
         room.playerVotes = {};
 
         // Auto-cast bot votes
-        if (room.selectedGame?.id === MAFIA_GAME_ID) {
-          simulateMafiaBotVotes(room);
-        } else {
-          this.simulateBotVotes(room);
-        }
+        this.simulateBotVotes(room);
 
         this.startPhaseTimer(
           room,
           25,
           () => broadcastState(),
-          () =>
-            room.selectedGame?.id === MAFIA_GAME_ID
-              ? this.finishMafiaTrial(room, broadcastState)
-              : this.transitionToPhase(room, 'results', broadcastState)
+          () => this.transitionToPhase(room, 'results', broadcastState)
         );
-
-        // Mafia: if only bots are left to vote, the trial can resolve right away.
-        if (
-          room.selectedGame?.id === MAFIA_GAME_ID &&
-          getLivingPlayerIds(room).every((id) => room.hasVoted.has(id))
-        ) {
-          this.finishMafiaTrial(room, broadcastState);
-          return;
-        }
         break;
       }
 
@@ -1737,7 +1912,8 @@ export class RoomManager {
   }
 
   /**
-   * Mafia: scores the night, then either ends the game or wakes the town up.
+   * Mafia: resolves the night and opens the morning report. Win conditions are
+   * checked when the morning beat ends so the announcement is never skipped.
    */
   private finishMafiaNight(room: InternalRoom, broadcastState: () => void) {
     if (room.phase !== 'night') return;
@@ -1745,35 +1921,88 @@ export class RoomManager {
 
     this.clearBotTimeouts(room);
     resolveMafiaNight(room);
-
-    const winningSide = checkMafiaWin(room);
-    if (winningSide) {
-      setMafiaWinningSide(room, winningSide);
-      this.transitionToPhase(room, 'results', broadcastState);
-      return;
-    }
-
-    this.transitionToPhase(room, 'day', broadcastState);
+    this.transitionToPhase(room, 'mafia-morning', broadcastState);
   }
 
   /**
-   * Mafia: resolves the day's exile trial, then either ends the game or
-   * loops the room back into another night.
+   * Mafia: resolves the secret ballot and opens the exile beat. The win check
+   * happens when that beat ends, after the tally has been shown.
    */
   private finishMafiaTrial(room: InternalRoom, broadcastState: () => void) {
     if (room.phase !== 'vote') return;
     if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
 
+    this.clearBotTimeouts(room);
     resolveMafiaExile(room);
+    this.transitionToPhase(room, 'mafia-exile', broadcastState);
+  }
 
-    const winningSide = checkMafiaWin(room);
-    if (winningSide) {
-      setMafiaWinningSide(room, winningSide);
-      this.transitionToPhase(room, 'results', broadcastState);
-      return;
-    }
+  /**
+   * Mafia: bots take their night actions one beat apart, so a room with bots
+   * feels alive instead of resolving instantly. A bot only acts while the night
+   * is still open, and the last confirmation arms the 1-2s sunrise delay.
+   */
+  private scheduleMafiaNightBots(room: InternalRoom, broadcastState: () => void) {
+    const bots = room.players.filter((player) => player.isBot);
 
-    this.transitionToPhase(room, 'night', broadcastState);
+    bots.forEach((bot, index) => {
+      this.scheduleBotAction(room, 1200 + index * 400 + Math.floor(Math.random() * 900), () => {
+        if (room.phase !== 'night') return;
+        if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
+
+        const state = getMafiaRound(room.code);
+        if (!state || !state.alive.has(bot.id) || state.nightConfirmed.has(bot.id)) return;
+
+        const outcome = submitMafiaNightAction(
+          room,
+          bot.id,
+          pickMafiaBotNightAction(room, bot.id)
+        );
+        if (!outcome.accepted) return;
+
+        broadcastState();
+        if (outcome.complete) this.scheduleMafiaNightResolution(room, broadcastState);
+      });
+    });
+  }
+
+  /** Sunrise lands 1-2 seconds after the last confirmation. */
+  private scheduleMafiaNightResolution(room: InternalRoom, broadcastState: () => void) {
+    this.scheduleBotAction(room, 1000 + Math.floor(Math.random() * 1000), () => {
+      if (room.phase !== 'night') return;
+      if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
+      this.finishMafiaNight(room, broadcastState);
+    });
+  }
+
+  /** Bots cast their secret ballots one beat apart. */
+  private scheduleMafiaVoteBots(room: InternalRoom, broadcastState: () => void) {
+    const bots = room.players.filter((player) => player.isBot);
+
+    bots.forEach((bot, index) => {
+      this.scheduleBotAction(room, 1200 + index * 350 + Math.floor(Math.random() * 800), () => {
+        if (room.phase !== 'vote') return;
+        if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
+
+        const state = getMafiaRound(room.code);
+        if (!state || !state.alive.has(bot.id) || state.votes[bot.id]) return;
+
+        const outcome = submitMafiaVote(room, bot.id, pickMafiaBotVote(room, bot.id));
+        if (!outcome.accepted) return;
+
+        broadcastState();
+        if (outcome.complete) this.scheduleMafiaTrialResolution(room, broadcastState);
+      });
+    });
+  }
+
+  /** The exile beat opens shortly after the final ballot. */
+  private scheduleMafiaTrialResolution(room: InternalRoom, broadcastState: () => void) {
+    this.scheduleBotAction(room, 700 + Math.floor(Math.random() * 700), () => {
+      if (room.phase !== 'vote') return;
+      if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
+      this.finishMafiaTrial(room, broadcastState);
+    });
   }
 
   /**
@@ -2203,25 +2432,70 @@ export class RoomManager {
   }
 
   /**
-   * Mafia: a night actor locks in a target. The night resolves once every
-   * Mafia member and the Detective are done.
+   * Mafia: any living player locks in their night action (the Mafia victim, the
+   * Doctor’s protection, the Detective’s investigation, or a decoy). The phase
+   * closes when every living player has confirmed, after a short sunrise beat.
    */
   public submitMafiaNightTarget(
     room: InternalRoom,
     playerId: string,
-    targetPlayerId: string,
+    targetPlayerId: string | null,
     broadcastState: () => void
   ) {
     if (room.phase !== 'night') return;
+    if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
 
     const outcome = submitMafiaNightAction(room, playerId, targetPlayerId);
-    if (!outcome.accepted) return;
-
-    if (outcome.complete) {
-      this.finishMafiaNight(room, broadcastState);
+    if (!outcome.accepted) {
+      broadcastState();
       return;
     }
 
+    broadcastState();
+    if (outcome.complete) this.scheduleMafiaNightResolution(room, broadcastState);
+  }
+
+  /**
+   * Mafia: a living player locks in a secret ballot. `'skip'` is a valid ballot.
+   */
+  public submitMafiaBallot(
+    room: InternalRoom,
+    voterId: string,
+    targetPlayerId: string,
+    broadcastState: () => void
+  ) {
+    if (room.phase !== 'vote') return;
+    if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
+
+    const outcome = submitMafiaVote(room, voterId, targetPlayerId);
+    if (!outcome.accepted) {
+      broadcastState();
+      return;
+    }
+
+    broadcastState();
+    if (outcome.complete) this.scheduleMafiaTrialResolution(room, broadcastState);
+  }
+
+  /**
+   * Mafia: a living player says they are ready to vote. More than half of the
+   * living ends the discussion immediately.
+   */
+  public submitMafiaReady(
+    room: InternalRoom,
+    playerId: string,
+    broadcastState: () => void
+  ) {
+    if (room.phase !== 'discussion') return;
+    if (room.selectedGame?.id !== MAFIA_GAME_ID) return;
+
+    const result = markMafiaReadyToVote(room, playerId);
+    if (!result.accepted) return;
+
+    if (result.shouldVote) {
+      this.transitionToPhase(room, 'vote', broadcastState);
+      return;
+    }
     broadcastState();
   }
 
@@ -2560,6 +2834,11 @@ export class RoomManager {
     // round result all live here, so a reconnect gets them back.
     if (room.selectedGame?.id === TOP_100_GAME_ID) {
       syncTop100PrivateState(room);
+    }
+    // Mafia: role, teammates, findings and the active night prompt (with the
+    // room timer's remaining seconds) are rebuilt on demand.
+    if (room.selectedGame?.id === MAFIA_GAME_ID) {
+      syncMafiaPrivateState(room);
     }
     return room.privateData[playerId] || {};
   }

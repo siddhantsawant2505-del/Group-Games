@@ -3,6 +3,7 @@ import {
   AvoidSettings,
   GameMetadata,
   ImpostorSettings,
+  MafiaSettings,
   Player,
   RoomPublicState,
   Top100Settings,
@@ -10,6 +11,7 @@ import {
 import { AvoidSettingsPanel } from './AvoidSettingsPanel';
 import { GameSettingsPanel } from './GameSettingsPanel';
 import { GtlCustomPromptPanel } from './GtlCustomPromptPanel';
+import { MafiaSettingsPanel } from './MafiaSettingsPanel';
 import { SettingsSheet } from './SettingsSheet';
 import { TeamSupportBadge } from './TeamSupportBadge';
 import { Top100SettingsPanel } from './Top100SettingsPanel';
@@ -18,6 +20,7 @@ type SettingsPatch = {
   impostor?: Partial<ImpostorSettings>;
   avoidTheWord?: Partial<AvoidSettings>;
   top100?: Partial<Top100Settings>;
+  mafia?: Partial<MafiaSettings>;
 };
 
 interface GameSettingsSheetProps {
@@ -95,6 +98,16 @@ export function GameSettingsSheet({
     if (game.id === 'top-100') {
       return (
         <Top100SettingsPanel
+          room={room}
+          myPlayer={myPlayer}
+          onSaveGameSettings={onSaveGameSettings}
+        />
+      );
+    }
+
+    if (game.id === 'mafia') {
+      return (
+        <MafiaSettingsPanel
           room={room}
           myPlayer={myPlayer}
           onSaveGameSettings={onSaveGameSettings}

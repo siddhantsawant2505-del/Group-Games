@@ -40,11 +40,14 @@ import { AvoidAnchorRevealScreen } from './screens/avoidTheWord/AvoidAnchorRevea
 import { AvoidTurnScreen } from './screens/avoidTheWord/AvoidTurnScreen';
 import { AvoidRoundRevealScreen } from './screens/avoidTheWord/AvoidRoundRevealScreen';
 import { AvoidResultsScreen } from './screens/avoidTheWord/AvoidResultsScreen';
-import { MafiaRevealScreen } from './screens/MafiaRevealScreen';
-import { MafiaNightActionScreen } from './screens/MafiaNightActionScreen';
-import { MafiaTownSleepsScreen } from './screens/MafiaTownSleepsScreen';
-import { MafiaMorningScreen } from './screens/MafiaMorningScreen';
-import { MafiaResultsScreen } from './screens/MafiaResultsScreen';
+import { RoleRevealScreen } from './screens/mafia/RoleRevealScreen';
+import { NightScreen } from './screens/mafia/NightScreen';
+import type { MafiaTeamPick } from './screens/mafia/NightScreen';
+import { MorningScreen } from './screens/mafia/MorningScreen';
+import { DayScreen } from './screens/mafia/DayScreen';
+import { VoteScreen as MafiaVoteScreen } from './screens/mafia/VoteScreen';
+import { ExileScreen } from './screens/mafia/ExileScreen';
+import { GameOverScreen } from './screens/mafia/GameOverScreen';
 import { GtlHintRevealScreen } from './screens/GtlHintRevealScreen';
 import { GtlInputScreen } from './screens/GtlInputScreen';
 import { GtlResponseRevealScreen } from './screens/GtlResponseRevealScreen';
@@ -109,6 +112,8 @@ export default function App() {
   const [room, setRoom] = useState<RoomPublicState | null>(null);
   const [myPlayer, setMyPlayer] = useState<Player | null>(null);
   const [privateState, setPrivateState] = useState<PlayerPrivateState>({});
+  /** Mafia's faction-private live picks (only living Mafia ever receive them). */
+  const [mafiaTeamPicks, setMafiaTeamPicks] = useState<MafiaTeamPick[] | null>(null);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -183,10 +188,16 @@ export default function App() {
       setPrivateState(updatedPrivateState);
     };
 
+    // Mafia only: the family's live night picks.
+    const handleMafiaTeamUpdate = (payload: { picks?: MafiaTeamPick[] }) => {
+      setMafiaTeamPicks(payload?.picks ?? null);
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('room:update', handleRoomUpdate);
     socket.on('player:private-state', handlePrivateState);
+    socket.on('mafia:team-update', handleMafiaTeamUpdate);
 
     if (socket.connected) {
       setConnected(true);
@@ -197,6 +208,7 @@ export default function App() {
       socket.off('disconnect', handleDisconnect);
       socket.off('room:update', handleRoomUpdate);
       socket.off('player:private-state', handlePrivateState);
+      socket.off('mafia:team-update', handleMafiaTeamUpdate);
     };
   }, [room]);
 
@@ -488,9 +500,9 @@ export default function App() {
     });
   }, [room, myPlayer]);
 
-  // Mafia: a night actor (Mafia/Detective) locks in a target
+  // Mafia: every living player locks a night action (or confirms the decoy).
   const handleMafiaNightAction = useCallback(
-    (targetPlayerId: string) => {
+    (targetPlayerId: string | null) => {
       if (!room || !myPlayer) return;
       playNotificationSound('submit-lock');
       triggerHaptic('heavy');
@@ -503,6 +515,31 @@ export default function App() {
     },
     [room, myPlayer]
   );
+
+  // Mafia: a secret ballot (a player id, or 'skip').
+  const handleMafiaVote = useCallback(
+    (targetPlayerId: string) => {
+      if (!room || !myPlayer) return;
+      playNotificationSound('submit-lock');
+      triggerHaptic('heavy');
+      const socket = getSocket();
+      socket.emit('cast-vote', {
+        roomCode: room.roomCode,
+        voterId: myPlayer.id,
+        targetPlayerId,
+      });
+    },
+    [room, myPlayer]
+  );
+
+  // Mafia: ready to vote (more than half of the living ends discussion early).
+  const handleMafiaReady = useCallback(() => {
+    if (!room || !myPlayer) return;
+    playNotificationSound('submit-lock');
+    triggerHaptic('medium');
+    const socket = getSocket();
+    socket.emit('mafia-ready-vote', { roomCode: room.roomCode, playerId: myPlayer.id });
+  }, [room, myPlayer]);
 
   // Mafia: host skip that resolves the night early
   const handleMafiaResolveNight = useCallback(() => {
@@ -746,12 +783,7 @@ export default function App() {
             onAdvance={() => handleAdvancePhase('avoid-anchor')}
           />
         ) : isMafia ? (
-          <MafiaRevealScreen
-            room={room}
-            myPlayer={myPlayer}
-            privateState={privateState}
-            onAdvance={() => handleAdvancePhase('night')}
-          />
+          <RoleRevealScreen room={room} myPlayer={myPlayer} privateState={privateState} />
         ) : isGuessTheLink ? (
           <GtlHintRevealScreen
             room={room}
@@ -801,25 +833,19 @@ export default function App() {
           onContinue={handleAvoidContinue}
         />
       ) : room.phase === 'night' ? (
-        privateState.mafiaCanAct ? (
-          <MafiaNightActionScreen
-            room={room}
-            myPlayer={myPlayer}
-            privateState={privateState}
-            onSelectTarget={handleMafiaNightAction}
-            onHostResolveNight={handleMafiaResolveNight}
-          />
-        ) : (
-          <MafiaTownSleepsScreen
-            room={room}
-            myPlayer={myPlayer}
-            onHostResolveNight={handleMafiaResolveNight}
-          />
-        )
-      ) : room.phase === 'day' ? (
-        <MafiaMorningScreen
+        <NightScreen
           room={room}
           myPlayer={myPlayer}
+          privateState={privateState}
+          teamPicks={mafiaTeamPicks}
+          onSelectTarget={handleMafiaNightAction}
+          onHostResolveNight={handleMafiaResolveNight}
+        />
+      ) : room.phase === 'mafia-morning' ? (
+        <MorningScreen
+          room={room}
+          myPlayer={myPlayer}
+          privateState={privateState}
           onAdvance={() => handleAdvancePhase('discussion')}
         />
       ) : room.phase === 'input' ? (
@@ -909,30 +935,48 @@ export default function App() {
           onHostSkip={() => handleAdvancePhase('results')}
         />
       ) : room.phase === 'discussion' ? (
-        <DiscussionPhaseScreen
-          room={room}
-          myPlayer={myPlayer}
-          onAdvanceToVote={() => handleAdvancePhase('vote')}
-          ownQuestion={isImpostorQuestionMode ? privateState.impostorQuestion : undefined}
-        />
+        isMafia ? (
+          <DayScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onReadyToVote={handleMafiaReady}
+            onHostAdvance={() => handleAdvancePhase('vote')}
+          />
+        ) : (
+          <DiscussionPhaseScreen
+            room={room}
+            myPlayer={myPlayer}
+            onAdvanceToVote={() => handleAdvancePhase('vote')}
+            ownQuestion={isImpostorQuestionMode ? privateState.impostorQuestion : undefined}
+          />
+        )
       ) : room.phase === 'vote' ? (
-        <VotePhaseScreen
-          room={room}
-          myPlayer={myPlayer}
-          privateState={privateState}
-          onCastVote={handleCastVote}
-          eligiblePlayerIds={
-            isMafia
-              ? room.mafiaState?.alivePlayerIds
-              : isReverseCategories
-              ? room.players.filter((p) => p.id !== myPlayer.id).map((p) => p.id)
-              : undefined
-          }
-          copy={isReverseCategories ? RC_VOTE_COPY : undefined}
-          onHostSkip={() =>
-            isMafia ? handleMafiaResolveTrial() : handleAdvancePhase('results')
-          }
-        />
+        isMafia ? (
+          <MafiaVoteScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onVote={handleMafiaVote}
+            onHostSkip={handleMafiaResolveTrial}
+          />
+        ) : (
+          <VotePhaseScreen
+            room={room}
+            myPlayer={myPlayer}
+            privateState={privateState}
+            onCastVote={handleCastVote}
+            eligiblePlayerIds={
+              isReverseCategories
+                ? room.players.filter((p) => p.id !== myPlayer.id).map((p) => p.id)
+                : undefined
+            }
+            copy={isReverseCategories ? RC_VOTE_COPY : undefined}
+            onHostSkip={() => handleAdvancePhase('results')}
+          />
+        )
+      ) : room.phase === 'mafia-exile' ? (
+        <ExileScreen room={room} myPlayer={myPlayer} privateState={privateState} />
       ) : room.phase === 'results' ? (
         isAvoidTheWord ? (
           <AvoidResultsScreen
@@ -943,7 +987,7 @@ export default function App() {
             onEndSession={() => handleAdvancePhase('post-game')}
           />
         ) : isMafia ? (
-          <MafiaResultsScreen
+          <GameOverScreen
             room={room}
             myPlayer={myPlayer}
             onNextRound={() => handleAdvancePhase('next-round')}

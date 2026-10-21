@@ -8,6 +8,7 @@ import path from 'path';
 import { Server as SocketIOServer } from 'socket.io';
 import { createServer as createViteServer } from 'vite';
 import { roomManager } from './roomManager.ts';
+import { getMafiaTeamPicks } from './games/mafia.ts';
 import { reportAiUnavailableOnce } from './content/index.ts';
 
 const projectRoot = process.cwd();
@@ -66,6 +67,26 @@ async function startServer() {
     if (!room || !teamId) return;
     for (const player of room.players) {
       if (player.teamId !== teamId || !player.socketId) continue;
+      io.to(player.socketId).emit(event, payload);
+    }
+  };
+
+  /**
+   * Emits an event to an explicit set of players (Mafia's faction-private team
+   * update). The payload is never part of `room:update`, and non-recipients never
+   * receive it.
+   */
+  const emitToPlayers = (
+    roomCode: string,
+    playerIds: string[],
+    event: string,
+    payload: unknown
+  ) => {
+    const room = roomManager.getRoom(roomCode);
+    if (!room) return;
+    const allowed = new Set(playerIds);
+    for (const player of room.players) {
+      if (!allowed.has(player.id) || !player.socketId) continue;
       io.to(player.socketId).emit(event, payload);
     }
   };
@@ -271,6 +292,7 @@ async function startServer() {
             impostor?: { mode?: string; difficulty?: string; tone?: string; theme?: string };
             avoidTheWord?: Record<string, unknown>;
             top100?: Record<string, unknown>;
+            mafia?: Record<string, unknown>;
           };
         },
         callback
@@ -400,7 +422,17 @@ async function startServer() {
                   'results',
                 ]
               : room.selectedGame?.id === 'mafia'
-              ? ['lobby', 'game-select', 'reveal', 'night', 'day', 'discussion', 'vote', 'results']
+              ? [
+                  'lobby',
+                  'game-select',
+                  'reveal',
+                  'night',
+                  'mafia-morning',
+                  'discussion',
+                  'vote',
+                  'mafia-exile',
+                  'results',
+                ]
               : room.selectedGame?.id === 'guess-the-link'
               ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'guess', 'results']
               : room.selectedGame?.id === 'top-100'
@@ -464,6 +496,15 @@ async function startServer() {
         const upperCode = (roomCode || '').toUpperCase().trim();
         const room = roomManager.getRoom(upperCode);
         if (!room) return;
+
+        // Mafia's ballot accepts 'skip' and is resolved by the Mafia module;
+        // every other game keeps the generic accusation vote.
+        if (room.selectedGame?.id === 'mafia') {
+          roomManager.submitMafiaBallot(room, voterId, targetPlayerId, () =>
+            broadcastRoom(upperCode)
+          );
+          return;
+        }
 
         roomManager.castVote(room, voterId, targetPlayerId, () =>
           broadcastRoom(upperCode)
@@ -539,7 +580,8 @@ async function startServer() {
       }
     );
 
-    // 11. Mafia: a night actor (Mafia/Detective) locks in a target
+    // 11. Mafia: every living player confirms a night action (role-specific target
+    // or the harmless decoy). `targetPlayerId` may be null to confirm with no pick.
     socket.on(
       'mafia-night-action',
       ({
@@ -549,15 +591,39 @@ async function startServer() {
       }: {
         roomCode: string;
         playerId: string;
-        targetPlayerId: string;
+        targetPlayerId: string | null;
       }) => {
         const upperCode = (roomCode || '').toUpperCase().trim();
         const room = roomManager.getRoom(upperCode);
         if (!room) return;
 
-        roomManager.submitMafiaNightTarget(room, playerId, targetPlayerId, () =>
+        roomManager.submitMafiaNightTarget(room, playerId, targetPlayerId ?? null, () =>
           broadcastRoom(upperCode)
         );
+
+        // Faction-private: only the living Mafia see each other's live picks.
+        const picks = getMafiaTeamPicks(room);
+        if (picks.length > 0) {
+          emitToPlayers(
+            upperCode,
+            picks.map((pick) => pick.playerId),
+            'mafia:team-update',
+            { picks }
+          );
+        }
+      }
+    );
+
+    // 11b. Mafia: a living player says they are ready to vote (also used to end
+    // the discussion early once more than half agree).
+    socket.on(
+      'mafia-ready-vote',
+      ({ roomCode, playerId }: { roomCode: string; playerId: string }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+
+        roomManager.submitMafiaReady(room, playerId, () => broadcastRoom(upperCode));
       }
     );
 

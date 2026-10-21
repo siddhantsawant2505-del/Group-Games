@@ -498,8 +498,9 @@ async function main(): Promise<void> {
       PARTY_GAMES.find((game) => game.id === 'mafia')?.teamSupport === 'aggregate'
   );
   check(
-    'only Top 100 is playable — the rest are marked Coming Soon',
-    PARTY_GAMES.filter((game) => !game.comingSoon).map((game) => game.id).join(',') === 'top-100'
+    'Top 100 and Mafia are playable — the rest are marked Coming Soon',
+    PARTY_GAMES.filter((game) => !game.comingSoon).map((game) => game.id).join(',') ===
+      'mafia,top-100'
   );
 
   // ------------------------------------------------------------------- cleanup
