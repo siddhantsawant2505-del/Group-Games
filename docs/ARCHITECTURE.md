@@ -262,6 +262,9 @@ reveal-answers
 guess           (Guess the Link simultaneous guessing)
 discussion
 vote
+night           (Mafia night actions)
+mafia-morning   (Mafia resolution + narration)
+mafia-exile     (Mafia ballot result -> next night or results)
 results
 next-round
 closed (idle timeout / host left)
@@ -271,13 +274,16 @@ closed (idle timeout / host left)
 
 1. **Host creates room** → generates a unique 4-character code, creates a host player, sets phase
    to `lobby`.
-2. **Players join** → validate code, cap at 12 players, assign color index (0–5), generate
-   session token.
+2. **Players join** → validate code, cap at 16 seats (the largest game's table), assign color
+   index (0–5), generate session token. Each game enforces its own smaller minimum and maximum.
 3. **Game select** → host picks the game.
 4. **Reveal** → server assigns roles and hidden words; starts a reveal timer. The Impostor word is
    served by the content engine, so this phase completes in its own method when the provider
-   resolves instead of blocking the synchronous state machine.
+   resolves instead of blocking the synchronous state machine. Mafia deals its roles here and
+   every phone shows a hold-to-reveal card.
 5. **Input** → players submit clues; server records them; starts an input timer.
+   Mafia's own chain runs `night → mafia-morning → discussion → vote → mafia-exile` and loops back
+   to `night` until a faction wins, at which point the room moves to `results` with the recap.
 6. **Reveal-answers** → compile revealed answers in random order; start timer.
 7. **Discussion** → timed discussion.
 8. **Vote** → record votes; start vote timer.
@@ -335,8 +341,11 @@ lobby ──> game-select ──> reveal
 | `avoid-reveal`  | the question, the anchor's answer, every answer, overrules | the answers grid, host-only overrule toggles and Continue |
 | `input`         | submitted answers, input timer                        | single-word clue input, submission status      |
 | `reveal-answers`| randomized revealed answers, reveal timer             | rotating reveal cards                          |
-| `discussion`    | discussion timer, visible clues                       | clue list, discussion prompt                   |
-| `vote`          | vote tallies, vote timer                              | player vote grid, vote lock-in                 |
+| `discussion`    | discussion timer, visible clues; Mafia adds the ready-to-vote majority and the public log | clue list, discussion prompt; Mafia adds ready/dead lists and private detective notes |
+| `vote`          | vote tallies, vote timer; Mafia hides ballots until the close | player vote grid, vote lock-in; Mafia adds Skip |
+| `night`         | every living player's secret target, the confirmed count, the Mafia team's shared picks | one identical grid for all roles: Mafia victim picker with teammates' picks, Doctor protect, Detective investigate, or the decoy prompt; dead players see a spectator view |
+| `mafia-morning` | the resolved death/save, the narration line, the Detective's private finding | narration, the death card with optional role, the private result card |
+| `mafia-exile`   | the closed ballot, the tally, the exile and the next win check | animated tally, exile outcome, optional role |
 | `results`       | standings, role reveals, winner title                 | leaderboard, secret word/impostor reveal       |
 | `next-round`    | restart reveal phase                                  | auto-advance to reveal                         |
 
@@ -406,7 +415,7 @@ Public (broadcast to room)
   playMode, teams (name/icon/accent/members/total), gameSettings,
   roundNumber, totalRounds, timer, phasePrompt, phaseSubprompt,
   hasSubmittedInput, hasVoted, revealedAnswers, voteTallies, results
-  (results.teamStandings in team mode)
+  (results.teamStandings in team mode), mafiaState
 
 Private (per player)
   role, secretWord, secretHint, isSpecialRole, specialAccentBg,
@@ -414,8 +423,29 @@ Private (per player)
   submittedAnswer, voteSubmitted, votedForPlayerId,
   avoidQuestion, avoidQuestionCategory, avoidAnswerType, avoidChoices,
   avoidNumberRange, avoidIsAnchor, avoidIsActive, avoidAlive,
-  avoidRoundPoints
+  avoidRoundPoints,
+  mafiaRole, mafiaRoleLabel, mafiaSide, mafiaRoleTagline, mafiaIsAlive,
+  mafiaTeammateNames, mafiaTeammateIds, mafiaTeamSelections,
+  mafiaCanAct, mafiaActionLabel, mafiaActionPrompt, mafiaActionSubmitted,
+  mafiaActionTargetId, mafiaActionTargetName, mafiaCanSkip,
+  mafiaLastProtectedName, mafiaInvestigations, mafiaLastFinding,
+  mafiaSecondsRemaining
 ```
+
+**Mafia hidden information.** The public `mafiaState` carries the phase, night/day numbers, the
+living and eliminated ids, the confirmed count (never who confirmed), the closed ballot, public
+deaths/exiles with an optional role, the reveal flags and the game-over recap. It also carries the
+dealt Mafia/Detective/Doctor counts, which are public rule information — never a living player's
+role. `getPlayerPrivateState()` adds `mafiaRole` for the receiver only; a Mafia player also gets
+the teammate list and their teammates' live picks, a Detective gets their own findings, and a
+Doctor gets the name they protected last night. Current night targets are never broadcast, and a
+deallocated teammate's pick is dropped server-side. The `mafia-morning`/`mafia-exile` payloads
+only expose roles for players who are already out when `revealRoleOnDeath` is on; the recap is
+withheld until `gameOver`.
+
+The engine also sends `mafia:team-update` through a small `emitToPlayers(room, playerIds, event,
+payload)` helper, so the living Mafia see each other's picks and nothing about that channel is
+reachable from a Town or dead socket.
 
 **Scoped secrets.** The Avoid the Word question is written into exactly one player's private state
 at a time — the anchor during `avoid-anchor`, the current player during `avoid-turn` — and is

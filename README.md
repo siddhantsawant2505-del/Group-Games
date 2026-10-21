@@ -63,17 +63,17 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 - **Room settings gear (lobby)** — one gear next to the player list opens the room-wide settings: **Solo / Team** play mode, team count (2-4), tap-to-join teams, team rename, auto-balance and shuffle, and the number of rounds per session.
 - **Per-game settings gear (game select)** — every game card carries its own gear, so each game is tuned separately: Impostor mode/difficulty/tone/theme, Guess the Link's custom round, and a read-only summary for everyone else.
 - **Team mode** — individual scores are kept and every award also rolls up to the player's team through one central `awardPoints()`; team totals survive team switches and reconnects, the lobby blocks a bad split (and warns about lopsided ones), and results/post-game lead with the team leaderboard.
-- **One live game, more on the way** — Top 100 is playable today; Impostor, Avoid the Word, Mafia, Guess the Link and Reverse Categories are listed as **Coming Soon** and cannot be launched yet.
+- **Two live games, four on the way** — Top 100 and Mafia are playable today; Impostor, Avoid the Word, Guess the Link and Reverse Categories are listed as **Coming Soon** and cannot be launched yet.
 - **Two Impostor modes** — *Word* (the classic secret word) and *Question*: everyone privately receives the same question, one player was quietly asked a related but different one, and the difference only surfaces on the answer board.
 - **Content engine (`server/content/`)** — a reusable provider layer. Words are served from a 2,059-noun corpus through a per-room shuffle bag, so nothing repeats until a room has seen the whole pool; an optional AI top-up is validated locally (commonness, shape, blocklist, room history) before it can ever be used.
 - **Host difficulty setting** — Easy / Medium / Any filter the Impostor word pool, plus an optional custom theme and an AI top-up once a real `GEMINI_API_KEY` is configured. Without a key everything silently falls back to the bundled pool.
 - **123-question Avoid the Word deck** — four answer types (open text, 8+ options, numeric ranges, "who here" player picks) in `shared/data/questions/avoidTheWordQuestions.json`, validated by the provider before use.
 - **Hidden-answer elimination rounds** — one anchor answers a question privately, everyone else answers it one at a time, and any answer that matches the anchor is announced live (never the answer itself) and knocked out on the host's Continue.
-- **Dedicated Mafia engine** — privately dealt roles, timed night actions, day eliminations, win-condition checks, and scoring.
+- **Dedicated Mafia engine** — server-dealt Mafia / Detective / Doctor / Townsperson roles, a hold-to-reveal role card, one identical-timer night screen for every role (including a harmless decoy for townspeople), live Mafia teammate picks, doctor protection with a no-repeat rule, private detective findings, day discussion with a ready-to-vote majority, hidden exile ballots with tie/skip rules, narrated mornings, a full recap, and win-condition checks after every death.
 - **Dedicated Guess the Link engine** — one hidden concept, a different private hint angle per player, a shuffled link board, and simultaneous concept guessing with per-correct points.
 - **Dedicated Top 100 engine** — a hidden 100-item ranked list per round, one free-text guess per player (or per team captain), position-exact scoring (a match at position N is worth N), host overrules, duplicate policies, region/category filters, and only positions 1-10 and 90-100 ever revealed.
 - **Dedicated Reverse Categories engine** — three deliberately unrelated items shown publicly (no secrets at all), privately invented category names, a shuffled attributed board, and the standard secret ballot repurposed to crown the best category.
-- **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, guess, rank, avoid-anchor, avoid-turn, avoid-reveal, discussion, vote, night, day, results, next-round.
+- **Extensible phase machine** — lobby, game-select, reveal, input, reveal-answers, guess, rank, avoid-anchor, avoid-turn, avoid-reveal, discussion, vote, night, mafia-morning, mafia-exile, results, next-round.
 
 ---
 
@@ -85,6 +85,7 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 | Content engine suite | `PASSING` | `npm run test:content` — 500 rounds, no repeats before pool exhaustion |
 | Question-mode suite | `PASSING` | `npm run test:questions` — four answer types, `{target}` dealing, leak checks |
 | Avoid the Word suite | `PASSING` | `npm run test:avoid` — matching rules, question bank and answer-space rules, shuffle bag, a full bot game, leak/overrule/AFK/reconnect/placement checks |
+| Mafia suite | `PASSING` | `npm run test:mafia` — role counts for 4–16, night resolution (kill/save/no-repeat/tie/abstain), vote tally rules, win ordering, 250 bot-only games, a 6-player room game with public/private leak checks and recap |
 | Top 100 suite | `PASSING` | `npm run validate:top100` + `npm run test:top100` — list validation, normalisation/typo matching, position scoring, duplicate policy, host overrules, the shuffle bag, a 5-round bot game and a team game with captain rotation and private suggestions |
 | Team-mode suite | `PASSING` | `npm run test:teams` — play modes, team seating, start gate, team scoring |
 | Vite Client Build | `PASSING` | React 19 SPA bundled to `dist/` with Tailwind CSS v4 |
@@ -97,18 +98,18 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 
 ## Games collection, rules & working state
 
-Party Games features a collection of six multiplayer party games designed for phone controllers. **Top 100 is the only shipped game**; the other five are listed as **Coming Soon** — their cards stay visible but cannot be selected or launched until their engines are re-verified. The dedicated engines for those games still live in the repo and in the test suites.
+Party Games features a collection of six multiplayer party games designed for phone controllers. **Top 100 and Mafia are shipped**; the other four are listed as **Coming Soon** — their cards stay visible but cannot be selected or launched until their engines are re-verified. The dedicated engines for those games still live in the repo and in the test suites.
 
 | Game | Players | Category | Icon | Current Working State |
 |---|---|---|---|---|
 | **Impostor** | 3–12 | Social Deduction | Mask | 🟡 **Coming Soon** — engine, bot AI and settings exist; not selectable in the app yet |
 | **Avoid the Word** | 3–10 | Bluff / Elimination | Ban | 🟡 **Coming Soon** — engine and settings exist; not selectable in the app yet |
-| **Mafia** | 4–16 | Social Deduction | Detective | 🟡 **Coming Soon** — engine exists; not selectable in the app yet |
+| **Mafia** | 4–16 | Social Deduction | Detective | 🟢 **Fully Working & Playable** — Dedicated engine with hold-to-reveal roles, identical-timer night actions (Mafia/Doctor/Detective/decoy), narrator mornings, discussion + secret exile ballots, a full recap, and faction scoring |
 | **Guess the Link** | 3–8 | Word Association | Link | 🟡 **Coming Soon** — engine exists; not selectable in the app yet |
 | **Top 100** | 3–10 | Ranking / List Knowledge | List-Ordered | 🟢 **Fully Working & Playable** — Dedicated engine with a hidden 100-item list per round, one guess per player (or team), position-exact scoring, host overrules, duplicate/region/category settings, and only the 1-10 / 90-100 slices revealed |
 | **Reverse Categories** | 3–8 | Trivia / Creative | Shuffle | 🟡 **Coming Soon** — engine exists; not selectable in the app yet |
 
-**Availability.** `PARTY_GAMES` marks the five unshipped games with `comingSoon: true`; the game-selection
+**Availability.** `PARTY_GAMES` marks the four unshipped games with `comingSoon: true`; the game-selection
 screen shows them dimmed with a **Coming Soon** badge, hides their settings gear, and refuses to select or
 launch them. `PLAYABLE_GAMES` / `DEFAULT_GAME` in `shared/data/games.ts` are the single source of truth, and
 the server falls back to `DEFAULT_GAME` when a room still points at a Coming Soon game.
@@ -124,7 +125,8 @@ standing takes the win. **Top 100 is native**: each team locks exactly one guess
 rotating captain, and the team is scored through `awardTeamPoints()`, leaving individual totals alone.
 
 **Per-game settings.** Each game-select card has its own gear: Impostor (mode, difficulty, tone,
-custom theme), Avoid the Word (anchor answer time, turn time, round cap, question tone), Guess the
+custom theme), Avoid the Word (anchor answer time, turn time, round cap, question tone), Mafia
+(mafia count, night / discussion / vote timers, Detective, Doctor, reveal-role-on-death), Guess the
 Link (a host-authored round), Top 100 (rounds, guess time, duplicate policy, region and category
 filters), and a read-only summary of the current choices for everyone else. The lobby gear covers
 the room-wide settings instead: play mode, teams and rounds per session.
@@ -216,32 +218,41 @@ Pick **Question** in the host settings and the same engine plays a different gam
 
 ### 3. Mafia — Dedicated Night/Day Engine (🟢 Fully Operational)
 
-**Mafia** ships a fully custom server engine (`server/games/mafia.ts`) with its own phase chain (`reveal → night → day → discussion → vote → results`), server-side role dealing, private night actions, win-condition checks after every elimination, and scoring.
+**Mafia** ships a fully custom server engine — `server/games/mafia.ts` (room/phases/timers/bots/narration) on top of pure rules in `server/games/mafia.engine.ts` — with its own phase chain (`reveal → night → mafia-morning → discussion → vote → mafia-exile → … → results`). One full game (many nights and days) is **one room round**; Next round deals a brand-new game. It is phone-only: nobody moderates, the server narrates.
 
 - **Objective**: The hidden Mafia thin the town out each night; the town must identify and exile them by day before the numbers run out.
 
 - **Game Rules & Mechanics**:
   1. **Player Requirements**: 4 to 16 players (solo testing supported via "+ Add Bot").
   2. **Role Assignment (`reveal` phase, 10s)**:
-     - Roles are dealt as **roughly 1 Mafia per 4 players (minimum 1)** — 4–7 players get 1 Mafia, 8–11 get 2, 12–15 get 3, and so on.
-     - One **Detective** is included when the table is large enough for the role to matter; every remaining player is a **Townsperson**.
-     - Each player privately sees **only their own** role on a themed card (Mafia / Detective / Townsperson). Roles are never part of the public state.
+     - `mafiaCount = max(1, round(N / 4))` unless the host overrides it, always clamped to at most `floor((N - 1) / 2)` — so the Mafia are always strictly fewer than half the table.
+     - One **Detective** when N ≥ 4 and the host setting is on (default on); one **Doctor** when N ≥ 6 and the setting is on (default on); everyone else is a **Townsperson**.
+     - The role card is hidden behind a **press-and-hold to reveal** control, so a glance over the shoulder cannot leak it. Mafia also see their teammates' names on the same card. Roles never enter the public state.
   3. **Night (`night` phase, 30s)**:
-     - **Mafia** privately pick a player to eliminate; the last standing pick wins, and Mafia cannot target their own members.
-     - The **Detective** privately investigates one player and is told whether that player is Mafia. Investigators see an *investigate* list, Mafia see an *eliminate* list.
-     - **Townspeople** (and eliminated players) get a simple **"The Town Sleeps…"** waiting screen with a headcount of night actions still in play.
-     - The host can end the night early, and bots resolve their own night actions so a solo host can play.
-  4. **Day (`day` phase, 10s)**:
-     - Everyone learns **who** was eliminated overnight — never who did it.
-     - The existing **discussion** and **vote** phases then run unchanged to exile a suspect, and the exiled player is out of the game.
-  5. **Win Conditions**: checked after every elimination or exile —
-     - **Mafia wins** when living Mafia ≥ living townspeople.
-     - **Town wins** when every Mafia member is eliminated.
-     - Otherwise the game loops back to `night` with the survivors.
-  6. **Results (`results` phase)**:
-     - **Final role reveal** for every player, the winning side, the night-by-night game log, and the standings.
-     - **+1 point** per surviving Town/Detective on a Town win; **+1 point** per surviving Mafia on a Mafia win. Eliminated players score nothing.
-  7. **Next Round Loop (`next-round`)**: a fresh role deal for a brand new game, with cumulative scores preserved.
+     - Every living player gets the **same screen, grid and timer**, so nobody's role can be inferred from layout or timing.
+     - **Mafia** pick a victim (never a teammate) and see each other's current picks live. The victim is the pick with the most Mafia votes; ties are broken at random; if no Mafia voted, nobody is attacked.
+     - The **Doctor** protects one player, may protect themselves, and may not protect the same player on two consecutive nights.
+     - The **Detective** investigates one player and privately learns *Mafia* / *Not Mafia* at dawn.
+     - **Townspeople** (and any role with nothing to do) confirm a harmless decoy — *"Who do you trust the most?"* — which does nothing. The phase ends when every living player confirms, or at the timer, plus a short randomized beat after the last confirmation. Only the number of confirmed players is public.
+  4. **Morning (`mafia-morning` phase, 8s)**:
+     - The server resolves the night: the Mafia target dies unless the Doctor protected them. The narration announces the death by name (plus role when `revealRoleOnDeath` is on) or *"Nobody died tonight."* — never whether a save happened.
+     - A surviving Detective receives their result privately now; a Detective who died overnight receives nothing. The win condition is checked immediately.
+  5. **Day (`discussion`, 120s) and Exile (`vote`, 30s)**:
+     - The living argue out loud; the public log of past nights and exiles stays visible, and a Detective can reopen their private notes.
+     - The host can skip discussion, and it also ends early when more than half of the living players tap **ready to vote**.
+     - Everyone secretly votes for a living player or **Skip**. The ballot stays hidden until the tally. The player with the most votes is exiled; a tie for first, or Skip being top or tied, exiles nobody.
+     - `mafia-exile` (8s) shows the tally and the exile with their role when enabled, then checks the win condition and loops back to night.
+  6. **Win Conditions**, checked after the morning resolution and after each exile:
+     - **Town wins** when no Mafia remain alive.
+     - **Mafia wins** when living Mafia ≥ living non-Mafia.
+     - Otherwise the game continues.
+  7. **Dead players become spectators** — public state only, no living roles or night actions, no actions of their own. A disconnected living player is treated as a skip/abstain.
+  8. **Game over (`results` phase)**: the winning faction, every role revealed, a **recap timeline** (each night's Mafia target, Doctor save, investigation + result; each day's tally and exile), and the leaderboard.
+  9. **Scoring**: every member of the winning faction scores **+3**, and every surviving winner scores **+1 extra**, all through `awardPoints()`.
+  10. **Host Settings (`game-select` phase)**: mafia count (`auto` or a number), night / discussion / vote timers, Detective, Doctor and reveal-role-on-death. The panel shows the resulting role breakdown for the current table; Start is disabled with the exact reason when the deal is illegal.
+  11. **Bots**: night actions are random within each role's rules (Mafia avoid teammates, the Doctor respects the no-repeat rule, the Detective favours unchecked players); day votes are random among living non-self players, Mafia never vote a teammate, and a Detective bot votes a known Mafia member. Bots never call the AI.
+  12. **Narration**: `shared/data/mafiaNarration.ts` holds 10+ non-graphic variants for every beat (night falls, a death, a quiet morning, an exile, each faction win), drawn from a per-room shuffle bag so lines do not repeat back to back.
+  13. **Next Round Loop (`next-round`)**: a fresh role deal for a brand-new game, with cumulative scores preserved.
 
 ---
 
@@ -401,11 +412,12 @@ One provider layer feeds every content-driven game: the Impostor word pool, the 
 4. **`input`** — players submit clues (Impostor), responses (Guess the Link), guesses (Top 100, plus team-private suggestions in team mode), or invented categories (Reverse Categories).
 5. **`reveal-answers`** — clues revealed simultaneously (Impostor), the shuffled link board (Guess the Link), the guesses board with its host overrules (Top 100), or the shuffled attributed category board (Reverse Categories).
 6. **`guess`** — simultaneous guessing at the hidden concept (Guess the Link).
-7. **`discussion`** — timed debate (Impostor; Mafia day phase).
-9. **`vote`** — secret ballot (Impostor; Mafia exile vote; Reverse Categories' best-category vote).
-10. **`avoid-anchor` → `avoid-turn` (repeats) → `avoid-reveal`** — Avoid the Word's private anchor answer, one timed turn per alive player, then the public round reveal with host overrules.
-11. **`night`** — Mafia and Detective act privately (Mafia).
-12. **`day`** — overnight elimination announced, then discussion and vote (Mafia).
+7. **`discussion`** — timed debate (Impostor; Mafia day phase, with a host skip and a ready-to-vote majority).
+8. **`vote`** — secret ballot (Impostor; Mafia exile vote; Reverse Categories' best-category vote).
+9. **`avoid-anchor` → `avoid-turn` (repeats) → `avoid-reveal`** — Avoid the Word's private anchor answer, one timed turn per alive player, then the public round reveal with host overrules.
+10. **`night`** — every living Mafia player acts privately on the same screen: Mafia pick a victim (and see teammates' live picks), the Doctor protects, the Detective investigates, everyone else confirms a harmless decoy.
+11. **`mafia-morning`** — the server narrates the night (a death, or nobody died — never whether the Doctor saved someone), privately hands the Detective their result, then checks the win condition.
+12. **`mafia-exile`** — the public vote tally and the exile outcome; the win condition is checked again before the loop returns to `night`.
 13. **`results`** — tally reveal, role exposure, winner, next-round option.
 14. **`next-round`** — new round with a fresh secret assignment.
 
@@ -476,7 +488,7 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   ├── index.html             # Client HTML entry point
 │   └── src/
 │       ├── components/        # UI components (QR modal, header, player badges, settings sheets/panels, team leaderboard)
-│       ├── screens/           # Phase screens (Mafia*, Gtl*, Top100*, RevCat*, avoidTheWord/*, and the Impostor question-mode screens)
+│       ├── screens/           # Phase screens (mafia/*, Gtl*, Top100*, RevCat*, avoidTheWord/*, and the Impostor question-mode screens)
 │       ├── services/
 │       │   ├── socket.ts      # Client-side Socket.IO singleton
 │       │   └── sound.ts       # Web audio notifications & haptics
@@ -505,7 +517,8 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   │   ├── impostorQuestionMode.ts # Impostor question mode: dealing, 4 answer types, board, results
 │   │   ├── avoidTheWord.ts    # Avoid the Word engine: anchor rotation, turns, eliminations, overrule, placements
 │   │   ├── avoidTheWord.match.ts # Pure answer matching: normalisation, stems, typos, per-type comparison
-│   │   ├── mafia.ts           # Mafia engine: roles, night actions, win conditions, scoring
+│   │   ├── mafia.ts           # Mafia room engine: phases, timers, private state, bots, narrator, scoring
+│   │   ├── mafia.engine.ts    # Pure Mafia rules: role deal, night resolution, tally, win check, validation
 │   │   ├── guessTheLink.ts    # Link engine: concept hiding, hint dealing, guessing, scoring
 │   │   ├── top100.ts          # Top 100 engine: hidden list, guesses, overrules, slices, awards
 │   │   ├── top100.match.ts    # Top 100 matcher/scorer: normalisation, typo windows, position points
@@ -524,6 +537,8 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   │   │   ├── impostorQuestions.json # 160 question pairs (6 kinds, 34 with {target})
 │   │   │   └── avoidTheWordQuestions.json # 123 Avoid the Word questions (text/choice/number/player)
 │   │   ├── guessTheLinkPrompts.ts  # 44 concepts × 6 hint angles each
+│   │   ├── mafiaNarration.ts  # Shuffle-bag narrator lines (night, morning, exile, faction wins)
+│   │   ├── mafiaSetup.ts      # Shared Mafia settings defaults and deal validation for the UI
 │   │   ├── top100/            # Hidden ranked lists: 17 JSON files, 100 items each
 │   │   ├── top100Categories.ts # The eligible Top 100 categories
 │   │   └── reverseCategoriesItems.ts # 66 items across 22 themes
@@ -537,6 +552,7 @@ The application is structured into three distinct layers: `client/` (React SPA),
 │   ├── testImpostorQuestionMode.ts # `npm run test:questions`
 │   ├── testTeamMode.ts        # `npm run test:teams`
 │   ├── testAvoidTheWord.ts    # `npm run test:avoid`
+│   ├── testMafia.ts           # `npm run test:mafia`
 │   ├── validateTop100Lists.ts # `npm run validate:top100`
 │   └── testTop100.ts          # `npm run test:top100`
 ├── data/
@@ -584,6 +600,10 @@ npm run validate:top100
 # Top 100 suite: matching, scoring, duplicates, host overrules, shuffle bag, a full bot game,
 # a team game (captain rotation, private suggestions, team scoring) and list-leak checks
 npm run test:top100
+
+# Mafia suite: role deals 4-16, night resolution, vote tally, win ordering, 250 bot-only games,
+# and a 6-player room game with public/private leak checks, reconnect and recap assertions
+npm run test:mafia
 
 # Regenerate shared/data/words/commonNouns.json from scripts/commonNouns.source.txt
 npm run generate:words

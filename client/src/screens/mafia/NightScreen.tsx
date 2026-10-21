@@ -73,7 +73,8 @@ export function NightScreen({
   const lastProtectedName = privateState.mafiaLastProtectedName ?? null;
   const targets = room.players.filter((player) => {
     if (!alive.includes(player.id)) return false;
-    if (player.id === myPlayer.id) return false;
+    // The Doctor may protect themselves; every other role picks someone else.
+    if (player.id === myPlayer.id && role !== 'doctor') return false;
     if (role === 'mafia' && teammateIds.includes(player.id)) return false;
     if (role === 'doctor' && lastProtectedName === player.name) return false;
     return true;

@@ -51,7 +51,9 @@ export function LobbyScreen({
   const isHost = myPlayer.isHost;
   const playerCount = room.players.length;
   // Solo keeps today's hard gate of 3 players; team mode adds its own rules.
-  const minPlayers = 3;
+  // Read the table limits from the selected game: Mafia needs 4, Top 100 needs 3.
+  const minPlayers = room.selectedGame?.minPlayers ?? 3;
+  const maxPlayers = room.selectedGame?.maxPlayers ?? 16;
   const readiness = getTeamStartReadiness(room.playMode, room.teams, playerCount, minPlayers);
   const canStart = room.playMode === 'team' ? readiness.ready : playerCount >= minPlayers;
   const myTeam = room.teams.find((team) => team.id === myPlayer.teamId);
@@ -180,7 +182,7 @@ export function LobbyScreen({
                     : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
                 }`}
               >
-                {playerCount} / 12 Joined
+                {playerCount} / {maxPlayers} Joined
               </span>
 
               {/* Room settings (play mode, teams, rounds) live behind this gear. */}
