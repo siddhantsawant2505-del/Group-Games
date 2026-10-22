@@ -1,9 +1,8 @@
 import { motion } from 'motion/react';
 import { ArrowRight, Gavel, MinusCircle } from 'lucide-react';
-import { Player, PlayerPrivateState, RoomPublicState } from '@shared/types';
+import { MAFIA_ROLE_LABELS, Player, PlayerPrivateState, RoomPublicState } from '@shared/types';
 import { Timer } from '../../components/Timer';
 import { PlayerAvatar } from '../../components/PlayerAvatar';
-import { MAFIA_ROLE_STYLES } from './roleTheme';
 
 interface ExileScreenProps {
   room: RoomPublicState;
@@ -77,7 +76,7 @@ export function ExileScreen({ room, myPlayer, privateState }: ExileScreenProps) 
                 </h2>
                 <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
                   {exiledRole
-                    ? `They were the ${MAFIA_ROLE_STYLES[exiledRole].label}.`
+                    ? `They were the ${MAFIA_ROLE_LABELS[exiledRole]}.`
                     : 'Their role stays a secret.'}
                 </span>
               </div>

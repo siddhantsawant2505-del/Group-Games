@@ -1,10 +1,9 @@
 import { motion } from 'motion/react';
 import { Eye, Moon, Search, Sun, Sunrise } from 'lucide-react';
-import { MafiaRole, Player, PlayerPrivateState, RoomPublicState } from '@shared/types';
+import { MAFIA_ROLE_LABELS, Player, PlayerPrivateState, RoomPublicState } from '@shared/types';
 import { Timer } from '../../components/Timer';
 import { ActionButton } from '../../components/ActionButton';
 import { PlayerAvatar } from '../../components/PlayerAvatar';
-import { MAFIA_ROLE_STYLES } from './roleTheme';
 
 interface MorningScreenProps {
   room: RoomPublicState;
@@ -83,7 +82,7 @@ export function MorningScreen({ room, myPlayer, privateState, onAdvance }: Morni
               </span>
               <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
                 {victimRole
-                  ? `They were the ${MAFIA_ROLE_STYLES[victimRole as MafiaRole].label}.`
+                  ? `They were the ${MAFIA_ROLE_LABELS[victimRole]}.`
                   : 'Their role stays a secret.'}
               </span>
             </div>

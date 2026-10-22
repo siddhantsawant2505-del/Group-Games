@@ -17,7 +17,6 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Discuss, find inconsistencies, and vote to eliminate the Impostor.',
     ],
     teamSupport: 'aggregate',
-    comingSoon: true,
   },
   {
     id: 'avoid-the-word',
@@ -36,7 +35,6 @@ export const PARTY_GAMES: GameMetadata[] = [
     ],
     // Team mode is native: a team survives while it has any alive member.
     teamSupport: 'native',
-    comingSoon: true,
   },
   {
     id: 'mafia',
@@ -107,7 +105,6 @@ export const PARTY_GAMES: GameMetadata[] = [
       'Players vote on the most clever category invention.',
     ],
     teamSupport: 'native',
-    comingSoon: true,
   },
 ];
 

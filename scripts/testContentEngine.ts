@@ -247,6 +247,14 @@ async function main(): Promise<void> {
   resetAiClientForTests();
   check('a well-formed Gemini key reports available', isAiAvailable() === true);
 
+  process.env.GEMINI_API_KEY = 'AQ.Ab8RN6J0abcdefghijklmnopqrstuvwxyz0123456789ABCDE';
+  resetAiClientForTests();
+  check('a newer AQ. Gemini key reports available', isAiAvailable() === true);
+
+  process.env.GEMINI_API_KEY = 'AQ.placeholder';
+  resetAiClientForTests();
+  check('an AQ. shaped placeholder still reports unavailable', isAiAvailable() === false);
+
   process.env.CONTENT_AI_DISABLED = 'true';
   resetAiClientForTests();
   check('CONTENT_AI_DISABLED forces unavailable', isAiAvailable() === false);

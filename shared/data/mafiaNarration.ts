@@ -46,7 +46,7 @@ export const MAFIA_NARRATION: Record<MafiaNarrationKind, string[]> = {
     'The square fills slowly, counting heads. {name} is not among them.',
     'Someone knocks on {name}’s door. There is no answer, and there will not be one.',
     'The village wakes with one fewer voice and one more question.',
-    'Morning brings thin light and a shorter attendance at the well.',
+    'Morning brings thin light and a shorter attendance at the well. {name} is not there to see it.',
     'The first thing anyone says today is {name}’s name, and then silence.',
   ],
   'morning-calm': [

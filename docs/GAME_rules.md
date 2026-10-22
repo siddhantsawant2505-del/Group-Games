@@ -20,11 +20,11 @@ built with React 19, TypeScript, Tailwind CSS v4, Express, and Socket.IO.
 - A 4-character room code + QR code are used for joining.
 - A "next-round" loop lets a host replay a new round with a fresh role assignment.
 
-> **Availability.** **Top 100** and **Mafia** are selectable in the app today. Impostor, Avoid the
-> Word, Guess the Link and Reverse Categories are marked `comingSoon` in `shared/data/games.ts`:
-> their cards appear with a **Coming Soon** badge, cannot be selected or launched, and the server
-> falls back to `DEFAULT_GAME` when a room still points at one of them. Their rules below are kept
-> for the engines and test suites, not as a promise that the game is live.
+> **Availability.** **Impostor**, **Avoid the Word**, **Mafia**, **Top 100** and **Reverse
+> Categories** are selectable in the app today. Only **Guess the Link** is marked `comingSoon` in
+> `shared/data/games.ts`: its card appears with a **Coming Soon** badge, cannot be selected or
+> launched, and the server falls back to `DEFAULT_GAME` when a room still points at it. Its rules
+> below are kept for the engine and test suite, not as a promise that the game is live.
 
 ---
 
@@ -617,7 +617,8 @@ the games still to get them:
   checks and a full recap; hidden concepts with per-player hint angles and simultaneous guessing;
   hidden 100-item ranked lists with position-exact scoring, host overrules and only the 1-10 /
   90-100 slices revealed; and unrelated item triplets with invented categories scored by the
-  standard ballot respectively). **Top 100 and Mafia are selectable**; the rest are Coming Soon.
+  standard ballot respectively). **Impostor, Avoid the Word, Mafia, Top 100 and Reverse Categories
+  are selectable**; only Guess the Link is still Coming Soon.
 - **Rooms** now run in **solo** or **team** mode, with host-managed teams, a central
   `awardPoints()` scoring path, and team leaderboards on the results and post-game screens.
 - **Per-game settings** live behind a gear on each game-select card (Impostor mode/difficulty/tone/

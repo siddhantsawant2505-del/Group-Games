@@ -46,10 +46,11 @@ function logOnce(key: string, message: string): void {
 }
 
 function looksLikeRealKey(key: string): boolean {
-  // Google AI Studio keys are ~39 characters and start with "AIza". The shipped
+  // AI Studio issues classic `AIza…` keys and newer `AQ.…` keys. The shipped
   // .env carries a placeholder, and placeholder values must not produce failing
   // network calls on every round.
-  return /^AIza[0-9A-Za-z_-]{20,}$/.test(key) && !/placeholder|your|example|changeme/i.test(key);
+  if (/placeholder|your|example|changeme/i.test(key)) return false;
+  return /^AIza[0-9A-Za-z_-]{20,}$/.test(key) || /^AQ\.[0-9A-Za-z._-]{20,}$/.test(key);
 }
 
 export function getAiStatus(): AiStatus {
