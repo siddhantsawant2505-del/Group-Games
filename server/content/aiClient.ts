@@ -7,7 +7,7 @@
  * channels, and the API key never leaves this module.
  *
  * Behaviour contract:
- *  - 8 second timeout, one retry, strict JSON output.
+ *  - 12 second timeout, one retry, strict JSON output.
  *  - Per-room rate limit (20 generation calls per rolling hour).
  *  - When no usable key is configured the client reports "unavailable" once and
  *    every caller silently falls back to bundled content: no errors, no log spam.
@@ -15,7 +15,9 @@
 
 import { GoogleGenAI } from '@google/genai';
 
-const TIMEOUT_MS = 8000;
+// Gemini rejects any deadline below 10s ("Manually set deadline 8s is too short"),
+// so the request timeout has to stay above that floor.
+const TIMEOUT_MS = 12000;
 const MAX_ATTEMPTS = 2;
 const RATE_LIMIT_MAX_CALLS = 20;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;

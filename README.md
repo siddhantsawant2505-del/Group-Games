@@ -366,7 +366,7 @@ One provider layer feeds every content-driven game: the Impostor word pool, the 
 |---|---|
 | `types.ts` | `ContentProvider<T>` contract (`next(roomId, opts)`, `release(roomId)`), the shared difficulty setting, and the theme/word sanitizers |
 | `contentBag.ts` | Per-room shuffle bag: a room's shuffled queue + served set, so nothing repeats until the pool is exhausted. A reshuffle (and a mid-session difficulty switch) can never serve any of the 10 most recent items first, and never re-serves a word while unused words remain |
-| `aiClient.ts` | Server-side Gemini wrapper: 8s timeout, one retry, strict JSON output, 20 generation calls per room per hour, and an "unavailable" report that fires **once** — no key, placeholder key or failures all fall back to bundled content silently |
+| `aiClient.ts` | Server-side Gemini wrapper: 12s timeout (Gemini's 10s minimum), one retry, strict JSON output, 20 generation calls per room per hour, and an "unavailable" report that fires **once** — no key, placeholder key or failures all fall back to bundled content silently |
 | `wordProvider.ts` | The word provider: bundled corpus via the bag, background AI top-up when the bag drops below 15 items or a theme is set, and local validation of every AI word |
 | `questionProvider.ts` | The Impostor question-pair provider: tone-filtered bag plus `validateQuestionPair` for both sides of a pair |
 | `avoidQuestionProvider.ts` | The Avoid the Word provider: tone/table-size filtered bag over the 123-question bank, the answer-space rule (`options ≥ alive + 4`, numeric range ≥ 20, "who here" only at 5+ alive), and a validated background AI top-up of ~15 questions per batch |

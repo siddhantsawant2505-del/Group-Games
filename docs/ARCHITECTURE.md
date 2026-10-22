@@ -101,7 +101,7 @@ word list, and no room repeats content:
   the pool is exhausted, and after a reshuffle the first items are never any of the last 10 served.
   Unused items always come before already-served ones, so even rebuilding the pool (a mid-session
   difficulty switch) cannot replay a word.
-- **AI client** — server-only Gemini wrapper: 8s timeout, one retry, strict JSON output, a per-room
+- **AI client** — server-only Gemini wrapper: 12s timeout (Gemini's 10s deadline minimum), one retry, strict JSON output, a per-room
   rate limit (20 calls/hour) and a single "unavailable" report. The API key never reaches a client,
   and a missing or placeholder key degrades to bundled content without errors or log spam.
 - **Validation before use** — AI content is validated locally (shape, commonness data, blocklist,
