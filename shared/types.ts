@@ -32,6 +32,7 @@ export type GamePhase =
   | 'mafia-exile'
   | 'reveal-answers'
   | 'guess'
+  | 'link-loading'
   | 'discussion'
   | 'vote'
   | 'results'
@@ -188,6 +189,7 @@ export interface GameSettings {
   avoidTheWord: AvoidSettings;
   top100: Top100Settings;
   mafia: MafiaSettings;
+  guessTheLink: GtlSettings;
 }
 
 export const PLAY_MODE_LABELS: Record<PlayMode, string> = {
@@ -637,17 +639,123 @@ export interface RevCatPublicState {
   roundsPlayed: number;
 }
 
+/* ────────────────────── Guess the Link (three images) ───────────────────── */
+
+/** One of the three clue images of a puzzle. */
+export interface LinkItem {
+  name: string;
+  emoji: string;
+  imagePrompt: string;
+  imageToken?: string;
+}
+
+/** A puzzle as stored in the library. The link itself never reaches clients early. */
+export interface GuessLinkPuzzle {
+  id: string;
+  link: string;
+  aliases: string[];
+  linkType: 'shared-word' | 'shared-property' | 'shared-category' | 'lateral';
+  difficulty: 1 | 2 | 3;
+  hint: string;
+  items: [LinkItem, LinkItem, LinkItem];
+  botWrongGuesses: string[];
+  quality: { solverChecked: boolean; imagesChecked: boolean; disabled: boolean };
+  createdAt: string;
+  useCount: number;
+}
+
+export type GtlDifficultySetting = 'easy' | 'medium' | 'hard' | 'mixed';
+
+/** Public Guess the Link settings (strategy, never round secrets). */
+export interface GtlSettings {
+  roundCount: number;
+  roundSeconds: number;
+  difficulty: GtlDifficultySetting;
+  attempts: number;
+  hintEnabled: boolean;
+  theme?: string;
+}
+
+export const GTL_SETTINGS_LIMITS = {
+  roundCount: { min: 1, max: 12 },
+  roundSeconds: { min: 20, max: 180 },
+  attempts: { min: 1, max: 5 },
+} as const;
+
+export const DEFAULT_GTL_SETTINGS: GtlSettings = {
+  roundCount: 6,
+  roundSeconds: 60,
+  difficulty: 'mixed',
+  attempts: 3,
+  hintEnabled: true,
+};
+
+/** A clue as shown during a round (never carries the link). */
+export interface GtlClue {
+  emoji: string;
+  /** Present only from the get-ready step onwards, and only for stored images. */
+  imageUrl: string | null;
+}
+
+/** One player/team that solved the round. */
+export interface GtlSolve {
+  rowId: string;
+  name: string;
+  colorIndex: number;
+  points: number;
+  seconds: number;
+}
+
+/** A wrong guess the host can overrule (results only). */
+export interface GtlWrongGuess {
+  rowId: string;
+  name: string;
+  guess: string;
+  overruled: boolean;
+}
+
+/** One item revealed at results (name only leaves the server here). */
+export interface GtlRevealedItem {
+  name: string;
+  emoji: string;
+  imageUrl: string | null;
+  caption: string;
+}
+
 export interface GtlPublicState {
-  category: string;            // broad category of the hidden concept
-  conceptWordCount: number;    // how many words the concept has (a fair nudge)
-  hintsDealt: number;          // distinct hint angles dealt this round
-  totalPlayers: number;
-  responsesReady: boolean;     // every response has been compiled for the reveal
-  guessesSubmitted: string[];  // playerIds who locked in a guess
-  guessSeconds: number;
-  revealed: boolean;           // concept is public (results only)
-  concept: string | null;      // null until revealed
-  correctPlayerIds: string[];  // empty until revealed
+  /** ready = get-ready/countdown, guessing = live guesses, results = revealed. */
+  phase: 'ready' | 'guessing' | 'results';
+  roundNumber: number;
+  roundCount: number;
+  /** Clues for the current round; imageUrl is null for emoji-only puzzles. */
+  clues: GtlClue[];
+  seconds: number;
+  attempts: number;
+  hintEnabled: boolean;
+  /** Public hint, once half the time has passed with nobody solved. */
+  hint: string | null;
+  /** Everyone who has solved, in server receive order. */
+  solved: GtlSolve[];
+  /** playerId/teamId -> attempts used this round. */
+  attemptsUsed: Record<string, number>;
+  /** Results only. */
+  revealed: boolean;
+  /** Canonical link, only at results. */
+  link: string | null;
+  items: GtlRevealedItem[];
+  wrongGuesses: GtlWrongGuess[];
+  finalRound: boolean;
+  gameOver: boolean;
+  /** Deprecated legacy fields kept so older screens still type-check. */
+  category?: string;
+  conceptWordCount?: number;
+  hintsDealt?: number;
+  totalPlayers?: number;
+  responsesReady?: boolean;
+  guessesSubmitted: string[];
+  guessSeconds?: number;
+  concept?: string | null;
+  correctPlayerIds?: string[];
 }
 
 export type MafiaRole = 'mafia' | 'detective' | 'doctor' | 'townsperson';
@@ -813,6 +921,10 @@ export interface PhaseResultsData {
   roleReveals?: RoleRevealInfo[];
   standings: PlayerResultStanding[];
   winnerTitle?: string;
+  /** Final-round flags used by the Guess the Link results screen. */
+  finalRound?: boolean;
+  gameOver?: boolean;
+  winnerIds?: string[];
   // Avoid the Word-specific
   avoidPlacements?: AvoidPlacement[];
   avoidWinnerNames?: string[];
@@ -976,6 +1088,11 @@ export interface PlayerPrivateState {
   gtlGuessText?: string;
   gtlGuessCorrect?: boolean;
   gtlPointsAwarded?: number;
+  /** New image engine: this row's (player or team) remaining attempts + verdicts. */
+  gtlAttemptsLeft?: number;
+  gtlAttemptsUsed?: number;
+  gtlVerdicts?: boolean[];
+  gtlSolved?: boolean;
   // Top 100
   top100GuessSubmitted?: boolean;
   top100GuessText?: string;            // the locked guess (own, or the team's)

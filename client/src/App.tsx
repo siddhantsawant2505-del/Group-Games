@@ -48,11 +48,10 @@ import { DayScreen } from './screens/mafia/DayScreen';
 import { VoteScreen as MafiaVoteScreen } from './screens/mafia/VoteScreen';
 import { ExileScreen } from './screens/mafia/ExileScreen';
 import { GameOverScreen } from './screens/mafia/GameOverScreen';
-import { GtlHintRevealScreen } from './screens/GtlHintRevealScreen';
+import { GtlHintRevealScreen } from './screens/guessTheLink/GuessTheLinkScreens';
 import { GtlInputScreen } from './screens/GtlInputScreen';
 import { GtlResponseRevealScreen } from './screens/GtlResponseRevealScreen';
-import { GtlGuessScreen } from './screens/GtlGuessScreen';
-import { GtlResultsScreen } from './screens/GtlResultsScreen';
+import { GtlGuessScreen, GtlResultsScreen } from './screens/guessTheLink/GuessTheLinkScreens';
 import { Top100QuestionScreen } from './screens/top100/Top100QuestionScreen';
 import { Top100GuessScreen } from './screens/top100/Top100GuessScreen';
 import { Top100GuessesRevealScreen } from './screens/top100/Top100GuessesRevealScreen';
@@ -554,6 +553,18 @@ export default function App() {
   }, [room, myPlayer]);
 
   // Guess the Link: a player locks in their guess at the hidden concept
+  const handleGtlOverrule = useCallback(
+    (wrongIndex: number) => {
+      if (!room || !myPlayer) return;
+      getSocket().emit('gtl-overrule', {
+        roomCode: room.roomCode,
+        playerId: myPlayer.id,
+        wrongIndex,
+      });
+    },
+    [room, myPlayer]
+  );
+
   const handleGtlGuess = useCallback(
     (guess: string) => {
       if (!room || !myPlayer) return;
@@ -998,9 +1009,11 @@ export default function App() {
           <GtlResultsScreen
             room={room}
             myPlayer={myPlayer}
+            privateState={privateState}
             onNextRound={() => handleAdvancePhase('next-round')}
             onReturnToLobby={handleReturnToLobby}
             onEndSession={() => handleAdvancePhase('post-game')}
+            onOverrule={handleGtlOverrule}
           />
         ) : isTop100 ? (
           <Top100ListSlicesScreen

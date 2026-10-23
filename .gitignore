@@ -37,3 +37,5 @@ coverage/
 
 # Runtime content-maintenance aid: Top 100 guesses that matched nothing (no player data)
 data/unmatched-guesses.json
+# Guess the Link generated puzzle library (seed puzzles are in code)
+data/puzzle-library/

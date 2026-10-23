@@ -671,6 +671,27 @@ async function startServer() {
       }
     );
 
+    // 14a. Guess the Link: the host marks a wrong guess as actually correct
+    socket.on(
+      'gtl-overrule',
+      ({
+        roomCode,
+        playerId,
+        wrongIndex,
+      }: {
+        roomCode: string;
+        playerId: string;
+        wrongIndex: number;
+      }) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) return;
+        roomManager.gtlOverrule(room, playerId, Number(wrongIndex), () =>
+          broadcastRoom(upperCode)
+        );
+      }
+    );
+
     // 14b. Guess the Link: host authors a custom concept + hint angles
     socket.on(
       'gtl-set-prompt',

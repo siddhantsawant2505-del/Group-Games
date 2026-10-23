@@ -44,6 +44,9 @@ import {
   DEFAULT_IMPOSTOR_SETTINGS,
   DEFAULT_MAFIA_SETTINGS,
   DEFAULT_TOP100_SETTINGS,
+  DEFAULT_GTL_SETTINGS,
+  GtlSettings,
+  GTL_SETTINGS_LIMITS,
   GameSettings,
   MAFIA_SETTINGS_LIMITS,
   MafiaSettings,
@@ -131,6 +134,9 @@ import {
   pendingGtlGuessers,
   calculateGtlResults,
   cleanupGtlRound,
+  applyGtlOverrule,
+  maybeRevealGtlHint,
+  readGtlSettings,
 } from './games/guessTheLink';
 import {
   TOP100_OVERRULE_SECONDS,
@@ -454,6 +460,7 @@ export class RoomManager {
       impostorQuestionState: null,
       gameSettings: {
         impostor: { ...DEFAULT_IMPOSTOR_SETTINGS },
+        guessTheLink: { ...DEFAULT_GTL_SETTINGS },
         avoidTheWord: { ...DEFAULT_AVOID_SETTINGS },
         top100: { ...DEFAULT_TOP100_SETTINGS },
         mafia: { ...DEFAULT_MAFIA_SETTINGS },
@@ -786,6 +793,7 @@ export class RoomManager {
       avoidTheWord?: Partial<AvoidSettings>;
       top100?: Partial<Top100Settings>;
       mafia?: Partial<MafiaSettings>;
+      guessTheLink?: Partial<GtlSettings>;
     }
   ): { success: boolean; error?: string } {
     const room = this.getRoom(code);
@@ -821,6 +829,40 @@ export class RoomManager {
       ),
       top100: sanitizeTop100SettingsPatch(patch?.top100 || {}, room.gameSettings.top100),
       mafia: sanitizeMafiaSettingsPatch(patch?.mafia || {}, room.gameSettings.mafia),
+      guessTheLink: {
+        roundCount: Math.min(
+          GTL_SETTINGS_LIMITS.roundCount.max,
+          Math.max(
+            GTL_SETTINGS_LIMITS.roundCount.min,
+            Math.floor(Number(patch?.guessTheLink?.roundCount ?? room.gameSettings.guessTheLink.roundCount))
+          )
+        ),
+        roundSeconds: Math.min(
+          GTL_SETTINGS_LIMITS.roundSeconds.max,
+          Math.max(
+            GTL_SETTINGS_LIMITS.roundSeconds.min,
+            Math.floor(Number(patch?.guessTheLink?.roundSeconds ?? room.gameSettings.guessTheLink.roundSeconds))
+          )
+        ),
+        attempts: Math.min(
+          GTL_SETTINGS_LIMITS.attempts.max,
+          Math.max(
+            GTL_SETTINGS_LIMITS.attempts.min,
+            Math.floor(Number(patch?.guessTheLink?.attempts ?? room.gameSettings.guessTheLink.attempts))
+          )
+        ),
+        difficulty:
+          patch?.guessTheLink?.difficulty === 'easy' ||
+          patch?.guessTheLink?.difficulty === 'medium' ||
+          patch?.guessTheLink?.difficulty === 'hard' ||
+          patch?.guessTheLink?.difficulty === 'mixed'
+            ? patch.guessTheLink.difficulty
+            : room.gameSettings.guessTheLink.difficulty,
+        hintEnabled:
+          typeof patch?.guessTheLink?.hintEnabled === 'boolean'
+            ? patch.guessTheLink.hintEnabled
+            : room.gameSettings.guessTheLink.hintEnabled,
+      },
     };
     room.lastActivityAt = Date.now();
     return { success: true };
@@ -1317,6 +1359,16 @@ export class RoomManager {
         // Prepare private roles/words based on selected game
         if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
           setupGtlRound(room);
+          room.phasePrompt = 'Get Ready';
+          room.phaseSubprompt = 'Three pictures, one hidden link';
+          this.startPhaseTimer(
+            room,
+            5,
+            () => broadcastState(),
+            () => this.transitionToPhase(room, 'guess', broadcastState)
+          );
+          broadcastState();
+          return;
         } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
           setupReverseCategoriesRound(room);
         } else {
@@ -1582,15 +1634,19 @@ export class RoomManager {
           return;
         }
 
-        room.phasePrompt = 'Guess the Concept';
-        room.phaseSubprompt = 'Lock in the link that ties every response together';
+        const gtlSettings = readGtlSettings(room);
+        room.phasePrompt = 'Guess the Link';
+        room.phaseSubprompt = 'Spot what connects the three pictures';
         beginGtlGuessing(room);
         simulateGtlBotGuesses(room);
 
         this.startPhaseTimer(
           room,
-          GTL_GUESS_SECONDS,
-          () => broadcastState(),
+          gtlSettings.roundSeconds,
+          () => {
+            maybeRevealGtlHint(room);
+            broadcastState();
+          },
           () => this.finishGtlGuessing(room, broadcastState)
         );
 
@@ -1720,7 +1776,10 @@ export class RoomManager {
               ? this.buildTeamStandings(room, room.results.standings)
               : undefined;
         }
-        if (room.selectedGame?.id === TOP_100_GAME_ID) {
+        if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
+          room.phasePrompt = 'The Link Revealed';
+          room.phaseSubprompt = 'Solve order, points and who nearly had it';
+        } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
           room.phasePrompt = 'How the List Looks';
           room.phaseSubprompt = 'The revealed slices, your own guess, then the standings';
         } else {
@@ -1908,6 +1967,7 @@ export class RoomManager {
   private phaseAfterReveal(room: InternalRoom): GamePhase {
     if (room.selectedGame?.id === AVOID_THE_WORD_GAME_ID) return 'avoid-anchor';
     if (room.selectedGame?.id === MAFIA_GAME_ID) return 'night';
+    if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) return 'guess';
     return 'input';
   }
 
@@ -2601,6 +2661,22 @@ export class RoomManager {
    * Guess the Link: a player locks in their guess at the hidden concept.
    * The guess stays private until results.
    */
+  /** Guess the Link: the host marks a wrong guess as actually correct (+1). */
+  public gtlOverrule(
+    room: InternalRoom,
+    playerId: string,
+    wrongIndex: number,
+    broadcastState: () => void
+  ): { success: boolean; error?: string } {
+    if (playerId !== room.hostId) return { success: false, error: 'Only the host can overrule.' };
+    if (room.selectedGame?.id !== GUESS_THE_LINK_GAME_ID) {
+      return { success: false, error: 'Not a Guess the Link round.' };
+    }
+    const result = applyGtlOverrule(room, wrongIndex);
+    if (result.success) broadcastState();
+    return result;
+  }
+
   public submitGtlGuess(
     room: InternalRoom,
     playerId: string,
@@ -2613,7 +2689,7 @@ export class RoomManager {
     const outcome = recordGtlGuess(room, playerId, guess);
     if (!outcome.accepted) return;
 
-    if (outcome.pendingPlayerIds.length === 0) {
+    if (!outcome.pendingRowIds || outcome.pendingRowIds.length === 0) {
       this.finishGtlGuessing(room, broadcastState);
       return;
     }

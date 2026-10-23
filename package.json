@@ -17,7 +17,9 @@
     "generate:words": "tsx scripts/generateCommonNouns.ts",
     "validate:top100": "tsx scripts/validateTop100Lists.ts",
     "test:top100": "tsx scripts/testTop100.ts",
-    "test:mafia": "tsx scripts/testMafia.ts"
+    "test:mafia": "tsx scripts/testMafia.ts",
+    "test:link": "tsx scripts/testGuessTheLink.ts",
+    "seed:link": "tsx scripts/seedLinkLibrary.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
