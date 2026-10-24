@@ -21,7 +21,38 @@ import {
   GtlWrongGuess,
   PlayerResultStanding,
 } from '../../shared/types';
-import { SEED_LINK_PUZZLES } from '../content/guessTheLink/seedPuzzles';
+import { takePuzzle } from '../content/guessTheLink/linkProvider';
+import { releaseRoomBuffer } from '../content/guessTheLink/linkProvider';
+
+export {
+  prepare as prepareGtlPuzzles,
+  releaseRoomBuffer as releaseGtlBuffer,
+  providerStats as gtlProviderStats,
+  startWarmPool as startGtlWarmPool,
+} from '../content/guessTheLink/linkProvider';
+import {
+  acceptedAnswers,
+  getEditDistance,
+  judgeLinkGuess,
+  JudgeAi,
+  normalizeLinkText,
+} from '../content/guessTheLink/linkJudge';
+import { generateJsonArray } from '../content/aiClient';
+
+/** AI fallback judge for near-misses; never sent to a client. */
+const linkJudgeAi: JudgeAi = {
+  async ask({ systemInstruction, prompt, roomId }) {
+    const rows = await generateJsonArray({
+      roomId,
+      systemInstruction,
+      prompt,
+      label: 'guess-link judge',
+      temperature: 0,
+    });
+    const verdict = (rows?.[0] as { correct?: unknown } | undefined)?.correct;
+    return typeof verdict === 'boolean' ? verdict : null;
+  },
+};
 
 /** Points by solve order: 1st +3, 2nd +2, everyone later +1. */
 export const GTL_POINTS_BY_ORDER = [3, 2, 1] as const;
@@ -65,6 +96,7 @@ export function getGtlRoundState(roomCode: string): GtlRoundState | undefined {
 
 export function cleanupGtlRound(roomCode: string): void {
   activeRounds.delete(roomCode);
+  releaseRoomBuffer(roomCode);
 }
 
 /** Reads the public settings, clamping anything the host sent out of range. */
@@ -109,50 +141,27 @@ export function sanitizeGtlGuess(raw: string): string {
     .slice(0, GTL_MAX_GUESS_CHARS);
 }
 
-/** Normalizes an answer: lowercase, accents stripped, punctuation gone. */
-export function normalizeGtlText(value: string): string {
-  return (value || '')
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9 ]+/g, ' ')
-    .replace(/\b(the|a|an)\b\s*/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/s$/, '');
-}
-
-/** Levenshtein distance, bounded by the strings' lengths. */
-export function editDistance(a: string, b: string): number {
-  if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    const current = [i];
-    for (let j = 1; j <= b.length; j++) {
-      current[j] = Math.min(
-        previous[j] + 1,
-        current[j - 1] + 1,
-        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
-      );
-    }
-    previous = current;
-  }
-  return previous[b.length];
-}
+/** Shared normalizer (one implementation, also used by the judge). */
+export const normalizeGtlText = normalizeLinkText;
+export const editDistance = getEditDistance;
 
 /** Local judgement: exact link/alias, then a small typo allowance. */
 export function isCorrectGtlGuess(puzzle: GuessLinkPuzzle, rawGuess: string): boolean {
-  const guess = normalizeGtlText(rawGuess);
-  if (!guess) return false;
-  const accepted = [puzzle.link, ...puzzle.aliases].map(normalizeGtlText).filter(Boolean);
-  if (accepted.includes(guess)) return true;
-  return accepted.some((answer) => {
+  const local = matchGtlLocal(puzzle, rawGuess);
+  return local === 'correct';
+}
+
+function matchGtlLocal(puzzle: GuessLinkPuzzle, rawGuess: string): 'correct' | 'ambiguous' | 'incorrect' {
+  const guess = normalizeLinkText(rawGuess);
+  if (!guess) return 'incorrect';
+  const accepted = acceptedAnswers(puzzle);
+  if (accepted.includes(guess)) return 'correct';
+  const near = accepted.filter((answer) => {
     const tolerance = answer.length >= 10 ? 2 : answer.length >= 5 ? 1 : 0;
-    return tolerance > 0 && editDistance(guess, answer) <= tolerance;
+    return tolerance > 0 && getEditDistance(guess, answer) <= tolerance;
   });
+  if (near.length === 1) return 'correct';
+  return near.length > 1 ? 'ambiguous' : 'incorrect';
 }
 
 function rowsFor(room: InternalRoom, settings: GtlSettings): GtlRow[] {
@@ -176,28 +185,25 @@ function rowsFor(room: InternalRoom, settings: GtlSettings): GtlRow[] {
   }));
 }
 
-function puzzlePool(settings: GtlSettings, used: string[]): GuessLinkPuzzle[] {
-  const byDifficulty =
-    settings.difficulty === 'mixed'
-      ? SEED_LINK_PUZZLES
-      : SEED_LINK_PUZZLES.filter(
-          (puzzle) =>
-            (settings.difficulty === 'easy' && puzzle.difficulty === 1) ||
-            (settings.difficulty === 'medium' && puzzle.difficulty === 2) ||
-            (settings.difficulty === 'hard' && puzzle.difficulty === 3)
-        );
-  const enabled = byDifficulty.filter((puzzle) => !puzzle.quality.disabled);
-  if (enabled.length === 0) return SEED_LINK_PUZZLES;
-  const fresh = enabled.filter((puzzle) => !used.includes(puzzle.id));
-  return fresh.length > 0 ? fresh : enabled;
-}
 
-function pickPuzzle(settings: GtlSettings, used: string[]): GuessLinkPuzzle {
-  const pool = puzzlePool(settings, used);
-  const picked = pool[Math.floor(Math.random() * pool.length)];
-  picked.useCount += 1;
-  return picked;
-}
+/** Last-resort emoji puzzle, only if the library itself is empty. */
+const SEED_FALLBACK: GuessLinkPuzzle = {
+  id: 'fallback-link',
+  link: 'Circle',
+  aliases: ['circles', 'round', 'rings', 'hoops'],
+  linkType: 'shared-category',
+  difficulty: 1,
+  hint: 'It is a shape - 6 letters',
+  items: [
+    { name: 'Wheel', emoji: '🛞', imagePrompt: 'a wooden cart wheel' },
+    { name: 'Clock', emoji: '🕰️', imagePrompt: 'a round wall clock' },
+    { name: 'Plate', emoji: '🍽️', imagePrompt: 'a round dinner plate' },
+  ],
+  botWrongGuesses: ['square', 'metal', 'time'],
+  quality: { solverChecked: true, imagesChecked: false, disabled: false },
+  createdAt: '2026-01-01T00:00:00.000Z',
+  useCount: 0,
+};
 
 /**
  * 1. Get ready: pick the round's puzzle and publish only its emoji tiles.
@@ -210,7 +216,13 @@ export function setupGtlRound(room: InternalRoom): void {
   }
   const previous = activeRounds.get(room.code);
   const usedPuzzleIds = previous?.usedPuzzleIds ?? [];
-  const puzzle = pickPuzzle(settings, usedPuzzleIds);
+  // Library first (seeds are in it), prepared buffer, then libraries fallback.
+  const puzzle =
+    takePuzzle(room.code, settings) ??
+    ({
+      ...SEED_FALLBACK,
+      useCount: SEED_FALLBACK.useCount + 1,
+    } as GuessLinkPuzzle);
 
   const state: GtlRoundState = {
     puzzle,
@@ -222,7 +234,7 @@ export function setupGtlRound(room: InternalRoom): void {
     startedAt: 0,
     roundPoints: new Map(),
     overruledWrong: new Set(),
-    usedPuzzleIds: [...usedPuzzleIds, puzzle.id].slice(-SEED_LINK_PUZZLES.length),
+    usedPuzzleIds: [...usedPuzzleIds, puzzle.id].slice(-60),
     roundsPlayed: previous?.roundsPlayed ?? 0,
   };
   activeRounds.set(room.code, state);
@@ -338,11 +350,11 @@ export interface GtlGuessOutcome {
 }
 
 /** Judge + score one live guess. Called by the room manager. */
-export function recordGtlGuess(
+export async function recordGtlGuess(
   room: InternalRoom,
   playerId: string,
   rawGuess: string
-): GtlGuessOutcome {
+): Promise<GtlGuessOutcome> {
   const state = activeRounds.get(room.code);
   if (!state || state.phase !== 'guessing') return { accepted: false };
   const settings = readGtlSettings(room);
@@ -358,7 +370,8 @@ export function recordGtlGuess(
   if (!guess) return { accepted: false };
 
   row.used += 1;
-  const correct = isCorrectGtlGuess(state.puzzle, guess);
+  const judgement = await judgeLinkGuess(room.code, state.puzzle, guess, linkJudgeAi);
+  const correct = judgement.correct;
   row.verdicts.push(correct);
 
   if (correct) {
@@ -534,7 +547,7 @@ export function simulateGtlBotGuesses(room: InternalRoom): void {
         : state.puzzle.botWrongGuesses[
             Math.floor(Math.random() * state.puzzle.botWrongGuesses.length)
           ];
-      recordGtlGuess(room, bot.id, guess);
+      void recordGtlGuess(room, bot.id, guess);
     }, delay);
     // Tracked on the room so a phase change cancels them.
     room.botTimeouts.push(timeout);

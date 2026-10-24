@@ -21,7 +21,7 @@ built with React 19, TypeScript, Tailwind CSS v4, Express, and Socket.IO.
 - A "next-round" loop lets a host replay a new round with a fresh role assignment.
 
 > **Availability.** **Impostor**, **Avoid the Word**, **Mafia**, **Top 100** and **Reverse
-> Categories** are selectable in the app today. Only **Guess the Link** is marked `comingSoon` in
+> Categories** and **Guess the Link** are selectable in the app today. None are marked `comingSoon` in
 > `shared/data/games.ts`: its card appears with a **Coming Soon** badge, cannot be selected or
 > launched, and the server falls back to `DEFAULT_GAME` when a room still points at it. Its rules
 > below are kept for the engine and test suite, not as a promise that the game is live.
@@ -298,20 +298,14 @@ a death, a quiet morning, an exile, a Town win and a Mafia win, drawn from a per
 
 ### 2.6 Guess the Link game rules
 
-- **Hint dealing:** the server hides one concept and deals every player a **different** hint angle on
-  it (six distinct angles per concept, reused in bigger rooms). Each player sees only their own
-  angle, the concept's category, its word count, and their angle number.
-- **Responses:** each player privately writes one word or a short phrase from their own angle,
-  sanitized to 3 words / 24 characters.
-- **Link board:** every response is revealed together in shuffled order; the concept itself stays
-  hidden.
-- **Guessing:** everyone locks in a guess at the hidden concept at the same time — the room sees who
-  has locked in, never what they guessed. The phase closes when everyone has guessed or the timer
-  ends.
-- **Scoring:** **+1** per correct guess (exact answers, plural-insensitive spellings, shipped
-  aliases, and answers clearly containing the concept all count).
-- **Results:** the concept, every angle, every guess, the correct guessers, a heuristic "biggest
-  giveaway" callout, and the cumulative leaderboard.
+- **Players:** 3–8 solo, or 2+ teams. Default 6 rounds; highest total wins.
+- **Each round** shows three images of concrete things sharing one hidden link.
+- **Get ready:** clients preload the images, then a 3-2-1 countdown.
+- **Guessing:** everyone guesses live with up to 3 attempts. Each guess is judged immediately and only the submitter sees correct/incorrect; the public feed shows "<name> got it!" in solve order. A public hint appears after half the time if nobody has solved it.
+- **Scoring:** 1st correct +3, 2nd +2, later solvers +1, nothing for unsolved. The host can mark a wrong guess "actually correct" for +1.
+- **Reveal:** the link, each item with its name, solve order, points and standings. Continue skips ahead.
+- **Team mode:** one shared attempt pool and verdicts per team; teams score in solve order.
+- **Content:** puzzles come from a persistent library served by `server/content/guessTheLink/linkProvider.ts`. Images degrade to emoji tiles, and seed puzzles guarantee a round can always start.
 
 ### 2.7 Top 100 game rules
 

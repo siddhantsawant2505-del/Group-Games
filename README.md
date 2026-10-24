@@ -98,14 +98,14 @@ All six games ship their own dedicated server engine — **Impostor**, **Avoid t
 
 ## Games collection, rules & working state
 
-Party Games features a collection of six multiplayer party games designed for phone controllers. **Impostor, Avoid the Word, Mafia, Top 100 and Reverse Categories are shipped**; only Guess the Link is still listed as **Coming Soon** — its card stays visible but cannot be selected or launched until its engine is re-verified.
+Party Games features a collection of six multiplayer party games designed for phone controllers. **All six games are shipped and selectable**, including Guess the Link's three-image link engine.
 
 | Game | Players | Category | Icon | Current Working State |
 |---|---|---|---|---|
 | **Impostor** | 3–12 | Social Deduction | Mask | 🟢 **Fully Working & Playable** — Word and Question modes, private clues, secret voting, content engine with an AI top-up, host difficulty/tone/theme settings |
 | **Avoid the Word** | 3–10 | Bluff / Elimination | Ban | 🟢 **Fully Working & Playable** — rotating anchor, one hidden answer, live match knockouts, host overrules, 123-question deck, native team rules |
 | **Mafia** | 4–16 | Social Deduction | Detective | 🟢 **Fully Working & Playable** — Dedicated engine with hold-to-reveal roles, identical-timer night actions (Mafia/Doctor/Detective/decoy), narrator mornings, discussion + secret exile ballots, a full recap, and faction scoring |
-| **Guess the Link** | 3–8 | Word Association | Link | 🟡 **Coming Soon** — engine exists; not selectable in the app yet |
+| **Guess the Link** | 3–8 | Word Association | Link | 🟢 **Live** — three clue images, live attempts, solve-order points |
 | **Top 100** | 3–10 | Ranking / List Knowledge | List-Ordered | 🟢 **Fully Working & Playable** — Dedicated engine with a hidden 100-item list per round, one guess per player (or team), position-exact scoring, host overrules, duplicate/region/category settings, and only the 1-10 / 90-100 slices revealed |
 | **Reverse Categories** | 3–8 | Trivia / Creative | Shuffle | 🟢 **Fully Working & Playable** — server-picked triplets, privately invented categories, shuffled board, secret ballot for the best invention |
 
@@ -675,3 +675,8 @@ npm run clean
 - **Name:** Party Games
 - **Description:** Mobile-first real-time party and social deduction game engine.
 - **Major capability:** Server-side game engine with real-time multiplayer.
+
+
+### Guess the Link content pipeline
+
+Puzzles come from a persistent library under `data/puzzle-library/` (gitignored; seed puzzles ship in code). The server warms a pool of illustrated puzzles in the background, prepares a two-deep lookahead when the host selects the game, and always has a seed fallback, so a round never waits on the model. Text generation and judging use `GEMINI_API_KEY` through `server/content/aiClient.ts`; clue images use a separate adapter (`IMAGE_PROVIDER=gemini|mock|none`, `IMAGE_MODEL`, `IMAGE_API_KEY`). With no image provider the game plays on emoji tiles. Images are random-token WebP files served immutably from `/api/guess-link/img/:token`; `npm run seed:link` fills the seed library, `/api/guess-link/stats` reports pipeline health and `/dev/link-library` (development only) curates puzzles.

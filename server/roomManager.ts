@@ -137,6 +137,8 @@ import {
   applyGtlOverrule,
   maybeRevealGtlHint,
   readGtlSettings,
+  prepareGtlPuzzles,
+  releaseGtlBuffer,
 } from './games/guessTheLink';
 import {
   TOP100_OVERRULE_SECONDS,
@@ -729,6 +731,10 @@ export class RoomManager {
     // when the host switches away stops it surprising a later round.
     if (gameId !== GUESS_THE_LINK_GAME_ID) {
       room.gtlCustomPrompt = null;
+      releaseGtlBuffer(room.code);
+    } else {
+      // Start early: round 1 is ready before the host presses Start.
+      void prepareGtlPuzzles(room.code, readGtlSettings(room));
     }
     // Switching away from Mafia drops its secret roles and night state instead
     // of leaving them attached to the room's public payload.
@@ -865,6 +871,11 @@ export class RoomManager {
       },
     };
     room.lastActivityAt = Date.now();
+    if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
+      // Settings changed: the room's lookahead must match the new band/theme.
+      releaseGtlBuffer(room.code);
+      void prepareGtlPuzzles(room.code, readGtlSettings(room));
+    }
     return { success: true };
   }
 
@@ -2677,7 +2688,7 @@ export class RoomManager {
     return result;
   }
 
-  public submitGtlGuess(
+  public async submitGtlGuess(
     room: InternalRoom,
     playerId: string,
     guess: string,
@@ -2686,7 +2697,7 @@ export class RoomManager {
     if (room.phase !== 'guess') return;
     if (room.selectedGame?.id !== GUESS_THE_LINK_GAME_ID) return;
 
-    const outcome = recordGtlGuess(room, playerId, guess);
+    const outcome = await recordGtlGuess(room, playerId, guess);
     if (!outcome.accepted) return;
 
     if (!outcome.pendingRowIds || outcome.pendingRowIds.length === 0) {

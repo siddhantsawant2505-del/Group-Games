@@ -617,3 +617,8 @@ Use this checklist when generating or reviewing a game architecture:
 *The current implementation is a strong starting point: it already models these pillars in a
 single-process Express + Socket.IO server. The remaining work is hardening: persistence, scaling,
 rate limits, formal reconnect handling, and production observability.*
+
+
+### Guess the Link content pipeline
+
+`puzzleLibrary.ts` owns the persistent index (`LIBRARY_DIR`, `LIBRARY_MAX`) and per-room no-repeat bags. `puzzleGenerator.ts` validates AI text, runs a solver check, then draws all three images in parallel through `imageProvider.ts` (Gemini, mock or none) under a global concurrency cap and daily budget. `imageStore.ts` post-processes with sharp to 512×512 WebP under random tokens. `linkProvider.ts` keeps `LOOKAHEAD_DEPTH` puzzles ready per room and falls back library → any band → seed, so the phase machine never blocks. Dev endpoints: `GET /api/guess-link/img/:token`, `/api/guess-link/stats`, `/dev/link-library`; images are seeded with `npm run seed:link` when a provider is configured.

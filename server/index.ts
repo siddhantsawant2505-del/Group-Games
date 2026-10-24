@@ -10,6 +10,15 @@ import { createServer as createViteServer } from 'vite';
 import { roomManager } from './roomManager.ts';
 import { getMafiaTeamPicks } from './games/mafia.ts';
 import { reportAiUnavailableOnce } from './content/index.ts';
+import { readImage, hasImageToken } from './content/guessTheLink/imageStore.ts';
+import {
+  gtlProviderStats,
+  startGtlWarmPool,
+} from './games/guessTheLink.ts';
+import {
+  allPuzzles,
+  setPuzzleDisabled,
+} from './content/guessTheLink/puzzleLibrary.ts';
 
 const projectRoot = process.cwd();
 
@@ -17,6 +26,8 @@ async function startServer() {
   // Announce once at boot whether the content engine has an AI provider, so the
   // fallback behaviour is never a surprise. Silent when a real key is set.
   reportAiUnavailableOnce();
+  // Fills the warm pool shortly after boot so a first round never waits.
+  startGtlWarmPool();
 
   const app = express();
   const server = http.createServer(app);
@@ -817,6 +828,60 @@ async function startServer() {
   // Health check API
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+
+  // Guess the Link clue images: only tokens the library knows are served, with
+  // immutable caching. The random token name says nothing about the puzzle.
+  app.get('/api/guess-link/img/:token', async (req, res) => {
+    const token = String(req.params.token || '');
+    if (!/^[a-f0-9]{32}$/.test(token) || !hasImageToken(token)) {
+      res.status(404).end();
+      return;
+    }
+    const image = await readImage(token);
+    if (!image) {
+      res.status(404).end();
+      return;
+    }
+    res.setHeader('Content-Type', image.mime);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.end(image.data);
+  });
+
+  // Dev-only pipeline stats (404 in production).
+  app.get('/api/guess-link/stats', (_req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(404).end();
+      return;
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(gtlProviderStats());
+  });
+
+  // Dev-only curation page: every library puzzle with its images and flags.
+  app.get('/dev/link-library', (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(404).end();
+      return;
+    }
+    if (req.query.disable) {
+      setPuzzleDisabled(String(req.query.disable), req.query.enabled !== 'true');
+    }
+    const rows = allPuzzles()
+      .map((puzzle) => {
+        const images = puzzle.items
+          .map((item) =>
+            item.imageToken
+              ? `<img src="/api/guess-link/img/${item.imageToken}" width="96" height="96" alt="clue" style="border-radius:12px">`
+              : `<span style="font-size:40px">${item.emoji}</span>`
+          )
+          .join(' ');
+        return `<tr style="border-top:1px solid #ddd"><td>${images}</td><td><b>${puzzle.link}</b><br><small>${puzzle.quality.disabled ? 'disabled' : 'active'}</small></td><td>${puzzle.items.map((item) => item.name).join(', ')}</td><td>${puzzle.difficulty}</td><td><a href="/dev/link-library?disable=${puzzle.id}&enabled=${!puzzle.quality.disabled}">${puzzle.quality.disabled ? 'Enable' : 'Disable'}</a></td></tr>`;
+      })
+      .join('');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end(`<!doctype html><html><body style="font-family:system-ui;padding:24px"><h1>Guess the Link library</h1><p>${allPuzzles().length} puzzles — dev only.</p><table cellpadding="8">${rows}</table></body></html>`);
   });
 
   // Vite middleware in development vs static files in production
