@@ -13,3 +13,4 @@ export * from './GameSettingsSheet';
 export * from './GtlSettingsPanel';
 export * from './TeamLeaderboard';
 export * from './TeamSupportBadge';
+export * from './BottomScoreBoard';

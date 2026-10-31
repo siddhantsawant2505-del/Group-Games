@@ -26,6 +26,7 @@ import {
 } from '@shared/types';
 import type { RoomSettingsActions } from './screens/LobbyScreen';
 import { Header } from './components/Header';
+import { BottomScoreBoard } from './components/BottomScoreBoard';
 import { LoadingScreen } from './screens/LoadingScreen';
 import { NameEntryScreen } from './screens/NameEntryScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -1030,6 +1031,11 @@ export default function App() {
         />
       )}
       </Suspense>
+
+      {/* Persistent Bottom Score Board during room sessions */}
+      {room && myPlayer && (
+        <BottomScoreBoard room={room} myPlayer={myPlayer} />
+      )}
     </div>
   );
 }
