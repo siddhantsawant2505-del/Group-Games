@@ -3,12 +3,13 @@ import { motion } from 'motion/react';
 import { PLAYER_COLORS } from '@shared/theme/tokens';
 
 interface LoadingScreenProps {
-  onComplete: () => void;
+  onComplete?: () => void;
   durationMs?: number;
 }
 
 export function LoadingScreen({ onComplete, durationMs = 1350 }: LoadingScreenProps) {
   useEffect(() => {
+    if (!onComplete) return;
     const timer = setTimeout(() => {
       onComplete();
     }, durationMs);

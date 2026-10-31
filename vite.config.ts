@@ -1,13 +1,12 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
 
 const projectRoot = import.meta.dirname;
 
 export default defineConfig(() => {
   return {
-    // All frontend code lives in client/; code shared with the server lives in shared/.
     root: path.resolve(projectRoot, 'client'),
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -17,15 +16,41 @@ export default defineConfig(() => {
       },
     },
     build: {
-      // Emit the production bundle to <project root>/dist, where server.ts serves static files.
       outDir: path.resolve(projectRoot, 'dist'),
       emptyOutDir: true,
+      target: 'es2022',
+      minify: 'esbuild',
+      cssMinify: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+                return 'vendor-react';
+              }
+              if (id.includes('motion')) {
+                return 'vendor-motion';
+              }
+              if (id.includes('socket.io-client') || id.includes('engine.io-client')) {
+                return 'vendor-socket';
+              }
+              if (id.includes('qrcode')) {
+                return 'vendor-qrcode';
+              }
+              if (id.includes('canvas-confetti')) {
+                return 'vendor-confetti';
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-lucide';
+              }
+              return 'vendor-misc';
+            }
+          },
+        },
+      },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };

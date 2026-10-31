@@ -3,7 +3,7 @@
  * Mobile-first architecture, real-time WebSocket sync, and round-phase framework.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
   getSocket,
   saveSession,
@@ -30,44 +30,44 @@ import { LoadingScreen } from './screens/LoadingScreen';
 import { NameEntryScreen } from './screens/NameEntryScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { JoinRoomScreen } from './screens/JoinRoomScreen';
-import { PostGameScreen } from './screens/PostGameScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
-import { GameSelectScreen } from './screens/GameSelectScreen';
-import { RevealPhaseScreen } from './screens/RevealPhaseScreen';
-import { InputPhaseScreen } from './screens/InputPhaseScreen';
-import { RevealAnswersScreen } from './screens/RevealAnswersScreen';
-import { DiscussionPhaseScreen } from './screens/DiscussionPhaseScreen';
-import { VotePhaseScreen } from './screens/VotePhaseScreen';
-import { ResultsPhaseScreen } from './screens/ResultsPhaseScreen';
-import { AvoidAnchorRevealScreen } from './screens/avoidTheWord/AvoidAnchorRevealScreen';
-import { AvoidTurnScreen } from './screens/avoidTheWord/AvoidTurnScreen';
-import { AvoidRoundRevealScreen } from './screens/avoidTheWord/AvoidRoundRevealScreen';
-import { AvoidResultsScreen } from './screens/avoidTheWord/AvoidResultsScreen';
-import { RoleRevealScreen } from './screens/mafia/RoleRevealScreen';
-import { NightScreen } from './screens/mafia/NightScreen';
 import type { MafiaTeamPick } from './screens/mafia/NightScreen';
-import { MorningScreen } from './screens/mafia/MorningScreen';
-import { DayScreen } from './screens/mafia/DayScreen';
-import { VoteScreen as MafiaVoteScreen } from './screens/mafia/VoteScreen';
-import { ExileScreen } from './screens/mafia/ExileScreen';
-import { GameOverScreen } from './screens/mafia/GameOverScreen';
-import {
-  GtlGetReadyScreen,
-  GtlGuessScreen,
-  GtlResultsScreen,
-} from './screens/guessTheLink/GuessTheLinkScreens';
-import { Top100QuestionScreen } from './screens/top100/Top100QuestionScreen';
-import { Top100GuessScreen } from './screens/top100/Top100GuessScreen';
-import { Top100GuessesRevealScreen } from './screens/top100/Top100GuessesRevealScreen';
-import { Top100ListSlicesScreen } from './screens/top100/Top100ListSlicesScreen';
-import { RevealAnswersCopy } from './screens/RevealAnswersScreen';
-import { VoteCopy } from './screens/VotePhaseScreen';
-import { RevCatItemsScreen } from './screens/RevCatItemsScreen';
-import { RevCatInputScreen } from './screens/RevCatInputScreen';
-import { RevCatResultsScreen } from './screens/RevCatResultsScreen';
-import { ImpostorQuestionRevealScreen } from './screens/ImpostorQuestionRevealScreen';
-import { ImpostorAnswerScreen } from './screens/ImpostorAnswerScreen';
-import { ImpostorAnswersGridScreen } from './screens/ImpostorAnswersGridScreen';
+import type { RevealAnswersCopy } from './screens/RevealAnswersScreen';
+import type { VoteCopy } from './screens/VotePhaseScreen';
+
+// Code-split dynamic screen chunks
+const PostGameScreen = lazy(() => import('./screens/PostGameScreen').then(m => ({ default: m.PostGameScreen })));
+const GameSelectScreen = lazy(() => import('./screens/GameSelectScreen').then(m => ({ default: m.GameSelectScreen })));
+const RevealPhaseScreen = lazy(() => import('./screens/RevealPhaseScreen').then(m => ({ default: m.RevealPhaseScreen })));
+const InputPhaseScreen = lazy(() => import('./screens/InputPhaseScreen').then(m => ({ default: m.InputPhaseScreen })));
+const RevealAnswersScreen = lazy(() => import('./screens/RevealAnswersScreen').then(m => ({ default: m.RevealAnswersScreen })));
+const DiscussionPhaseScreen = lazy(() => import('./screens/DiscussionPhaseScreen').then(m => ({ default: m.DiscussionPhaseScreen })));
+const VotePhaseScreen = lazy(() => import('./screens/VotePhaseScreen').then(m => ({ default: m.VotePhaseScreen })));
+const ResultsPhaseScreen = lazy(() => import('./screens/ResultsPhaseScreen').then(m => ({ default: m.ResultsPhaseScreen })));
+const AvoidAnchorRevealScreen = lazy(() => import('./screens/avoidTheWord/AvoidAnchorRevealScreen').then(m => ({ default: m.AvoidAnchorRevealScreen })));
+const AvoidTurnScreen = lazy(() => import('./screens/avoidTheWord/AvoidTurnScreen').then(m => ({ default: m.AvoidTurnScreen })));
+const AvoidRoundRevealScreen = lazy(() => import('./screens/avoidTheWord/AvoidRoundRevealScreen').then(m => ({ default: m.AvoidRoundRevealScreen })));
+const AvoidResultsScreen = lazy(() => import('./screens/avoidTheWord/AvoidResultsScreen').then(m => ({ default: m.AvoidResultsScreen })));
+const RoleRevealScreen = lazy(() => import('./screens/mafia/RoleRevealScreen').then(m => ({ default: m.RoleRevealScreen })));
+const NightScreen = lazy(() => import('./screens/mafia/NightScreen').then(m => ({ default: m.NightScreen })));
+const MorningScreen = lazy(() => import('./screens/mafia/MorningScreen').then(m => ({ default: m.MorningScreen })));
+const DayScreen = lazy(() => import('./screens/mafia/DayScreen').then(m => ({ default: m.DayScreen })));
+const MafiaVoteScreen = lazy(() => import('./screens/mafia/VoteScreen').then(m => ({ default: m.VoteScreen })));
+const ExileScreen = lazy(() => import('./screens/mafia/ExileScreen').then(m => ({ default: m.ExileScreen })));
+const GameOverScreen = lazy(() => import('./screens/mafia/GameOverScreen').then(m => ({ default: m.GameOverScreen })));
+const GtlGetReadyScreen = lazy(() => import('./screens/guessTheLink/GuessTheLinkScreens').then(m => ({ default: m.GtlGetReadyScreen })));
+const GtlGuessScreen = lazy(() => import('./screens/guessTheLink/GuessTheLinkScreens').then(m => ({ default: m.GtlGuessScreen })));
+const GtlResultsScreen = lazy(() => import('./screens/guessTheLink/GuessTheLinkScreens').then(m => ({ default: m.GtlResultsScreen })));
+const Top100QuestionScreen = lazy(() => import('./screens/top100/Top100QuestionScreen').then(m => ({ default: m.Top100QuestionScreen })));
+const Top100GuessScreen = lazy(() => import('./screens/top100/Top100GuessScreen').then(m => ({ default: m.Top100GuessScreen })));
+const Top100GuessesRevealScreen = lazy(() => import('./screens/top100/Top100GuessesRevealScreen').then(m => ({ default: m.Top100GuessesRevealScreen })));
+const Top100ListSlicesScreen = lazy(() => import('./screens/top100/Top100ListSlicesScreen').then(m => ({ default: m.Top100ListSlicesScreen })));
+const RevCatItemsScreen = lazy(() => import('./screens/RevCatItemsScreen').then(m => ({ default: m.RevCatItemsScreen })));
+const RevCatInputScreen = lazy(() => import('./screens/RevCatInputScreen').then(m => ({ default: m.RevCatInputScreen })));
+const RevCatResultsScreen = lazy(() => import('./screens/RevCatResultsScreen').then(m => ({ default: m.RevCatResultsScreen })));
+const ImpostorQuestionRevealScreen = lazy(() => import('./screens/ImpostorQuestionRevealScreen').then(m => ({ default: m.ImpostorQuestionRevealScreen })));
+const ImpostorAnswerScreen = lazy(() => import('./screens/ImpostorAnswerScreen').then(m => ({ default: m.ImpostorAnswerScreen })));
+const ImpostorAnswersGridScreen = lazy(() => import('./screens/ImpostorAnswersGridScreen').then(m => ({ default: m.ImpostorAnswersGridScreen })));
 
 /** Games that ship with a dedicated server-side rules module. */
 const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
@@ -720,6 +720,7 @@ export default function App() {
       )}
 
       {/* Screen Router based on current Room, Phase, or Pre-Room state */}
+      <Suspense fallback={<LoadingScreen />}>
       {!room || !myPlayer ? (
         preRoomScreen === 'loading' ? (
           <LoadingScreen onComplete={handleLoadingComplete} />
@@ -1028,6 +1029,7 @@ export default function App() {
           roomSettings={roomSettingsActions}
         />
       )}
+      </Suspense>
     </div>
   );
 }
