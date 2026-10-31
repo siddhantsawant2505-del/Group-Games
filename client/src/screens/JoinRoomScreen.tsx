@@ -60,24 +60,26 @@ export function JoinRoomScreen({
   const isCodeComplete = code.trim().length === 4;
 
   return (
-    <div className="flex-1 flex flex-col justify-between p-5 max-w-md mx-auto w-full">
+    <div className="flex-1 flex flex-col justify-between p-4 max-w-md mx-auto w-full">
       {/* Top Bar with Back Button */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between pb-2"
+        className="flex items-center justify-between pb-2 border-b-2 border-[var(--border-neo)]"
       >
         <button
           type="button"
           onClick={onBack}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-xs font-bold text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 cursor-pointer transition-colors active:scale-95"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-card)] text-xs font-black border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] cursor-pointer tactile-btn"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Home</span>
         </button>
 
-        <span className="text-xs font-bold text-neutral-400">Join Game Room</span>
+        <span className="text-xs font-black uppercase tracking-wider opacity-65">
+          Join Game Room
+        </span>
       </motion.div>
 
       {/* Main Join Input Card */}
@@ -85,13 +87,16 @@ export function JoinRoomScreen({
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="party-card p-6 rounded-3xl my-auto border border-[var(--border-subtle)] space-y-6"
+        className="p-6 rounded-3xl my-auto bg-[var(--surface-card)] border-[2.5px] border-[var(--border-neo)] shadow-[6px_6px_0px_var(--border-neo)] space-y-6"
       >
         <div className="text-center">
+          <div className="w-12 h-12 rounded-2xl bg-[#93C5FD] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] flex items-center justify-center mx-auto mb-3 text-2xl font-black">
+            🔑
+          </div>
           <h2 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">
             Enter Room Code
           </h2>
-          <p className="text-xs font-semibold text-neutral-400 mt-1">
+          <p className="text-xs font-bold opacity-60 mt-1">
             Ask the host for the 4-letter room code on their screen
           </p>
         </div>
@@ -110,12 +115,12 @@ export function JoinRoomScreen({
             <div className="flex items-center justify-between mb-2">
               <label
                 htmlFor="join-room-code-input"
-                className="block text-xs font-bold uppercase tracking-wider text-neutral-400 text-left"
+                className="block text-xs font-black uppercase tracking-wider opacity-75 text-left"
               >
-                Room Code
+                Room PIN
               </label>
               {isQrPrefilled && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                <span className="inline-flex items-center gap-1 text-[11px] font-black text-[#18181B] bg-[#86EFAC] px-2 py-0.5 rounded-md border border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)]">
                   <QrCode className="w-3 h-3" />
                   <span>From QR code</span>
                 </span>
@@ -133,10 +138,10 @@ export function JoinRoomScreen({
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck="false"
-              className={`w-full text-center text-4xl sm:text-5xl font-black tracking-widest uppercase py-4 px-4 rounded-2xl border-2 transition-all ${
+              className={`w-full text-center text-4xl sm:text-5xl font-black font-mono tracking-[0.3em] uppercase py-4 px-4 rounded-2xl border-[2.5px] transition-all bg-[var(--surface-card-subtle)] ${
                 errorMessage
-                  ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20 text-red-600 dark:text-red-300 focus:border-red-500'
-                  : 'border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 text-[var(--text-primary)] focus:border-neutral-900 dark:focus:border-neutral-100'
+                  ? 'border-[#FDA4AF] bg-[#FDA4AF]/20 text-[#18181B] shadow-[3px_3px_0px_#FDA4AF]'
+                  : 'border-[var(--border-neo)] text-[var(--text-primary)] focus:shadow-[4px_4px_0px_var(--border-neo)] focus:-translate-y-0.5'
               } focus:outline-none`}
               required
             />
@@ -147,7 +152,7 @@ export function JoinRoomScreen({
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-300 text-xs font-bold text-center"
+              className="p-3 rounded-xl bg-[#FDA4AF] border-2 border-[var(--border-neo)] text-[#18181B] text-xs font-black text-center shadow-[2px_2px_0px_var(--border-neo)]"
             >
               {errorMessage}
             </motion.div>
@@ -170,7 +175,7 @@ export function JoinRoomScreen({
 
       {/* Footer Info */}
       <div className="py-3 text-center">
-        <p className="text-xs text-neutral-400 font-medium">
+        <p className="text-xs opacity-60 font-bold">
           Codes are 4 uppercase letters • Case-insensitive
         </p>
       </div>

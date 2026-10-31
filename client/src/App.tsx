@@ -19,6 +19,9 @@ import {
   GamePhase,
   ImpostorSettings,
   AvoidSettings,
+  Top100Settings,
+  MafiaSettings,
+  GtlSettings,
   PlayMode,
 } from '@shared/types';
 import type { RoomSettingsActions } from './screens/LobbyScreen';
@@ -48,10 +51,11 @@ import { DayScreen } from './screens/mafia/DayScreen';
 import { VoteScreen as MafiaVoteScreen } from './screens/mafia/VoteScreen';
 import { ExileScreen } from './screens/mafia/ExileScreen';
 import { GameOverScreen } from './screens/mafia/GameOverScreen';
-import { GtlHintRevealScreen } from './screens/guessTheLink/GuessTheLinkScreens';
-import { GtlInputScreen } from './screens/GtlInputScreen';
-import { GtlResponseRevealScreen } from './screens/GtlResponseRevealScreen';
-import { GtlGuessScreen, GtlResultsScreen } from './screens/guessTheLink/GuessTheLinkScreens';
+import {
+  GtlGetReadyScreen,
+  GtlGuessScreen,
+  GtlResultsScreen,
+} from './screens/guessTheLink/GuessTheLinkScreens';
 import { Top100QuestionScreen } from './screens/top100/Top100QuestionScreen';
 import { Top100GuessScreen } from './screens/top100/Top100GuessScreen';
 import { Top100GuessesRevealScreen } from './screens/top100/Top100GuessesRevealScreen';
@@ -317,33 +321,16 @@ export default function App() {
     socket.emit('select-game', { roomCode: room.roomCode, gameId });
   }, [room]);
 
-  // Guess the Link: host queues a custom concept + hint angles for the next round
-  const handleSaveGtlPrompt = useCallback(
-    (
-      input: { concept: string; category?: string; hints?: string[] },
-      callback: (res: any) => void
-    ) => {
-      if (!room || !myPlayer) return;
-      const socket = getSocket();
-      socket.emit(
-        'gtl-set-prompt',
-        {
-          roomCode: room.roomCode,
-          playerId: myPlayer.id,
-          concept: input.concept,
-          category: input.category,
-          hints: input.hints,
-        },
-        callback
-      );
-    },
-    [room, myPlayer]
-  );
-
-  // Host updates the selected game's public settings (Impostor difficulty/theme)
+  // Host updates the selected game's public settings.
   const handleSaveGameSettings = useCallback(
     (
-      patch: { impostor?: Partial<ImpostorSettings>; avoidTheWord?: Partial<AvoidSettings> },
+      patch: {
+        impostor?: Partial<ImpostorSettings>;
+        avoidTheWord?: Partial<AvoidSettings>;
+        top100?: Partial<Top100Settings>;
+        mafia?: Partial<MafiaSettings>;
+        guessTheLink?: Partial<GtlSettings>;
+      },
       callback: (res: { success: boolean; error?: string }) => void
     ) => {
       if (!room || !myPlayer) return;
@@ -782,7 +769,6 @@ export default function App() {
           myPlayer={myPlayer}
           onSelectGame={handleSelectGame}
           onConfirmAndStart={handleConfirmAndStartRound}
-          onSaveGtlPrompt={handleSaveGtlPrompt}
           onSaveGameSettings={handleSaveGameSettings}
         />
       ) : room.phase === 'reveal' ? (
@@ -796,7 +782,7 @@ export default function App() {
         ) : isMafia ? (
           <RoleRevealScreen room={room} myPlayer={myPlayer} privateState={privateState} />
         ) : isGuessTheLink ? (
-          <GtlHintRevealScreen
+          <GtlGetReadyScreen
             room={room}
             myPlayer={myPlayer}
             privateState={privateState}
@@ -860,15 +846,7 @@ export default function App() {
           onAdvance={() => handleAdvancePhase('discussion')}
         />
       ) : room.phase === 'input' ? (
-        isGuessTheLink ? (
-          <GtlInputScreen
-            room={room}
-            myPlayer={myPlayer}
-            privateState={privateState}
-            onSubmitAnswer={handleSubmitAnswer}
-            onHostSkip={() => handleAdvancePhase('reveal-answers')}
-          />
-        ) : isTop100 ? (
+        isTop100 ? (
           <Top100GuessScreen
             room={room}
             myPlayer={myPlayer}
@@ -903,14 +881,7 @@ export default function App() {
           />
         )
       ) : room.phase === 'reveal-answers' ? (
-        isGuessTheLink ? (
-          <GtlResponseRevealScreen
-            room={room}
-            myPlayer={myPlayer}
-            privateState={privateState}
-            onAdvance={() => handleAdvancePhase('guess')}
-          />
-        ) : isTop100 ? (
+        isTop100 ? (
           <Top100GuessesRevealScreen
             room={room}
             myPlayer={myPlayer}

@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>J4MZ - Social Controller</title>
+<!-- Material Symbols Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Typography Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&amp;family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS with CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed-variant": "#73323d",
+            "surface-bright": "#fbf9f6",
+            "inverse-surface": "#30312f",
+            "tertiary-fixed-dim": "#9ccaff",
+            "outline": "#7b7766",
+            "tertiary-fixed": "#d0e4ff",
+            "surface-container-low": "#f5f3f0",
+            "primary-container": "#fef08a",
+            "on-tertiary-fixed": "#001d35",
+            "surface-dim": "#dbdad7",
+            "secondary-container": "#ffa6b1",
+            "on-surface": "#1b1c1a",
+            "primary": "#695f02",
+            "on-secondary": "#ffffff",
+            "error": "#ba1a1a",
+            "on-tertiary-fixed-variant": "#03497a",
+            "on-secondary-fixed": "#3b0613",
+            "on-primary-fixed": "#201c00",
+            "secondary": "#8f4953",
+            "inverse-on-surface": "#f2f0ed",
+            "on-primary": "#ffffff",
+            "on-primary-fixed-variant": "#4f4800",
+            "background": "#fbf9f6",
+            "on-primary-container": "#766c13",
+            "on-background": "#1b1c1a",
+            "primary-fixed-dim": "#d5c867",
+            "on-secondary-container": "#7a3842",
+            "surface-container-high": "#eae8e5",
+            "on-surface-variant": "#4a4738",
+            "primary-fixed": "#f2e580",
+            "on-tertiary": "#ffffff",
+            "on-error": "#ffffff",
+            "on-error-container": "#93000a",
+            "surface-container-highest": "#e4e2df",
+            "surface-variant": "#e4e2df",
+            "secondary-fixed-dim": "#ffb2bb",
+            "outline-variant": "#ccc7b3",
+            "secondary-fixed": "#ffd9dc",
+            "surface": "#fbf9f6",
+            "tertiary": "#2b6193",
+            "surface-container": "#efeeeb",
+            "tertiary-container": "#e5efff",
+            "surface-tint": "#695f02",
+            "surface-container-lowest": "#ffffff",
+            "error-container": "#ffdad6",
+            "on-tertiary-container": "#3a6fa2",
+            "inverse-primary": "#d5c867"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-sm": "0.5rem",
+            "space-xs": "0.25rem",
+            "gutter": "1rem",
+            "margin": "1.25rem",
+            "space-md": "1rem",
+            "space-xl": "2.25rem",
+            "space-lg": "1.5rem"
+          },
+          "fontFamily": {
+            "body-lg": ["Plus Jakarta Sans"],
+            "display-lg": ["Plus Jakarta Sans"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "display-lg-mobile": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "code-timer": ["JetBrains Mono"],
+            "label-caps": ["JetBrains Mono"],
+            "label-bold": ["Plus Jakarta Sans"],
+            "code-display": ["JetBrains Mono"]
+          },
+          "fontSize": {
+            "body-lg": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.03em", "fontWeight": "800" }],
+            "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.015em", "fontWeight": "700" }],
+            "body-md": ["15px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "500" }],
+            "display-lg-mobile": ["32px", { "lineHeight": "38px", "letterSpacing": "-0.025em", "fontWeight": "800" }],
+            "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "500" }],
+            "headline-lg": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+            "code-timer": ["24px", { "lineHeight": "28px", "letterSpacing": "0.04em", "fontWeight": "700" }],
+            "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.08em", "fontWeight": "700" }],
+            "label-bold": ["14px", { "lineHeight": "18px", "letterSpacing": "0.02em", "fontWeight": "800" }],
+            "code-display": ["36px", { "lineHeight": "44px", "letterSpacing": "0.12em", "fontWeight": "700" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+      line-height: 1;
+    }
+    
+    /* Tactile Neo-Brutalist utility shadows */
+    .neo-border {
+      border: 2.5px solid #18181B;
+    }
+    .neo-shadow {
+      box-shadow: 4px 4px 0px #18181B;
+    }
+    .neo-shadow-sm {
+      box-shadow: 2px 2px 0px #18181B;
+    }
+    .neo-shadow-lg {
+      box-shadow: 6px 6px 0px #18181B;
+    }
+    .neo-trough {
+      border: 2.5px dashed #18181B;
+      box-shadow: none;
+    }
+    
+    /* Press micro-interactions */
+    .tactile-btn {
+      transition: all 100ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .tactile-btn:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #18181B !important;
+    }
+
+    /* Pulsing & animated micro-effects */
+    @keyframes pulse-subtle {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+    .pulse-timer {
+      animation: pulse-subtle 1.8s infinite ease-in-out;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface min-h-screen flex flex-col justify-between items-center selection:bg-primary-container selection:text-on-surface antialiased overflow-x-hidden pb-28">
+<!-- ==================== SHARED COMPONENT 1: TopAppBar ==================== -->
+<header class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-margin py-space-sm w-full max-w-[680px] mx-auto bg-surface neo-border border-t-0 border-l-0 border-r-0 shadow-[0px_4px_0px_#18181B]">
+<!-- Left: Leading Type (Icon) & Room Code Pill -->
+<div class="flex items-center gap-space-xs">
+<div class="flex items-center gap-1.5 bg-surface-container neo-border rounded-xl px-2.5 py-1 neo-shadow-sm">
+<span class="material-symbols-outlined text-base text-on-surface" data-icon="wifi">wifi</span>
+<button class="flex items-center gap-1 font-label-caps text-label-caps text-on-surface hover:opacity-80 active:scale-95 transition-transform" id="copy-pin-btn" onclick="copyPin()" title="Copy Room PIN">
+<span>PIN:</span>
+<span class="font-code-timer font-bold tracking-wider">J4MZ</span>
+<span class="material-symbols-outlined text-sm ml-0.5" data-icon="content_copy">content_copy</span>
+</button>
+</div>
+<div class="hidden font-label-caps text-[10px] bg-primary-container text-on-surface neo-border rounded-lg px-2 py-0.5 neo-shadow-sm animate-bounce" id="copied-toast">
+        COPIED!
+      </div>
+</div>
+<!-- Center: Brand Anchor Headline -->
+<div class="flex flex-col items-center justify-center">
+<span class="font-headline-md text-headline-md font-black text-on-surface tracking-wider">J4MZ</span>
+<div class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-[#86EFAC] border border-[#18181B] inline-block animate-pulse"></span>
+<span class="font-label-caps text-[10px] text-on-surface-variant uppercase tracking-widest">LIVE</span>
+</div>
+</div>
+<!-- Right: Trailing Icon & Volume Toggle -->
+<div class="flex items-center gap-space-xs">
+<button aria-label="Toggle sound volume" class="w-10 h-10 rounded-xl bg-surface-container neo-border neo-shadow-sm flex items-center justify-center tactile-btn text-on-surface" id="mute-btn" onclick="toggleAudio()">
+<span class="material-symbols-outlined text-lg" data-icon="volume_up" id="audio-icon">volume_up</span>
+</button>
+<button aria-label="Game rules" class="w-10 h-10 rounded-xl bg-tertiary-container neo-border neo-shadow-sm flex items-center justify-center tactile-btn text-tertiary" onclick="toggleModal('rules-modal')">
+<span class="material-symbols-outlined text-lg" data-icon="help">help</span>
+</button>
+</div>
+</header>
+<!-- ==================== MAIN CONTENT CANVAS (PHONE-AS-CONTROLLER) ==================== -->
+<main class="w-full max-w-[480px] mx-auto px-margin pt-20 flex-1 flex flex-col gap-space-md">
+<!-- Round Status & Pulsing Timer Strip -->
+<div class="flex items-center justify-between gap-space-xs mt-2">
+<!-- Status Pill -->
+<div class="bg-primary-container text-on-surface neo-border rounded-full px-3 py-1 neo-shadow-sm flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-[#18181B]"></span>
+<span class="font-label-bold text-label-bold">ROUND 2/5</span>
+<span class="text-on-surface font-body-sm">•</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">VOTING</span>
+</div>
+<!-- Pulsating Countdown Timer -->
+<div class="bg-[#FDBA74] text-on-surface neo-border rounded-full px-3.5 py-1 neo-shadow-sm flex items-center gap-1.5 pulse-timer">
+<span class="material-symbols-outlined text-base font-bold" data-icon="timer">timer</span>
+<span class="font-code-timer text-sm font-extrabold tracking-tight">14s LEFT</span>
+</div>
+</div>
+<!-- Central Question & Hot Take Stage Card -->
+<section class="bg-surface-container-lowest neo-border rounded-2xl neo-shadow overflow-hidden">
+<!-- Card Banner Header -->
+<div class="bg-[#93C5FD] neo-border border-t-0 border-l-0 border-r-0 px-space-md py-2 flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-base" data-icon="local_fire_department">local_fire_department</span>
+<span class="font-label-caps text-label-caps text-on-surface tracking-wider">HOT TAKE ARENA</span>
+</div>
+<span class="bg-surface-container-lowest neo-border rounded-full px-2 py-0.5 font-label-caps text-[10px] shadow-sm">
+          +300 PTS
+        </span>
+</div>
+<!-- Prompt Question Body -->
+<div class="p-space-md flex flex-col gap-space-xs">
+<p class="font-label-caps text-[11px] text-on-surface-variant uppercase tracking-wider">Group Dilemma</p>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface leading-tight font-extrabold">
+          Who would survive the longest in a zombie apocalypse?
+        </h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">
+          Pick your champion before time expires. Majority vote wins round points.
+        </p>
+</div>
+</section>
+<!-- Interactive Nominees Voting Segment -->
+<section class="flex flex-col gap-2.5">
+<div class="flex items-center justify-between px-1">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Cast Nominee Choice</span>
+<span class="font-label-caps text-[11px] text-tertiary flex items-center gap-1 font-bold">
+<span class="material-symbols-outlined text-xs" data-icon="touch_app">touch_app</span> Select One
+        </span>
+</div>
+<!-- Nominee Option 1 -->
+<div class="group cursor-pointer bg-surface-container-lowest neo-border rounded-2xl p-3.5 neo-shadow tactile-btn flex items-center justify-between border-2 transition-all" id="choice-1" onclick="selectChoice(1)">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-xl bg-[#FDA4AF] neo-border flex items-center justify-center neo-shadow-sm font-label-bold text-base text-on-surface">
+            SK
+          </div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-bold text-label-bold text-on-surface">Sammy (You)</span>
+<span class="font-label-caps text-[10px] bg-primary-container text-on-surface px-1.5 py-0.2 neo-border rounded-md">HOST</span>
+</div>
+<span class="font-body-sm text-xs text-on-surface-variant">"Hoards canned beans &amp; cardio runner"</span>
+</div>
+</div>
+<div class="w-7 h-7 rounded-xl neo-border flex items-center justify-center neo-shadow-sm bg-surface-container" id="radio-1">
+<span class="material-symbols-outlined text-sm font-black hidden text-on-surface" data-icon="check" id="check-1">check</span>
+</div>
+</div>
+<!-- Nominee Option 2 -->
+<div class="group cursor-pointer bg-surface-container-lowest neo-border rounded-2xl p-3.5 neo-shadow tactile-btn flex items-center justify-between border-2 transition-all" id="choice-2" onclick="selectChoice(2)">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-xl bg-[#C4B5FD] neo-border flex items-center justify-center neo-shadow-sm font-label-bold text-base text-on-surface">
+            MB
+          </div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-bold text-label-bold text-on-surface">Maya B.</span>
+<span class="font-label-caps text-[10px] bg-[#86EFAC] text-on-surface px-1.5 py-0.2 neo-border rounded-md">LEADER</span>
+</div>
+<span class="font-body-sm text-xs text-on-surface-variant">"Engineering major with an axe"</span>
+</div>
+</div>
+<div class="w-7 h-7 rounded-xl neo-border flex items-center justify-center neo-shadow-sm bg-surface-container" id="radio-2">
+<span class="material-symbols-outlined text-sm font-black hidden text-on-surface" data-icon="check" id="check-2">check</span>
+</div>
+</div>
+</section>
+<!-- Player Lobby Status Mini-Grid (4 Chunky Tiles) -->
+<section class="bg-[#F3EFEA] neo-border rounded-2xl p-3 neo-trough">
+<div class="flex items-center justify-between mb-2.5 px-0.5">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-base" data-icon="groups">groups</span>
+<span class="font-label-caps text-label-caps text-on-surface uppercase">Live Party Roster (4/4)</span>
+</div>
+<span class="font-label-caps text-[11px] bg-surface neo-border rounded-md px-1.5 py-0.5 text-on-surface">ROOM SYNCED</span>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<!-- P1 Sammy -->
+<div class="bg-surface-container-lowest neo-border rounded-xl p-2.5 neo-shadow-sm flex items-center gap-2">
+<div class="w-7 h-7 rounded-lg bg-[#FDA4AF] neo-border flex items-center justify-center text-xs font-bold">
+            S
+          </div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<span class="font-label-bold text-xs truncate">Sammy</span>
+<span class="font-label-caps text-[10px] text-[#2b6193] font-bold">READY ✓</span>
+</div>
+</div>
+<!-- P2 Alex K. -->
+<div class="bg-surface-container-lowest neo-border rounded-xl p-2.5 neo-shadow-sm flex items-center gap-2">
+<div class="w-7 h-7 rounded-lg bg-[#93C5FD] neo-border flex items-center justify-center text-xs font-bold">
+            A
+          </div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<span class="font-label-bold text-xs truncate">Alex K.</span>
+<span class="font-label-caps text-[10px] text-[#2b6193] font-bold">VOTED ✓</span>
+</div>
+</div>
+<!-- P3 Maya B. -->
+<div class="bg-surface-container-lowest neo-border rounded-xl p-2.5 neo-shadow-sm flex items-center gap-2">
+<div class="w-7 h-7 rounded-lg bg-[#C4B5FD] neo-border flex items-center justify-center text-xs font-bold">
+            M
+          </div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<span class="font-label-bold text-xs truncate">Maya B.</span>
+<span class="font-label-caps text-[10px] text-[#7a3842] animate-pulse">THINKING 💭</span>
+</div>
+</div>
+<!-- P4 Jordan -->
+<div class="bg-surface-container-lowest neo-border rounded-xl p-2.5 neo-shadow-sm flex items-center gap-2">
+<div class="w-7 h-7 rounded-lg bg-[#FDBA74] neo-border flex items-center justify-center text-xs font-bold">
+            J
+          </div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<span class="font-label-bold text-xs truncate">Jordan</span>
+<span class="font-label-caps text-[10px] text-[#2b6193] font-bold">VOTED ✓</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Anchored Ergonomic Action Deck -->
+<section class="flex flex-col gap-2.5 mt-1">
+<!-- Bouncy Quick Reaction Bar -->
+<div class="flex items-center justify-between bg-surface-container-lowest neo-border rounded-2xl px-3 py-2 neo-shadow-sm">
+<span class="font-label-caps text-[11px] text-on-surface-variant uppercase font-bold">Buzz:</span>
+<div class="flex items-center gap-2">
+<button class="w-9 h-9 rounded-xl bg-surface-container neo-border neo-shadow-sm flex items-center justify-center tactile-btn text-base hover:bg-primary-container" onclick="sendEmoji('🔥')" title="Fire">🔥</button>
+<button class="w-9 h-9 rounded-xl bg-surface-container neo-border neo-shadow-sm flex items-center justify-center tactile-btn text-base hover:bg-primary-container" onclick="sendEmoji('😂')" title="Laugh">😂</button>
+<button class="w-9 h-9 rounded-xl bg-surface-container neo-border neo-shadow-sm flex items-center justify-center tactile-btn text-base hover:bg-primary-container" onclick="sendEmoji('💀')" title="Skull">💀</button>
+<button class="w-9 h-9 rounded-xl bg-surface-container neo-border neo-shadow-sm flex items-center justify-center tactile-btn text-base hover:bg-primary-container" onclick="sendEmoji('⚡')" title="Zap">⚡</button>
+<button class="w-9 h-9 rounded-xl bg-surface-container neo-border neo-shadow-sm flex items-center justify-center tactile-btn text-base hover:bg-primary-container" onclick="sendEmoji('👀')" title="Eyes">👀</button>
+</div>
+</div>
+<!-- Floating Emoji Float Canvas (Hidden Target) -->
+<div class="fixed pointer-events-none z-50 text-3xl transition-all duration-700 opacity-0 transform translate-y-0" id="emoji-floater"></div>
+<!-- Massive NeoButton CTA: Lock In Answer -->
+<button class="w-full min-h-[58px] bg-[#86EFAC] neo-border rounded-2xl neo-shadow flex items-center justify-center gap-2 tactile-btn cursor-pointer py-3.5 px-space-md" id="lock-btn" onclick="lockInAnswer()">
+<span class="material-symbols-outlined text-2xl font-black text-[#18181B]" data-icon="lock_open" id="lock-icon">lock_open</span>
+<span class="font-headline-md text-headline-md font-extrabold text-[#18181B] tracking-tight" id="lock-text">LOCK IN ANSWER</span>
+</button>
+<!-- Secondary Action Dual Bar -->
+<div class="grid grid-cols-2 gap-2">
+<button class="h-12 bg-[#FDA4AF] neo-border rounded-xl neo-shadow-sm flex items-center justify-center gap-1.5 tactile-btn font-label-bold text-label-bold text-on-surface" onclick="triggerBuzzer()">
+<span class="material-symbols-outlined text-lg" data-icon="notifications_active">notifications_active</span>
+<span>BUZZ HOST</span>
+</button>
+<button class="h-12 bg-surface-container neo-border rounded-xl neo-shadow-sm flex items-center justify-center gap-1.5 tactile-btn font-label-bold text-label-bold text-on-surface" onclick="toggleModal('settings-drawer')">
+<span class="material-symbols-outlined text-lg" data-icon="tune">tune</span>
+<span>SETTINGS</span>
+</button>
+</div>
+</section>
+</main>
+<!-- ==================== SHARED COMPONENT 2: BottomNavBar ==================== -->
+<!-- Active state dynamically selected: 'Play' (the current interactive party game session) -->
+<nav class="fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center px-margin py-space-xs w-full max-w-[680px] mx-auto pb-safe bg-surface-bright neo-border border-b-0 border-l-0 border-r-0 shadow-[0px_-4px_0px_#18181B]">
+<!-- Destination 1: Play (ACTIVE MATCH) -->
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container border-[2.5px] border-on-surface rounded-xl px-space-md py-space-xs shadow-[2px_2px_0px_#18181B] translate-y-[-2px] tactile-btn" href="#play">
+<span class="material-symbols-outlined text-xl text-on-surface" data-icon="sports_esports" data-weight="fill" style="font-variation-settings: 'FILL' 1;">sports_esports</span>
+<span class="text-label-bold font-label-bold text-on-surface text-xs mt-0.5">Play</span>
+</a>
+<!-- Destination 2: Players -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-space-sm py-space-xs tactile-btn hover:text-on-surface" href="#players" onclick="alert('Viewing 4 active players in room J4MZ'); return false;">
+<span class="material-symbols-outlined text-xl" data-icon="group">group</span>
+<span class="text-label-bold font-label-bold text-xs mt-0.5">Players</span>
+</a>
+<!-- Destination 3: Buzz -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-space-sm py-space-xs tactile-btn hover:text-on-surface" href="#buzz" onclick="triggerBuzzer(); return false;">
+<span class="material-symbols-outlined text-xl" data-icon="touch_app">touch_app</span>
+<span class="text-label-bold font-label-bold text-xs mt-0.5">Buzz</span>
+</a>
+<!-- Destination 4: Rules -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-space-sm py-space-xs tactile-btn hover:text-on-surface" href="#rules" onclick="toggleModal('rules-modal'); return false;">
+<span class="material-symbols-outlined text-xl" data-icon="menu_book">menu_book</span>
+<span class="text-label-bold font-label-bold text-xs mt-0.5">Rules</span>
+</a>
+</nav>
+<!-- ==================== MODAL 1: RULES DIALOG ==================== -->
+<div class="fixed inset-0 z-50 bg-[#18181B]/40 hidden items-center justify-center p-4" id="rules-modal">
+<div class="bg-surface-container-lowest neo-border rounded-2xl neo-shadow-lg w-full max-w-[420px] p-space-lg flex flex-col gap-space-md animate-in fade-in zoom-in-95 duration-150">
+<!-- Modal Header -->
+<div class="flex items-center justify-between border-b-[2.5px] border-on-surface pb-3">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-primary-container neo-border flex items-center justify-center">
+<span class="material-symbols-outlined text-lg" data-icon="menu_book">menu_book</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface font-extrabold">Hot Take Rules</h2>
+</div>
+<button class="w-8 h-8 rounded-lg neo-border bg-surface-container neo-shadow-sm flex items-center justify-center font-bold text-sm tactile-btn" onclick="toggleModal('rules-modal')">
+          ✕
+        </button>
+</div>
+<!-- Rules Content -->
+<div class="flex flex-col gap-3 font-body-md text-body-md text-on-surface">
+<div class="flex items-start gap-2.5 bg-[#FAF8F5] p-2.5 rounded-xl neo-border">
+<span class="w-6 h-6 rounded-full bg-[#93C5FD] neo-border flex items-center justify-center text-xs font-bold shrink-0">1</span>
+<p class="text-sm">Read the prompt on your phone and vote for the player you think fits best.</p>
+</div>
+<div class="flex items-start gap-2.5 bg-[#FAF8F5] p-2.5 rounded-xl neo-border">
+<span class="w-6 h-6 rounded-full bg-[#FDA4AF] neo-border flex items-center justify-center text-xs font-bold shrink-0">2</span>
+<p class="text-sm">Scores are awarded if you guess with the group majority (+300 pts).</p>
+</div>
+<div class="flex items-start gap-2.5 bg-[#FAF8F5] p-2.5 rounded-xl neo-border">
+<span class="w-6 h-6 rounded-full bg-[#86EFAC] neo-border flex items-center justify-center text-xs font-bold shrink-0">3</span>
+<p class="text-sm">Lock in before the 14s timer finishes to ensure your vote counts!</p>
+</div>
+</div>
+<button class="w-full py-3 bg-primary-container neo-border rounded-xl neo-shadow tactile-btn font-label-bold text-label-bold text-on-surface" onclick="toggleModal('rules-modal')">
+        GOT IT, LET'S PLAY!
+      </button>
+</div>
+</div>
+<!-- ==================== MODAL 2: SETTINGS DRAWER ==================== -->
+<div class="fixed inset-0 z-50 bg-[#18181B]/40 hidden items-end justify-center p-0" id="settings-drawer">
+<div class="bg-surface-container-lowest neo-border rounded-t-3xl neo-shadow-lg w-full max-w-[480px] p-space-lg flex flex-col gap-4 animate-in slide-in-from-bottom duration-200">
+<!-- Drawer Grab Handle -->
+<div class="w-12 h-1.5 bg-[#18181B] rounded-full mx-auto mb-1"></div>
+<div class="flex items-center justify-between pb-2 border-b-[2.5px] border-on-surface">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-xl" data-icon="tune">tune</span>
+<h2 class="font-headline-md text-headline-md font-bold">Controller Settings</h2>
+</div>
+<button class="w-8 h-8 rounded-lg neo-border bg-surface-container neo-shadow-sm flex items-center justify-center font-bold text-sm tactile-btn" onclick="toggleModal('settings-drawer')">
+          ✕
+        </button>
+</div>
+<!-- Toggles List -->
+<div class="flex flex-col gap-3 py-1">
+<!-- Setting 1: Haptic -->
+<div class="flex items-center justify-between p-3 bg-surface-container rounded-xl neo-border">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-lg" data-icon="vibration">vibration</span>
+<span class="font-label-bold text-sm">Haptic Feedback</span>
+</div>
+<button class="w-12 h-7 bg-[#86EFAC] neo-border rounded-full p-0.5 flex items-center justify-end neo-shadow-sm transition-all" id="toggle-haptic" onclick="toggleSetting('toggle-haptic')">
+<span class="w-5 h-5 bg-[#18181B] rounded-full"></span>
+</button>
+</div>
+<!-- Setting 2: Family Friendly -->
+<div class="flex items-center justify-between p-3 bg-surface-container rounded-xl neo-border">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-lg" data-icon="child_care">child_care</span>
+<span class="font-label-bold text-sm">Family-Friendly Filter</span>
+</div>
+<button class="w-12 h-7 bg-surface-container-highest neo-border rounded-full p-0.5 flex items-center justify-start neo-shadow-sm transition-all" id="toggle-family" onclick="toggleSetting('toggle-family')">
+<span class="w-5 h-5 bg-[#18181B] rounded-full"></span>
+</button>
+</div>
+<!-- Setting 3: SFX Audio -->
+<div class="flex items-center justify-between p-3 bg-surface-container rounded-xl neo-border">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-lg" data-icon="volume_up">volume_up</span>
+<span class="font-label-bold text-sm">Sound Effects Volume</span>
+</div>
+<button class="w-12 h-7 bg-[#86EFAC] neo-border rounded-full p-0.5 flex items-center justify-end neo-shadow-sm transition-all" id="toggle-sfx" onclick="toggleSetting('toggle-sfx')">
+<span class="w-5 h-5 bg-[#18181B] rounded-full"></span>
+</button>
+</div>
+</div>
+<button class="w-full py-3 bg-primary-container neo-border rounded-xl neo-shadow tactile-btn font-label-bold text-label-bold" onclick="toggleModal('settings-drawer')">
+        DONE
+      </button>
+</div>
+</div>
+<!-- Inline Interaction Scripts -->
+<script>
+    let selectedChoiceId = null;
+    let isLocked = false;
+    let isMuted = false;
+
+    // PIN Copy Interaction
+    function copyPin() {
+      navigator.clipboard?.writeText("J4MZ");
+      const toast = document.getElementById("copied-toast");
+      toast.classList.remove("hidden");
+      setTimeout(() => {
+        toast.classList.add("hidden");
+      }, 2000);
+    }
+
+    // Modal Display Controls
+    function toggleModal(id) {
+      const modal = document.getElementById(id);
+      if (modal.classList.contains("hidden")) {
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+      } else {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+      }
+    }
+
+    // Nominee Card Selection Logic
+    function selectChoice(id) {
+      if (isLocked) return;
+      selectedChoiceId = id;
+
+      const choice1 = document.getElementById("choice-1");
+      const choice2 = document.getElementById("choice-2");
+      const radio1 = document.getElementById("radio-1");
+      const radio2 = document.getElementById("radio-2");
+      const check1 = document.getElementById("check-1");
+      const check2 = document.getElementById("check-2");
+
+      if (id === 1) {
+        choice1.classList.add("bg-[#FEF08A]", "border-[#18181B]");
+        choice1.classList.remove("bg-surface-container-lowest");
+        radio1.classList.add("bg-[#86EFAC]");
+        check1.classList.remove("hidden");
+
+        choice2.classList.remove("bg-[#FEF08A]");
+        choice2.classList.add("bg-surface-container-lowest");
+        radio2.classList.remove("bg-[#86EFAC]");
+        check2.classList.add("hidden");
+      } else {
+        choice2.classList.add("bg-[#FEF08A]", "border-[#18181B]");
+        choice2.classList.remove("bg-surface-container-lowest");
+        radio2.classList.add("bg-[#86EFAC]");
+        check2.classList.remove("hidden");
+
+        choice1.classList.remove("bg-[#FEF08A]");
+        choice1.classList.add("bg-surface-container-lowest");
+        radio1.classList.remove("bg-[#86EFAC]");
+        check1.classList.add("hidden");
+      }
+    }
+
+    // Lock In Answer
+    function lockInAnswer() {
+      if (!selectedChoiceId) {
+        alert("Please pick a player nominee before locking in!");
+        return;
+      }
+      isLocked = !isLocked;
+      const btn = document.getElementById("lock-btn");
+      const icon = document.getElementById("lock-icon");
+      const text = document.getElementById("lock-text");
+
+      if (isLocked) {
+        btn.classList.remove("bg-[#86EFAC]");
+        btn.classList.add("bg-[#93C5FD]");
+        icon.textContent = "lock";
+        text.textContent = "ANSWER LOCKED IN ✓";
+      } else {
+        btn.classList.remove("bg-[#93C5FD]");
+        btn.classList.add("bg-[#86EFAC]");
+        icon.textContent = "lock_open";
+        text.textContent = "LOCK IN ANSWER";
+      }
+    }
+
+    // Quick Reaction Floating Emoji
+    function sendEmoji(emojiChar) {
+      const floater = document.getElementById("emoji-floater");
+      floater.textContent = emojiChar;
+      floater.style.left = (window.innerWidth / 2 - 20) + "px";
+      floater.style.top = "60%";
+      floater.classList.remove("opacity-0");
+      floater.classList.add("opacity-100", "-translate-y-24");
+
+      setTimeout(() => {
+        floater.classList.remove("opacity-100", "-translate-y-24");
+        floater.classList.add("opacity-0");
+        floater.style.top = "60%";
+      }, 650);
+    }
+
+    // Audio Mute Toggle
+    function toggleAudio() {
+      isMuted = !isMuted;
+      const icon = document.getElementById("audio-icon");
+      if (isMuted) {
+        icon.textContent = "volume_off";
+        icon.setAttribute("data-icon", "volume_off");
+      } else {
+        icon.textContent = "volume_up";
+        icon.setAttribute("data-icon", "volume_up");
+      }
+    }
+
+    // Buzzer action
+    function triggerBuzzer() {
+      sendEmoji("🚨");
+      if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
+    }
+
+    // Settings switch toggle
+    function toggleSetting(buttonId) {
+      const btn = document.getElementById(buttonId);
+      const isGreen = btn.classList.contains("bg-[#86EFAC]");
+      if (isGreen) {
+        btn.classList.remove("bg-[#86EFAC]", "justify-end");
+        btn.classList.add("bg-surface-container-highest", "justify-start");
+      } else {
+        btn.classList.remove("bg-surface-container-highest", "justify-start");
+        btn.classList.add("bg-[#86EFAC]", "justify-end");
+      }
+    }
+
+    // Pre-select Option 1 on load for instant playfulness
+    window.addEventListener("DOMContentLoaded", () => {
+      selectChoice(1);
+    });
+  </script>
+</body></html>

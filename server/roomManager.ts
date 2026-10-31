@@ -34,12 +34,6 @@ import { awardPoints, recomputeTeamScores as recomputeTeamScoreTotals, ScoreLogE
 import { PLAYER_COLORS } from '../shared/theme/tokens';
 import { DEFAULT_GAME, PARTY_GAMES } from '../shared/data/games';
 import {
-  GtlCustomPromptInput,
-  GuessTheLinkPrompt,
-  buildGtlCustomPrompt,
-  isBlankGtlCustomPrompt,
-} from '../shared/data/guessTheLinkPrompts';
-import {
   DEFAULT_AVOID_SETTINGS,
   DEFAULT_IMPOSTOR_SETTINGS,
   DEFAULT_MAFIA_SETTINGS,
@@ -120,13 +114,7 @@ import {
 } from './games/mafia';
 import { SKIP_VOTE } from './games/mafia.engine';
 import {
-  GTL_INPUT_SECONDS,
-  GTL_REVEAL_SECONDS,
-  GTL_GUESS_SECONDS,
   setupGtlRound,
-  recordGtlResponse,
-  simulateGtlBotResponses,
-  finalizeGtlReveal,
   beginGtlGuessing,
   recordGtlGuess,
   simulateGtlBotGuesses,
@@ -369,9 +357,6 @@ export interface InternalRoom {
   teams: Team[];
   /** Bounded audit trail of every awardPoints() call this room made. */
   scoreLog: ScoreLogEntry[];
-  /** Host-authored Guess the Link prompt, consumed by the next round.
-   *  Kept off public state so the concept never leaks before results. */
-  gtlCustomPrompt: GuessTheLinkPrompt | null;
   botTimeouts: NodeJS.Timeout[]; // pending simulated-bot actions
   createdAt: number;
   lastActivityAt: number;
@@ -470,7 +455,6 @@ export class RoomManager {
       playMode: 'solo',
       teams: [],
       scoreLog: [],
-      gtlCustomPrompt: null,
       botTimeouts: [],
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
@@ -727,14 +711,13 @@ export class RoomManager {
     const game = PARTY_GAMES.find((g) => g.id === gameId);
     if (!game) return false;
     room.selectedGame = game;
-    // A queued custom concept belongs to Guess the Link only — dropping it
-    // when the host switches away stops it surprising a later round.
-    if (gameId !== GUESS_THE_LINK_GAME_ID) {
-      room.gtlCustomPrompt = null;
-      releaseGtlBuffer(room.code);
-    } else {
-      // Start early: round 1 is ready before the host presses Start.
+    // Start early: a Guess the Link room fills its lookahead the moment the
+    // host selects it, so round 1 is ready before Start. Leaving the game
+    // releases the buffer instead of keeping a dead room's puzzles alive.
+    if (gameId === GUESS_THE_LINK_GAME_ID) {
       void prepareGtlPuzzles(room.code, readGtlSettings(room));
+    } else {
+      releaseGtlBuffer(room.code);
     }
     // Switching away from Mafia drops its secret roles and night state instead
     // of leaving them attached to the room's public payload.
@@ -743,42 +726,6 @@ export class RoomManager {
       cleanupMafiaRound(room.code);
     }
     return true;
-  }
-
-  /**
-   * Guess the Link: the host queues a custom concept + hint angles for the
-   * next round. The concept lives on the room only (never in public state)
-   * and is consumed when the round is set up. An all-blank payload clears
-   * it so the shipped 44-concept deck takes over.
-   */
-  public setGtlCustomPrompt(
-    code: string,
-    playerId: string,
-    input: GtlCustomPromptInput
-  ): { success: boolean; error?: string; prompt?: GuessTheLinkPrompt | null } {
-    const room = this.getRoom(code);
-    if (!room) return { success: false, error: 'Room not found.' };
-    if (playerId !== room.hostId) {
-      return { success: false, error: 'Only the host can set the concept.' };
-    }
-    if (room.phase !== 'game-select') {
-      return { success: false, error: 'Set this before launching the round.' };
-    }
-    if (room.selectedGame?.id !== GUESS_THE_LINK_GAME_ID) {
-      return { success: false, error: 'Select Guess the Link first.' };
-    }
-
-    if (isBlankGtlCustomPrompt(input)) {
-      room.gtlCustomPrompt = null;
-      return { success: true, prompt: null };
-    }
-
-    const result = buildGtlCustomPrompt(input);
-    if (!result.ok) return { success: false, error: result.error };
-
-    room.gtlCustomPrompt = result.prompt;
-    // Echoed only to the host's own callback — the concept never broadcasts.
-    return { success: true, prompt: result.prompt };
   }
 
   /**
@@ -1303,7 +1250,6 @@ export class RoomManager {
         room.gtlState = null;
         room.top100State = null;
         room.revCatState = null;
-        room.gtlCustomPrompt = null;
         cleanupAvoidTheWordRound(room.code);
         cleanupMafiaRound(room.code);
         cleanupGtlRound(room.code);
@@ -1501,7 +1447,6 @@ export class RoomManager {
       }
 
       case 'input': {
-        const inputIsGtl = room.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
         const inputIsTop100 = room.selectedGame?.id === TOP_100_GAME_ID;
         const inputIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
         const inputIsImpostorQuestion = this.isImpostorQuestionMode(room);
@@ -1511,8 +1456,6 @@ export class RoomManager {
           ? 'Invent Your Category'
           : inputIsTop100
           ? 'Name Something on the List'
-          : inputIsGtl
-          ? 'Write Your Response'
           : 'Submit Your Clue';
         room.phaseSubprompt = inputIsImpostorQuestion
           ? 'Keep your answer short — the table will compare all of them'
@@ -1520,8 +1463,6 @@ export class RoomManager {
           ? 'One category name that cleverly links all three items'
           : inputIsTop100
           ? 'One guess each — the deeper it ranks, the more it scores'
-          : inputIsGtl
-          ? 'One word or a short phrase inspired by your private hint'
           : 'Enter a one-word clue before the timer expires';
         room.hasSubmittedInput.clear();
 
@@ -1529,8 +1470,6 @@ export class RoomManager {
         if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
           if (inputIsImpostorQuestion) simulateImpostorQuestionBots(room);
           else simulateImpostorBotClues(room);
-        } else if (inputIsGtl) {
-          simulateGtlBotResponses(room);
         } else if (inputIsTop100) {
           // Bots lock a beat later, so the submitted board fills up live.
           this.scheduleTop100Bots(room, broadcastState);
@@ -1550,8 +1489,6 @@ export class RoomManager {
           ? top100GuessSeconds
           : inputIsRevCat
           ? RC_INPUT_SECONDS
-          : inputIsGtl
-          ? GTL_INPUT_SECONDS
           : 20;
 
         this.startPhaseTimer(
@@ -1561,8 +1498,6 @@ export class RoomManager {
           () => {
             if (room.selectedGame?.id === IMPOSTOR_GAME_ID) {
               this.finalizeImpostorInput(room);
-            } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
-              finalizeGtlReveal(room);
             } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
               finalizeTop100Guesses(room);
             } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
@@ -1575,7 +1510,6 @@ export class RoomManager {
       }
 
       case 'reveal-answers': {
-        const revealIsGtl = room.selectedGame?.id === GUESS_THE_LINK_GAME_ID;
         const revealIsTop100 = room.selectedGame?.id === TOP_100_GAME_ID;
         const revealIsRevCat = room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID;
         const revealIsImpostorQuestion = this.isImpostorQuestionMode(room);
@@ -1583,8 +1517,6 @@ export class RoomManager {
           ? 'The Answer Board'
           : revealIsRevCat
           ? 'The Category Board'
-          : revealIsGtl
-          ? 'The Link Board'
           : revealIsTop100
           ? 'The Guesses Board'
           : 'Simultaneous Reveal';
@@ -1592,15 +1524,11 @@ export class RoomManager {
           ? 'Every answer, shuffled — did one of them fit a different question?'
           : revealIsRevCat
           ? 'Every invented category, shuffled — then vote for the best one'
-          : revealIsGtl
-          ? 'Every response, shuffled — what single concept ties them together?'
           : revealIsTop100
           ? 'Every guess with its position — the host can overrule a close call'
           : 'Review every player’s clue in randomized order';
         if (room.selectedGame?.id === 'impostor') {
           this.finalizeImpostorInput(room);
-        } else if (revealIsGtl) {
-          finalizeGtlReveal(room);
         } else if (revealIsTop100) {
           finalizeTop100Guesses(room);
         } else if (revealIsRevCat) {
@@ -1613,8 +1541,6 @@ export class RoomManager {
           ? TOP100_OVERRULE_SECONDS
           : revealIsRevCat
           ? RC_REVEAL_SECONDS
-          : revealIsGtl
-          ? GTL_REVEAL_SECONDS
           : 15;
 
         this.startPhaseTimer(
@@ -1624,13 +1550,7 @@ export class RoomManager {
           () =>
             this.transitionToPhase(
               room,
-              revealIsGtl
-                ? 'guess'
-                : revealIsTop100
-                ? 'results'
-                : revealIsRevCat
-                ? 'vote'
-                : 'discussion',
+              revealIsTop100 ? 'results' : revealIsRevCat ? 'vote' : 'discussion',
               broadcastState
             )
         );
@@ -2402,8 +2322,6 @@ export class RoomManager {
       } else {
         recordPlayerClue(room, playerId, answer);
       }
-    } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
-      recordGtlResponse(room, playerId, answer);
     } else if (room.selectedGame?.id === TOP_100_GAME_ID) {
       const outcome = recordTop100Guess(room, playerId, answer);
       if (!outcome.accepted) {
@@ -2435,8 +2353,6 @@ export class RoomManager {
     if (room.hasSubmittedInput.size >= activeCount) {
       if (room.selectedGame?.id === 'impostor') {
         this.finalizeImpostorInput(room);
-      } else if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
-        finalizeGtlReveal(room);
       } else if (room.selectedGame?.id === REVERSE_CATEGORIES_GAME_ID) {
         finalizeRevCatReveal(room);
       }
@@ -2900,7 +2816,6 @@ export class RoomManager {
       playMode: room.playMode,
       teams: room.teams,
       aiContentAvailable: isAiAvailable(),
-      gtlCustomReady: Boolean(room.gtlCustomPrompt),
     };
   }
 

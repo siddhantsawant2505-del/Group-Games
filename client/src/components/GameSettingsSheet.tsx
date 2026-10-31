@@ -2,6 +2,7 @@ import { Settings, Sparkles } from 'lucide-react';
 import {
   AvoidSettings,
   GameMetadata,
+  GtlSettings,
   ImpostorSettings,
   MafiaSettings,
   Player,
@@ -10,7 +11,7 @@ import {
 } from '@shared/types';
 import { AvoidSettingsPanel } from './AvoidSettingsPanel';
 import { GameSettingsPanel } from './GameSettingsPanel';
-import { GtlCustomPromptPanel } from './GtlCustomPromptPanel';
+import { GtlSettingsPanel } from './GtlSettingsPanel';
 import { MafiaSettingsPanel } from './MafiaSettingsPanel';
 import { SettingsSheet } from './SettingsSheet';
 import { TeamSupportBadge } from './TeamSupportBadge';
@@ -21,6 +22,7 @@ type SettingsPatch = {
   avoidTheWord?: Partial<AvoidSettings>;
   top100?: Partial<Top100Settings>;
   mafia?: Partial<MafiaSettings>;
+  guessTheLink?: Partial<GtlSettings>;
 };
 
 interface GameSettingsSheetProps {
@@ -32,14 +34,6 @@ interface GameSettingsSheetProps {
   onSaveGameSettings?: (
     patch: SettingsPatch,
     callback: (res: { success: boolean; error?: string }) => void
-  ) => void;
-  onSaveGtlPrompt?: (
-    input: { concept: string; category?: string; hints?: string[] },
-    callback: (res: {
-      success: boolean;
-      error?: string;
-      prompt?: { concept: string; category: string; hints: string[] } | null;
-    }) => void
   ) => void;
 }
 
@@ -57,7 +51,6 @@ export function GameSettingsSheet({
   myPlayer,
   onClose,
   onSaveGameSettings,
-  onSaveGtlPrompt,
 }: GameSettingsSheetProps) {
   const isHost = myPlayer.isHost;
 
@@ -87,10 +80,10 @@ export function GameSettingsSheet({
 
     if (game.id === 'guess-the-link') {
       return (
-        <GtlCustomPromptPanel
+        <GtlSettingsPanel
           room={room}
           myPlayer={myPlayer}
-          onSaveGtlPrompt={onSaveGtlPrompt}
+          onSaveGameSettings={onSaveGameSettings}
         />
       );
     }

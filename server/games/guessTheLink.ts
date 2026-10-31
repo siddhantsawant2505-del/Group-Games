@@ -57,9 +57,7 @@ const linkJudgeAi: JudgeAi = {
 /** Points by solve order: 1st +3, 2nd +2, everyone later +1. */
 export const GTL_POINTS_BY_ORDER = [3, 2, 1] as const;
 export const GTL_OVERRULE_POINTS = 1;
-export const GTL_REVEAL_SECONDS = 15;
 export const GTL_GUESS_SECONDS = 60;
-export const GTL_INPUT_SECONDS = 0;
 export const GTL_MAX_GUESS_CHARS = 40;
 export const GTL_BOT_MIN_DELAY_MS = 4_000;
 export const GTL_BOT_MAX_DELAY_MS = 18_000;
@@ -164,7 +162,7 @@ function matchGtlLocal(puzzle: GuessLinkPuzzle, rawGuess: string): 'correct' | '
   return near.length > 1 ? 'ambiguous' : 'incorrect';
 }
 
-function rowsFor(room: InternalRoom, settings: GtlSettings): GtlRow[] {
+function rowsFor(room: InternalRoom): GtlRow[] {
   if (room.playMode === 'team' && room.teams.length > 0) {
     return room.teams.map((team) => ({
       id: team.id,
@@ -227,7 +225,7 @@ export function setupGtlRound(room: InternalRoom): void {
   const state: GtlRoundState = {
     puzzle,
     phase: 'ready',
-    rows: new Map(rowsFor(room, settings).map((row) => [row.id, row])),
+    rows: new Map(rowsFor(room).map((row) => [row.id, row])),
     solvedOrder: [],
     wrongGuesses: [],
     hintShown: false,
@@ -281,7 +279,6 @@ export function syncGtlPublicState(room: InternalRoom): void {
       };
     }),
     attemptsUsed,
-    guessesSubmitted: state.solvedOrder.map((entry) => entry.rowId),
     revealed,
     link: revealed ? state.puzzle.link : null,
     items: revealed
@@ -324,7 +321,6 @@ export function syncGtlPrivateState(room: InternalRoom): void {
       gtlAttemptsLeft: Math.max(0, settings.attempts - row.used),
       gtlVerdicts: [...row.verdicts],
       gtlSolved: row.solved,
-      gtlConcept: state.phase === 'results' ? state.puzzle.link : undefined,
     };
   }
   void rows;
@@ -553,16 +549,4 @@ export function simulateGtlBotGuesses(room: InternalRoom): void {
     room.botTimeouts.push(timeout);
     void settings;
   });
-}
-
-/* Legacy no-op exports kept so the older flow's imports still compile. */
-export function recordGtlResponse(..._args: unknown[]): string {
-  void _args;
-  return '';
-}
-export function simulateGtlBotResponses(..._args: unknown[]): void {
-  void _args;
-}
-export function finalizeGtlReveal(..._args: unknown[]): void {
-  void _args;
 }

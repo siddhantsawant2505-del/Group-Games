@@ -37,27 +37,25 @@ export function InputPhaseScreen({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between p-5 max-w-md mx-auto w-full">
+    <div className="flex-1 flex flex-col justify-between p-4 max-w-md mx-auto w-full">
       {/* Top Header & Timer */}
       <div>
         <div className="flex items-center justify-between mb-2">
           {/* "It's your turn" highlight using player's own identity color */}
           <div
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-black"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black"
             style={{
-              backgroundColor: `${playerColor.hex}18`,
-              borderColor: playerColor.hex,
-              color: 'var(--text-primary)',
+              backgroundColor: playerColor.hex,
+              color: playerColor.contrastText,
             }}
           >
             <span
-              className="w-2.5 h-2.5 rounded-full animate-pulse"
-              style={{ backgroundColor: playerColor.hex }}
+              className="w-2.5 h-2.5 rounded-full border border-[var(--border-neo)] bg-[#18181B] animate-pulse"
             />
             <span>It’s your turn!</span>
           </div>
 
-          <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400">
+          <span className="text-xs font-black opacity-65">
             {room.hasSubmittedInput.length} / {room.players.length} Submitted
           </span>
         </div>
@@ -75,13 +73,10 @@ export function InputPhaseScreen({
       <motion.div
         initial={{ y: 15, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="party-card p-6 rounded-3xl my-auto"
-        style={{
-          boxShadow: `0 8px 24px ${playerColor.hex}15`,
-        }}
+        className="p-6 rounded-3xl my-auto bg-[var(--surface-card)] border-[2.5px] border-[var(--border-neo)] shadow-[6px_6px_0px_var(--border-neo)]"
       >
         <div className="mb-4">
-          <span className="text-xs font-extrabold uppercase tracking-wider text-neutral-400 block mb-1">
+          <span className="text-xs font-black uppercase tracking-wider opacity-60 block mb-1">
             {privateState.isSpecialRole ? 'Impostor Bluff' : 'One-Word Clue'}
           </span>
           <h2 className="text-xl font-black text-[var(--text-primary)] leading-tight">
@@ -90,22 +85,22 @@ export function InputPhaseScreen({
               : `Type a one-word clue related to "${privateState.secretWord || 'the word'}"`}
           </h2>
           {privateState.secretHint && (
-            <p className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 mt-1">
+            <p className="text-xs font-bold opacity-60 mt-1">
               {privateState.secretHint}
             </p>
           )}
         </div>
 
         {hasSubmitted ? (
-          <div className="p-5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-center flex flex-col items-center gap-2">
-            <CheckCircle2 className="w-8 h-8 text-emerald-500" />
-            <span className="text-base font-black text-emerald-800 dark:text-emerald-200">
+          <div className="p-5 rounded-2xl bg-[#86EFAC] text-[#18181B] border-[2.5px] border-[var(--border-neo)] shadow-[4px_4px_0px_var(--border-neo)] text-center flex flex-col items-center gap-2">
+            <CheckCircle2 className="w-8 h-8 stroke-[3]" />
+            <span className="text-base font-black">
               Clue Locked In!
             </span>
-            <p className="text-lg font-black text-emerald-700 dark:text-emerald-300">
+            <p className="text-xl font-black">
               "{answer}"
             </p>
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
+            <span className="text-xs font-bold mt-1 opacity-80">
               Clues stay hidden until everyone finishes or timer expires
             </span>
           </div>
@@ -117,21 +112,19 @@ export function InputPhaseScreen({
                 maxLength={24}
                 value={answer}
                 onChange={(e) => {
-                  // Keep to a single word without spaces
                   const val = e.target.value.replace(/\s+/g, '');
                   setAnswer(val);
                 }}
                 placeholder={privateState.inputPlaceholder || 'Single word clue...'}
-                className="w-full p-4 rounded-2xl border-2 border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 font-black text-lg text-[var(--text-primary)] text-center tracking-wide focus:border-neutral-900 dark:focus:border-neutral-100 focus:outline-none transition-colors"
+                className="w-full p-4 rounded-2xl border-[2.5px] border-[var(--border-neo)] bg-[var(--surface-card-subtle)] font-black text-lg text-[var(--text-primary)] text-center tracking-wide focus:shadow-[4px_4px_0px_var(--border-neo)] focus:-translate-y-0.5 focus:outline-none transition-all"
                 autoFocus
               />
-              <div className="flex justify-between text-xs text-neutral-400 mt-1.5 px-1">
+              <div className="flex justify-between text-xs font-bold opacity-60 mt-1.5 px-1">
                 <span>Single word only</span>
                 <span>{answer.length}/24</span>
               </div>
             </div>
 
-            {/* Primary Action Button using player's own identity color */}
             <ActionButton
               type="submit"
               variant="personal"
@@ -148,8 +141,8 @@ export function InputPhaseScreen({
         )}
 
         {/* Live Submissions Tracker */}
-        <div className="mt-6 pt-4 border-t border-[var(--border-subtle)]">
-          <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 block mb-2 text-left">
+        <div className="mt-6 pt-4 border-t-2 border-[var(--border-neo)]">
+          <span className="text-xs font-black opacity-60 block mb-2 text-left">
             Player Status:
           </span>
           <div className="flex flex-wrap gap-1.5">
@@ -176,7 +169,7 @@ export function InputPhaseScreen({
           <button
             type="button"
             onClick={onHostSkip}
-            className="text-xs font-bold text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer underline"
+            className="text-xs font-black opacity-60 hover:opacity-100 cursor-pointer underline underline-offset-4"
           >
             Host: Skip to reveal phase immediately
           </button>

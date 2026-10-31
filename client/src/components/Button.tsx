@@ -37,8 +37,8 @@ export function Button({
   id,
 }: ButtonProps) {
   // Resolve player color if provided
-  let resolvedColor = '#FF5A5F';
-  let resolvedContrastText = '#FFFFFF';
+  let resolvedColor = '#FDA4AF';
+  let resolvedContrastText = '#18181B';
 
   if (typeof playerColor === 'number') {
     const token = getPlayerColor(playerColor);
@@ -46,32 +46,30 @@ export function Button({
     resolvedContrastText = token.contrastText;
   } else if (typeof playerColor === 'string') {
     resolvedColor = playerColor;
-    resolvedContrastText = '#FFFFFF';
+    resolvedContrastText = '#18181B';
   }
 
-  let bgStyle = 'var(--text-primary)';
-  let textStyle = 'var(--bg-app)';
-  let borderStyle = 'transparent';
+  let bgStyle = 'var(--color-success, #86EFAC)';
+  let textStyle = '#18181B';
 
   if (variant === 'personal') {
     bgStyle = resolvedColor;
     textStyle = resolvedContrastText;
   } else if (variant === 'shared' || variant === 'primary') {
-    bgStyle = 'var(--text-primary)';
-    textStyle = 'var(--bg-app)';
+    bgStyle = 'var(--color-success, #86EFAC)';
+    textStyle = '#18181B';
   } else if (variant === 'secondary' || variant === 'subtle') {
-    bgStyle = 'var(--surface-card)';
-    textStyle = 'var(--text-primary)';
-    borderStyle = 'var(--border-subtle)';
+    bgStyle = 'var(--surface-card, #FFFFFF)';
+    textStyle = 'var(--text-primary, #18181B)';
   } else if (variant === 'danger') {
-    bgStyle = 'var(--color-danger, #EF4444)';
-    textStyle = '#FFFFFF';
+    bgStyle = 'var(--color-danger, #FDA4AF)';
+    textStyle = '#18181B';
   }
 
   const sizeClasses = {
-    sm: 'min-h-[44px] px-4 py-2 text-sm',
-    md: 'min-h-[50px] px-6 py-3.5 text-base',
-    lg: 'min-h-[56px] px-7 py-4 text-lg',
+    sm: 'min-h-[44px] px-4 py-2 text-sm shadow-[2px_2px_0px_var(--border-neo)]',
+    md: 'min-h-[52px] px-6 py-3.5 text-base shadow-[4px_4px_0px_var(--border-neo)]',
+    lg: 'min-h-[60px] px-7 py-4 text-lg shadow-[4px_4px_0px_var(--border-neo)]',
   }[size];
 
   const spinnerSize = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-5 h-5' : 'w-4 h-4';
@@ -81,30 +79,29 @@ export function Button({
     <motion.button
       id={id}
       type={type}
-      whileHover={!isInteractivityDisabled ? { scale: 1.015, filter: 'brightness(1.03)' } : undefined}
-      whileTap={!isInteractivityDisabled ? { scale: 0.96 } : undefined}
-      transition={{ type: 'spring', stiffness: 450, damping: 22 }}
+      whileHover={!isInteractivityDisabled ? { y: -1, x: -1 } : undefined}
+      whileTap={!isInteractivityDisabled ? { x: 2, y: 2 } : undefined}
+      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
       onClick={!isInteractivityDisabled ? onClick : undefined}
       disabled={isInteractivityDisabled}
       aria-busy={loading}
-      className={`font-bold rounded-[var(--radius-button)] flex flex-col items-center justify-center transition-all select-none border shadow-xs relative overflow-hidden ${
+      className={`font-extrabold rounded-[var(--radius-button)] flex flex-col items-center justify-center select-none border-[2.5px] border-[var(--border-neo)] relative overflow-hidden transition-colors ${
         fullWidth ? 'w-full' : 'w-auto inline-flex'
       } ${sizeClasses} ${
         isInteractivityDisabled
           ? 'opacity-60 cursor-not-allowed'
-          : 'cursor-pointer active:shadow-inner'
+          : 'cursor-pointer active:shadow-[1px_1px_0px_var(--border-neo)]'
       } ${className}`}
       style={{
         backgroundColor: bgStyle,
         color: textStyle,
-        borderColor: borderStyle,
       }}
     >
       {/* Subtle top indeterminate progress bar when loading */}
       {loading && (
-        <div className="absolute top-0 left-0 right-0 h-1 overflow-hidden bg-black/10 dark:bg-white/10">
+        <div className="absolute top-0 left-0 right-0 h-1.5 overflow-hidden bg-black/15">
           <motion.div
-            className="h-full bg-current opacity-60 rounded-full"
+            className="h-full bg-current opacity-70 rounded-full"
             initial={{ x: '-100%', width: '40%' }}
             animate={{ x: '350%' }}
             transition={{
@@ -116,7 +113,7 @@ export function Button({
         </div>
       )}
 
-      <span className="inline-flex items-center justify-center gap-2 tracking-wide font-bold">
+      <span className="inline-flex items-center justify-center gap-2 tracking-wide font-black">
         {loading ? (
           <>
             <Loader2 className={`${spinnerSize} animate-spin shrink-0`} />
@@ -131,7 +128,7 @@ export function Button({
       </span>
 
       {!loading && subtext && (
-        <span className="text-xs font-normal opacity-80 mt-0.5 whitespace-nowrap">
+        <span className="text-xs font-semibold opacity-85 mt-0.5 whitespace-nowrap">
           {subtext}
         </span>
       )}

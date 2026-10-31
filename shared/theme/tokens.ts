@@ -1,28 +1,26 @@
 /**
  * Design system tokens and palette constants for Party Games.
- * Mobile-first bright, flat party minigame genre.
+ * Soothing Neo-Brutalism ("Chubby Neo-Brutalism") palette and tokens.
  */
 
 export interface PlayerColorToken {
   index: number;
   label: string;
   hex: string;
-  contrastText: string; // Black or white for high-contrast readability
+  contrastText: string; // Black/charcoal for high-contrast readability on pastel pop
 }
 
 export const PLAYER_COLORS: readonly PlayerColorToken[] = [
-  { index: 0, label: 'Coral Red', hex: '#FF5A5F', contrastText: '#FFFFFF' },
-  { index: 1, label: 'Sky Blue', hex: '#3AA0FF', contrastText: '#FFFFFF' },
-  { index: 2, label: 'Sunny Yellow', hex: '#FFC93C', contrastText: '#1A1B1E' },
-  { index: 3, label: 'Grass Green', hex: '#4CD787', contrastText: '#1A1B1E' },
-  { index: 4, label: 'Violet', hex: '#9B6DFF', contrastText: '#FFFFFF' },
-  { index: 5, label: 'Hot Pink', hex: '#FF6FB0', contrastText: '#FFFFFF' },
+  { index: 0, label: 'Bubblegum Coral', hex: '#FDA4AF', contrastText: '#18181B' },
+  { index: 1, label: 'Sky Blue', hex: '#93C5FD', contrastText: '#18181B' },
+  { index: 2, label: 'Butter Yellow', hex: '#FEF08A', contrastText: '#18181B' },
+  { index: 3, label: 'Pistachio Mint', hex: '#86EFAC', contrastText: '#18181B' },
+  { index: 4, label: 'Lavender Grape', hex: '#C4B5FD', contrastText: '#18181B' },
+  { index: 5, label: 'Tangerine Sorbet', hex: '#FDBA74', contrastText: '#18181B' },
 ] as const;
 
 /**
- * Team accents. Deliberately deeper than the six player identity colours so a
- * team bar and a player avatar never read as the same swatch, and they are
- * always paired with a team icon + name because colour is never the only cue.
+ * Team accents. Deeper solid shades paired with clear iconography.
  */
 export interface TeamAccentToken {
   index: number;
@@ -46,22 +44,24 @@ export function getTeamAccent(accentIndex: number): TeamAccentToken {
 
 export const THEME_COLORS = {
   light: {
-    background: '#FAFAF7',
+    background: '#FAF8F5',
     surface: '#FFFFFF',
-    textPrimary: '#1A1B1E',
-    textSecondary: '#6B6D73',
-    border: 'rgba(26, 27, 30, 0.08)',
+    textPrimary: '#18181B',
+    textSecondary: '#52525B',
+    border: '#18181B',
   },
   dark: {
-    background: '#16171A',
-    surface: '#212226',
-    textPrimary: '#F2F2F0',
-    textSecondary: '#A0A2A8',
-    border: 'rgba(242, 242, 240, 0.1)',
+    background: '#18181B',
+    surface: '#27272A',
+    textPrimary: '#FAF8F5',
+    textSecondary: '#A1A1AA',
+    border: '#3F3F46',
   },
   semantic: {
-    success: '#22C55E',
-    danger: '#EF4444',
+    success: '#86EFAC',
+    danger: '#FDA4AF',
+    warning: '#FDBA74',
+    info: '#93C5FD',
     specialRoleAccent: '#3D2C4E', // deep charcoal-purple for impostor/secret reveals
     specialRoleAccentLight: '#4D3864',
   },
@@ -85,13 +85,21 @@ export const THEME_RADII = {
   inner: '14px',
 } as const;
 
+export const THEME_SHADOWS = {
+  sm: '2px 2px 0px #18181B',
+  md: '4px 4px 0px #18181B',
+  lg: '6px 6px 0px #18181B',
+  active: '1px 1px 0px #18181B',
+} as const;
+
 export const THEME_TYPOGRAPHY = {
-  fontFamily: "'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-  headingWeight: '600',
+  fontFamily: "'Plus Jakarta Sans', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  monoFamily: "'JetBrains Mono', 'Fira Code', monospace",
+  headingWeight: '700',
   titleWeight: '800',
   bodyWeight: '500',
-  timerWeight: '900',
-  timerSize: '48px',
+  timerWeight: '800',
+  timerSize: '40px',
   roundTitleSize: '28px',
   bodySize: '16px',
 } as const;
@@ -102,9 +110,9 @@ export const DESIGN_TOKENS = {
   teamAccents: TEAM_ACCENTS,
   spacing: THEME_SPACING,
   radii: THEME_RADII,
+  shadows: THEME_SHADOWS,
   typography: THEME_TYPOGRAPHY,
 } as const;
-
 
 /**
  * Get player color info based on join order index (0 to 5, loops if > 5)

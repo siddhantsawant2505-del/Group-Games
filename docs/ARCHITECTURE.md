@@ -116,8 +116,8 @@ word list, and no room repeats content:
 
 - **Two kinds of settings, two places.** Room-wide settings (play mode, teams, rounds) live behind
   a **gear in the lobby**, next to the player list; per-game settings (Impostor mode/difficulty/
-  tone/theme, Guess the Link's custom concept) live behind a **gear on that game's card** in
-  game-select. Nothing is shared between games, so tuning one never disturbs another.
+  tone/theme, Guess the Link rounds/time/attempts/difficulty/hint) live behind a **gear on that
+  game's card** in game-select. Nothing is shared between games, so tuning one never disturbs another.
 - **`RoomSettingsSheet` is generic.** Both gears open the same bottom-sheet shell
   (`client/src/components/SettingsSheet.tsx`); the lobby mounts `RoomSettingsPanel`, the game cards
   mount `GameSettingsSheet`, which dispatches on the game id. Host-editable controls are disabled

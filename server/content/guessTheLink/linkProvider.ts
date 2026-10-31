@@ -36,7 +36,6 @@ interface RoomBuffer {
 }
 
 const buffers = new Map<string, RoomBuffer>();
-let generating = false;
 let warmTimer: NodeJS.Timeout | null = null;
 const stats = {
   onDemand: 0,

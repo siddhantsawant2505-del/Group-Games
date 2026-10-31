@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import QRCode from 'qrcode';
-import { QrCode, Copy, Check, X, Smartphone, ExternalLink, Download } from 'lucide-react';
+import { QrCode, Copy, Check, X, Smartphone, Download } from 'lucide-react';
 
 interface RoomQRCodeProps {
   roomCode: string;
@@ -25,15 +24,18 @@ export function RoomQRCodeModal({ roomCode, isOpen, onClose }: RoomQRCodeProps) 
     let isMounted = true;
     setLoading(true);
 
-    QRCode.toDataURL(joinUrl, {
-      width: 400,
-      margin: 2,
-      color: {
-        dark: '#111827', // Crisp dark slate for optimal optical camera scanning
-        light: '#FFFFFF',
-      },
-      errorCorrectionLevel: 'M',
-    })
+    import('qrcode')
+      .then(({ default: QRCode }) =>
+        QRCode.toDataURL(joinUrl, {
+          width: 400,
+          margin: 2,
+          color: {
+            dark: '#18181B',
+            light: '#FFFFFF',
+          },
+          errorCorrectionLevel: 'M',
+        })
+      )
       .then((url) => {
         if (isMounted) {
           setQrDataUrl(url);
@@ -81,7 +83,7 @@ export function RoomQRCodeModal({ roomCode, isOpen, onClose }: RoomQRCodeProps) 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            className="fixed inset-0 bg-[#18181B]/40 backdrop-blur-xs"
           />
 
           {/* Dialog Container */}
@@ -93,20 +95,20 @@ export function RoomQRCodeModal({ roomCode, isOpen, onClose }: RoomQRCodeProps) 
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.92, opacity: 0, y: 16 }}
             transition={{ type: 'spring', stiffness: 450, damping: 28 }}
-            className="relative w-full max-w-sm bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-3xl p-6 shadow-2xl z-10 text-center"
+            className="relative w-full max-w-sm bg-[var(--surface-card)] border-[2.5px] border-[var(--border-neo)] rounded-3xl p-6 shadow-[6px_6px_0px_var(--border-neo)] z-10 text-center"
           >
             {/* Close Button */}
             <button
               type="button"
               onClick={onClose}
-              className="absolute top-4 right-4 p-2 rounded-full text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+              className="absolute top-4 right-4 w-8 h-8 rounded-xl bg-[var(--surface-card-subtle)] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] flex items-center justify-center font-black text-sm cursor-pointer tactile-btn"
               aria-label="Close QR Code dialog"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
 
             {/* Header Badge */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 text-xs font-black mb-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#86EFAC] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] text-xs font-black mb-3">
               <Smartphone className="w-3.5 h-3.5" />
               <span>Instant Camera Join</span>
             </div>
@@ -118,16 +120,16 @@ export function RoomQRCodeModal({ roomCode, isOpen, onClose }: RoomQRCodeProps) 
               Scan to Join Room
             </h3>
 
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
+            <p className="text-xs font-bold opacity-60 mb-4">
               Point your phone camera at the QR code to open the game room directly.
             </p>
 
             {/* QR Code Container with High-Contrast White Backing */}
-            <div className="mx-auto w-64 h-64 p-3 bg-white rounded-2xl shadow-inner border border-neutral-200 flex items-center justify-center relative overflow-hidden">
+            <div className="mx-auto w-64 h-64 p-3 bg-white rounded-2xl border-2 border-[var(--border-neo)] shadow-[3px_3px_0px_var(--border-neo)] flex items-center justify-center relative overflow-hidden">
               {loading ? (
                 <div className="flex flex-col items-center justify-center gap-3 text-neutral-400">
                   <div className="w-8 h-8 border-3 border-neutral-300 border-t-neutral-800 rounded-full animate-spin" />
-                  <span className="text-xs font-semibold">Generating QR Code...</span>
+                  <span className="text-xs font-bold">Generating QR Code...</span>
                 </div>
               ) : qrDataUrl ? (
                 <motion.img
@@ -138,16 +140,16 @@ export function RoomQRCodeModal({ roomCode, isOpen, onClose }: RoomQRCodeProps) 
                   className="w-full h-full object-contain rounded-lg"
                 />
               ) : (
-                <span className="text-xs text-red-500">Failed to generate QR</span>
+                <span className="text-xs text-red-500 font-bold">Failed to generate QR</span>
               )}
             </div>
 
             {/* Room Code Badge */}
             <div className="mt-4 flex items-center justify-center gap-2">
-              <span className="text-xs uppercase font-extrabold tracking-wider text-neutral-400">
+              <span className="text-xs uppercase font-black opacity-60">
                 Room Code:
               </span>
-              <span className="font-mono text-xl font-black tracking-widest text-[var(--text-primary)] bg-neutral-100 dark:bg-neutral-800 px-3 py-0.5 rounded-lg border border-[var(--border-subtle)]">
+              <span className="font-mono text-xl font-black tracking-widest text-[#18181B] bg-[#FEF08A] px-3 py-1 rounded-xl border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)]">
                 {roomCode}
               </span>
             </div>
@@ -157,17 +159,17 @@ export function RoomQRCodeModal({ roomCode, isOpen, onClose }: RoomQRCodeProps) 
               <button
                 type="button"
                 onClick={copyJoinUrl}
-                className="w-full py-2.5 px-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-xs font-bold text-[var(--text-primary)] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="w-full py-2.5 px-3 rounded-xl bg-[var(--surface-card-subtle)] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black text-[var(--text-primary)] flex items-center justify-center gap-1.5 cursor-pointer tactile-btn"
               >
                 {copied ? (
                   <>
-                    <Check className="w-4 h-4 text-emerald-500" />
+                    <Check className="w-4 h-4 stroke-[3] text-emerald-600" />
                     <span>URL Copied!</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="w-4 h-4 text-neutral-500" />
-                    <span>Copy Link</span>
+                    <Copy className="w-4 h-4" />
+                    <span>Copy URL</span>
                   </>
                 )}
               </button>
@@ -176,9 +178,9 @@ export function RoomQRCodeModal({ roomCode, isOpen, onClose }: RoomQRCodeProps) 
                 type="button"
                 onClick={downloadQr}
                 disabled={!qrDataUrl}
-                className="w-full py-2.5 px-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-xs font-bold text-[var(--text-primary)] flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                className="w-full py-2.5 px-3 rounded-xl bg-[#93C5FD] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black text-[#18181B] flex items-center justify-center gap-1.5 cursor-pointer tactile-btn disabled:opacity-50"
               >
-                <Download className="w-4 h-4 text-neutral-500" />
+                <Download className="w-4 h-4" />
                 <span>Save Image</span>
               </button>
             </div>
@@ -189,9 +191,6 @@ export function RoomQRCodeModal({ roomCode, isOpen, onClose }: RoomQRCodeProps) 
   );
 }
 
-/**
- * Inline Compact QR Code Preview Widget
- */
 export function InlineRoomQR({
   roomCode,
   onOpenModal,
@@ -207,15 +206,18 @@ export function InlineRoomQR({
 
   useEffect(() => {
     let isMounted = true;
-    QRCode.toDataURL(joinUrl, {
-      width: 160,
-      margin: 1,
-      color: {
-        dark: '#111827',
-        light: '#FFFFFF',
-      },
-      errorCorrectionLevel: 'M',
-    })
+    import('qrcode')
+      .then(({ default: QRCode }) =>
+        QRCode.toDataURL(joinUrl, {
+          width: 160,
+          margin: 1,
+          color: {
+            dark: '#18181B',
+            light: '#FFFFFF',
+          },
+          errorCorrectionLevel: 'M',
+        })
+      )
       .then((url) => {
         if (isMounted) setQrDataUrl(url);
       })
@@ -229,12 +231,12 @@ export function InlineRoomQR({
   return (
     <div
       onClick={onOpenModal}
-      className={`inline-flex items-center gap-3 p-2.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs ${
-        onOpenModal ? 'cursor-pointer hover:border-neutral-400 dark:hover:border-neutral-600 transition-colors' : ''
+      className={`inline-flex items-center gap-3 p-2.5 rounded-2xl bg-[var(--surface-card)] border-2 border-[var(--border-neo)] shadow-[3px_3px_0px_var(--border-neo)] ${
+        onOpenModal ? 'cursor-pointer tactile-btn' : ''
       }`}
       title="Click to enlarge QR code for easy scanning"
     >
-      <div className="w-14 h-14 bg-white p-1 rounded-xl shrink-0 flex items-center justify-center border border-neutral-100 shadow-2xs">
+      <div className="w-14 h-14 bg-white p-1 rounded-xl shrink-0 flex items-center justify-center border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)]">
         {qrDataUrl ? (
           <img
             src={qrDataUrl}
@@ -247,16 +249,16 @@ export function InlineRoomQR({
       </div>
 
       <div className="text-left pr-1">
-        <div className="flex items-center gap-1 text-[11px] font-black text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
-          <Smartphone className="w-3 h-3 text-emerald-500" />
+        <div className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-[var(--text-primary)]">
+          <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
           <span>Scan to Join</span>
         </div>
-        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-tight mt-0.5">
+        <p className="text-[11px] font-bold opacity-60 leading-tight mt-0.5">
           Phone camera opens room directly
         </p>
       </div>
 
-      <div className="ml-auto pl-1 pr-1 text-neutral-400">
+      <div className="ml-auto pl-1 pr-1 opacity-70">
         <QrCode className="w-4 h-4" />
       </div>
     </div>

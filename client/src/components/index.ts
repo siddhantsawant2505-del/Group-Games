@@ -11,6 +11,6 @@ export * from './Header';
 export * from './SettingsSheet';
 export * from './RoomSettingsPanel';
 export * from './GameSettingsSheet';
-export * from './GtlCustomPromptPanel';
+export * from './GtlSettingsPanel';
 export * from './TeamLeaderboard';
 export * from './TeamSupportBadge';

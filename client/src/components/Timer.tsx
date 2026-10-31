@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { THEME_COLORS } from '@shared/theme/tokens';
 import { playNotificationSound, triggerHaptic } from '../services/sound';
 
 interface TimerProps {
@@ -26,57 +25,60 @@ export function Timer({
     }
   }, [secondsRemaining]);
 
-  // Calculate remaining percentage for progress bar if duration provided
   const percent = totalDuration > 0
     ? Math.max(0, Math.min(100, (secondsRemaining / totalDuration) * 100))
     : 100;
 
-  const textColor = isDanger
-    ? THEME_COLORS.semantic.danger
+  const badgeBg = isDanger
+    ? '#FDA4AF'
     : isWarning
-    ? '#F59E0B'
-    : 'var(--text-primary)';
+    ? '#FDBA74'
+    : '#93C5FD';
 
   return (
     <div className="flex flex-col items-center justify-center my-1 select-none">
       {label && (
-        <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1">
+        <span className="text-xs font-black uppercase tracking-wider opacity-65 mb-1">
           {label}
         </span>
       )}
 
-      {/* Big Centered Numerals (40px+) */}
-      <div className="relative flex items-center justify-center h-14">
+      {/* Chunky Neo-Brutalist Pill Timer */}
+      <div
+        className={`px-4 py-1.5 rounded-full border-2 border-[var(--border-neo)] shadow-[3px_3px_0px_var(--border-neo)] flex items-center justify-center gap-2 ${
+          isDanger ? 'pulse-timer' : ''
+        }`}
+        style={{ backgroundColor: badgeBg }}
+      >
+        <span className="text-base">⏱️</span>
         <AnimatePresence mode="popLayout">
-          <motion.div
+          <motion.span
             key={secondsRemaining}
-            initial={{ scale: 0.8, opacity: 0.5, y: -4 }}
+            initial={{ scale: 0.85, opacity: 0.6 }}
             animate={{
-              scale: isDanger ? [1.15, 1] : [1.06, 1],
+              scale: isDanger ? [1.12, 1] : 1,
               opacity: 1,
-              y: 0,
             }}
             transition={{
               type: 'spring',
               stiffness: 500,
               damping: 24,
             }}
-            className={`font-black tracking-tight leading-none ${
-              size === 'compact' ? 'text-3xl' : 'text-5xl'
+            className={`font-black font-mono tracking-tight text-[#18181B] leading-none ${
+              size === 'compact' ? 'text-xl' : 'text-2xl'
             }`}
-            style={{ color: textColor }}
           >
-            {Math.max(0, secondsRemaining)}s
-          </motion.div>
+            {Math.max(0, secondsRemaining)}s LEFT
+          </motion.span>
         </AnimatePresence>
       </div>
 
       {/* Progress pill bar */}
-      <div className="w-28 h-1.5 bg-neutral-200 dark:bg-neutral-800 rounded-full mt-2 overflow-hidden">
+      <div className="w-32 h-3 bg-[var(--surface-card-subtle)] border-2 border-[var(--border-neo)] rounded-full mt-2.5 overflow-hidden shadow-[1px_1px_0px_var(--border-neo)]">
         <motion.div
           className="h-full rounded-full"
           style={{
-            backgroundColor: textColor,
+            backgroundColor: isDanger ? '#FDA4AF' : isWarning ? '#FDBA74' : '#86EFAC',
           }}
           animate={{ width: `${percent}%` }}
           transition={{ ease: 'linear', duration: 0.2 }}

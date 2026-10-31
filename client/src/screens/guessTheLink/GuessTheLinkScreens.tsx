@@ -59,7 +59,7 @@ function ClueTile({
 }
 
 /** Get ready: three clues on screen with the countdown. */
-export function GtlHintRevealScreen({ room }: ScreenProps) {
+export function GtlGetReadyScreen({ room }: ScreenProps) {
   const state = room.gtlState;
   const [zoom, setZoom] = useState<number | null>(null);
   return (

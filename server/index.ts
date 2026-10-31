@@ -6,7 +6,6 @@ import http from 'http';
 import os from 'os';
 import path from 'path';
 import { Server as SocketIOServer } from 'socket.io';
-import { createServer as createViteServer } from 'vite';
 import { roomManager } from './roomManager.ts';
 import { getMafiaTeamPicks } from './games/mafia.ts';
 import { reportAiUnavailableOnce } from './content/index.ts';
@@ -26,8 +25,6 @@ async function startServer() {
   // Announce once at boot whether the content engine has an AI provider, so the
   // fallback behaviour is never a surprise. Silent when a real key is set.
   reportAiUnavailableOnce();
-  // Fills the warm pool shortly after boot so a first round never waits.
-  startGtlWarmPool();
 
   const app = express();
   const server = http.createServer(app);
@@ -304,6 +301,7 @@ async function startServer() {
             avoidTheWord?: Record<string, unknown>;
             top100?: Record<string, unknown>;
             mafia?: Record<string, unknown>;
+            guessTheLink?: Record<string, unknown>;
           };
         },
         callback
@@ -445,7 +443,7 @@ async function startServer() {
                   'results',
                 ]
               : room.selectedGame?.id === 'guess-the-link'
-              ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'guess', 'results']
+              ? ['lobby', 'game-select', 'reveal', 'guess', 'results']
               : room.selectedGame?.id === 'top-100'
               ? ['lobby', 'game-select', 'reveal', 'input', 'reveal-answers', 'results']
               : room.selectedGame?.id === 'reverse-categories'
@@ -703,41 +701,6 @@ async function startServer() {
       }
     );
 
-    // 14b. Guess the Link: host authors a custom concept + hint angles
-    socket.on(
-      'gtl-set-prompt',
-      (
-        {
-          roomCode,
-          playerId,
-          concept,
-          category,
-          hints,
-        }: {
-          roomCode: string;
-          playerId: string;
-          concept: string;
-          category?: string;
-          hints?: string[];
-        },
-        callback
-      ) => {
-        const upperCode = (roomCode || '').toUpperCase().trim();
-        const result = roomManager.setGtlCustomPrompt(upperCode, playerId, {
-          concept,
-          category,
-          hints,
-        });
-
-        if (typeof callback === 'function') {
-          callback(result);
-        }
-        if (result.success) {
-          broadcastRoom(upperCode);
-        }
-      }
-    );
-
     // 14c. Top 100 (team mode): a teammate sends a suggestion only their team sees
     socket.on(
       'top100-suggest',
@@ -826,7 +789,7 @@ async function startServer() {
   });
 
   // Health check API
-  app.get('/api/health', (req, res) => {
+  app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
@@ -886,6 +849,8 @@ async function startServer() {
 
   // Vite middleware in development vs static files in production
   if (process.env.NODE_ENV !== 'production') {
+    // Loaded only in development: a production boot must not pay for Vite.
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       configFile: path.resolve(projectRoot, 'vite.config.ts'),
       root: path.resolve(projectRoot, 'client'),
@@ -895,8 +860,19 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(projectRoot, 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.use(
+      express.static(distPath, {
+        setHeaders(res, filePath) {
+          // Vite fingerprints these names, so they can be cached forever.
+          if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          } else if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+          }
+        },
+      })
+    );
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -912,6 +888,10 @@ async function startServer() {
   sweepTimer.unref?.();
 
   server.listen(PORT, HOST, () => {
+    // Warm the puzzle library only after the port is open, so AI work never
+    // delays the first request (or the health check).
+    setImmediate(() => startGtlWarmPool());
+
     console.log(`\n🎉 Party Games Server running at:`);
     console.log(`  ➜  Local:   http://localhost:${PORT}/`);
 

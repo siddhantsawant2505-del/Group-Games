@@ -64,7 +64,7 @@ export function LoadingScreen({ onComplete, durationMs = 1350 }: LoadingScreenPr
                   x: { duration: 0.5, delay: 0.1, type: 'spring', stiffness: 300, damping: 20 },
                   y: { duration: 0.5, delay: 0.1, type: 'spring', stiffness: 300, damping: 20 },
                 }}
-                className="absolute w-4 h-4 rounded-full shadow-md"
+                className="absolute w-5 h-5 rounded-full border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)]"
                 style={{
                   backgroundColor: color.hex,
                 }}

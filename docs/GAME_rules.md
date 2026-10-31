@@ -20,11 +20,10 @@ built with React 19, TypeScript, Tailwind CSS v4, Express, and Socket.IO.
 - A 4-character room code + QR code are used for joining.
 - A "next-round" loop lets a host replay a new round with a fresh role assignment.
 
-> **Availability.** **Impostor**, **Avoid the Word**, **Mafia**, **Top 100** and **Reverse
-> Categories** and **Guess the Link** are selectable in the app today. None are marked `comingSoon` in
-> `shared/data/games.ts`: its card appears with a **Coming Soon** badge, cannot be selected or
-> launched, and the server falls back to `DEFAULT_GAME` when a room still points at it. Its rules
-> below are kept for the engine and test suite, not as a promise that the game is live.
+> **Availability.** **Impostor**, **Avoid the Word**, **Mafia**, **Top 100**, **Reverse
+> Categories** and **Guess the Link** are all selectable in the app today. None are marked
+> `comingSoon` in `shared/data/games.ts`; the flag remains supported for future games, and the
+> server falls back to `DEFAULT_GAME` when a room still points at one.
 
 ---
 
@@ -508,12 +507,13 @@ The engine follows a **server-authoritative, Socket.IO-based** architecture:
 - `client/src/screens/mafia/` — the Mafia views: `RoleRevealScreen`, `NightScreen` (one component
   for every role plus the dead spectator view), `MorningScreen`, `DayScreen`, `VoteScreen`,
   `ExileScreen` and `GameOverScreen`.
-- `shared/data/guessTheLinkPrompts.ts` — 44 original concepts, each with 6 hint angles.
-- `server/games/guessTheLink.ts` — the Guess the Link engine (concept hiding, hint dealing,
-  response sanitizing, the shuffled board, simultaneous guessing, scoring).
-- `client/src/screens/GtlHintRevealScreen.tsx`, `GtlInputScreen.tsx`,
-  `GtlResponseRevealScreen.tsx`, `GtlGuessScreen.tsx`, `GtlResultsScreen.tsx` — the Guess the
-  Link views.
+- `server/games/guessTheLink.ts` — the Guess the Link engine (image clues, private attempts,
+  solve-order scoring, the public hint, host overrules and bot guesses).
+- `server/content/guessTheLink/` — the puzzle pipeline: persistent library, no-repeat bags,
+  lookahead buffer, AI generation/validation, the link judge and image storage (`puzzleLibrary.ts`,
+  `linkProvider.ts`, `puzzleGenerator.ts`, `linkJudge.ts`, `imageProvider.ts`, `imageStore.ts`).
+- `client/src/screens/guessTheLink/GuessTheLinkScreens.tsx` — the get-ready, guessing and results
+  views (three clue images, live solve feed, attempts, hint and host overrules).
 - `shared/data/top100/*.json` — the hidden ranked lists (17 lists, 100 items each, with aliases,
   a category, a region, an as-of date and a cited source), plus `shared/data/top100Categories.ts`.
 - `scripts/validateTop100Lists.ts` — `npm run validate:top100`: exactly 100 items, unique ranks,
@@ -588,12 +588,11 @@ Every new game must:
 4. **Keep secrets out of public state** — roles, words, questions, answers before reveal, and Top
    100's ranked list only ever live on the server or travel through `player:private-state`.
 
-**Top 100 already ships native team rules** (one locked guess per team, a rotating captain, a
-team-private suggestion channel, and points through `awardTeamPoints()`), which is the reference for
-the games still to get them:
+**Top 100 and Guess the Link ship native team rules**: Top 100 locks one guess per team through a
+rotating captain with a team-private suggestion channel; Guess the Link gives each team one shared
+attempt pool, lets any member guess, and awards solve-order points through `awardTeamPoints()`. The
+games still to get native rules:
 
-- **Guess the Link** — each team submits ONE shared guess via a rotating captain; teams score
-  separately.
 - **Reverse Categories** — each team submits ONE invented category via its captain; players vote for
   the best category but not their own team's; points go to the winning team.
 - **Mafia** — Mafia vs Town stay the factions; room teams only aggregate scores.
@@ -608,17 +607,17 @@ the games still to get them:
   on dedicated engines (a rotating anchor with a hidden answer, one timed turn per player and live
   match announcements with host-overruled eliminations; hidden roles with a hold-to-reveal deal,
   identical role night screens, doctor/detective secrets, narrated mornings, exile ballots, win
-  checks and a full recap; hidden concepts with per-player hint angles and simultaneous guessing;
+  checks and a full recap;  three-image puzzles with private attempts and solve-order scoring;
   hidden 100-item ranked lists with position-exact scoring, host overrules and only the 1-10 /
   90-100 slices revealed; and unrelated item triplets with invented categories scored by the
-  standard ballot respectively). **Impostor, Avoid the Word, Mafia, Top 100 and Reverse Categories
-  are selectable**; only Guess the Link is still Coming Soon.
+  standard ballot respectively). **All six games are selectable.**
 - **Rooms** now run in **solo** or **team** mode, with host-managed teams, a central
   `awardPoints()` scoring path, and team leaderboards on the results and post-game screens.
 - **Per-game settings** live behind a gear on each game-select card (Impostor mode/difficulty/tone/
   theme, Avoid the Word's two timers, round cap and question tone, Mafia's mafia count, three timers
-  and role toggles, Guess the Link's custom concept, Top 100's rounds, guess time, duplicate
-  policy, region and category filters) and **room settings** (play mode, teams, rounds) behind a
+  and role toggles, Guess the Link's rounds/time/attempts/difficulty/hint, Top 100's rounds, guess
+  time, duplicate policy, region and category filters) and **room settings** (play mode, teams,
+  rounds) behind a
   gear in the lobby — no settings are shared between games any more.
 - **Production readiness** is not yet reached: no DB, no rate limiting, no room persistence, no
   persistence of rooms on restart, and no formal hardening pass.

@@ -41,7 +41,7 @@ export function PlayerChip({
   onClick,
 }: PlayerChipProps) {
   // Dynamically resolve player assigned color
-  let activeColorHex = '#FF5A5F';
+  let activeColorHex = '#FDA4AF';
 
   const effectiveColor = color !== undefined ? color : (colorHex || colorIndex || 0);
 
@@ -54,15 +54,15 @@ export function PlayerChip({
 
   const sizeClasses = {
     sm: {
-      container: 'px-2.5 py-1.5 text-xs gap-1.5 rounded-full',
+      container: 'px-2.5 py-1.5 text-xs gap-1.5 rounded-xl min-h-[36px]',
       avatarSize: 'xs' as const,
     },
     md: {
-      container: 'px-3.5 py-2 text-sm gap-2.5 rounded-full min-h-[44px]',
+      container: 'px-3.5 py-2 text-sm gap-2.5 rounded-xl min-h-[46px]',
       avatarSize: 'sm' as const,
     },
     lg: {
-      container: 'px-4 py-3 text-base gap-3 rounded-2xl min-h-[52px]',
+      container: 'px-4 py-3 text-base gap-3 rounded-2xl min-h-[54px]',
       avatarSize: 'md' as const,
     },
   }[size];
@@ -71,21 +71,20 @@ export function PlayerChip({
     <motion.button
       id={id}
       type="button"
-      whileHover={selectable ? { scale: 1.03 } : undefined}
-      whileTap={selectable ? { scale: 0.96 } : undefined}
+      whileHover={selectable ? { y: -1, x: -1 } : undefined}
+      whileTap={selectable ? { x: 2, y: 2 } : undefined}
       onClick={onClick}
       disabled={!selectable && !onClick}
-      className={`inline-flex items-center transition-colors font-medium border ${
-        selectable ? 'cursor-pointer' : 'cursor-default'
+      className={`inline-flex items-center transition-all font-bold border-2 border-[var(--border-neo)] select-none ${
+        selectable ? 'cursor-pointer active:shadow-[1px_1px_0px_var(--border-neo)]' : 'cursor-default'
       } ${
         selected
-          ? 'ring-2 ring-offset-2 ring-neutral-900 dark:ring-neutral-100 shadow-md'
-          : ''
+          ? 'shadow-[4px_4px_0px_var(--border-neo)] -translate-y-0.5'
+          : 'shadow-[2px_2px_0px_var(--border-neo)]'
       } ${sizeClasses.container}`}
       style={{
-        backgroundColor: selected ? `${activeColorHex}18` : 'var(--surface-card)',
-        borderColor: selected ? activeColorHex : 'var(--border-subtle)',
-        color: 'var(--text-primary)',
+        backgroundColor: selected ? '#FEF08A' : 'var(--surface-card, #FFFFFF)',
+        color: '#18181B',
       }}
     >
       {/* Player Avatar Component */}
@@ -99,10 +98,10 @@ export function PlayerChip({
       />
 
       {/* Name and Indicators */}
-      <span className="truncate max-w-[140px] font-semibold text-left">
+      <span className="truncate max-w-[140px] font-black text-left text-[var(--text-primary)]">
         {name}
         {isYou && (
-          <span className="ml-1 text-[11px] font-normal opacity-70">
+          <span className="ml-1 text-[11px] font-bold opacity-75">
             (You)
           </span>
         )}
@@ -112,21 +111,21 @@ export function PlayerChip({
       {(status === 'voted' || status === 'submitted') && (
         <span
           title={status === 'voted' ? 'Voted' : 'Submitted'}
-          className="shrink-0 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center ml-auto"
+          className="shrink-0 w-5 h-5 rounded-lg bg-[#86EFAC] text-[#18181B] border border-[var(--border-neo)] flex items-center justify-center ml-auto font-black"
         >
-          <Check className="w-3 h-3 stroke-[3]" />
+          <Check className="w-3.5 h-3.5 stroke-[3]" />
         </span>
       )}
 
       {/* Badge or Score */}
       {score !== undefined && (
-        <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-bold bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 ml-auto">
+        <span className="shrink-0 px-2 py-0.5 rounded-lg text-xs font-black bg-[#93C5FD] text-[#18181B] border border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] ml-auto font-mono">
           {score} pts
         </span>
       )}
 
       {badge && (
-        <span className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-bold bg-neutral-200 dark:bg-neutral-700 ml-auto">
+        <span className="shrink-0 px-2 py-0.5 rounded-lg text-[11px] font-black bg-[#C4B5FD] text-[#18181B] border border-[var(--border-neo)] ml-auto">
           {badge}
         </span>
       )}

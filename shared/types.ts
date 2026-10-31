@@ -435,24 +435,6 @@ export interface AvoidPlacement {
   teamIcon?: string;
 }
 
-export interface GtlGuessResult {
-  playerId: string;
-  playerName: string;
-  playerColor: string;
-  colorIndex: number;
-  hint: string;          // the angle this player was dealt
-  guessText: string;     // what they thought the hidden concept was
-  correct: boolean;
-  pointsAdded: number;
-}
-
-export interface GtlHintShare {
-  playerId: string;
-  playerName: string;
-  colorIndex: number;
-  hint: string;
-}
-
 /* ────────────────────────────── Top 100 ────────────────────────────────── */
 
 /** Where a list's ranking is scoped to. */
@@ -746,16 +728,6 @@ export interface GtlPublicState {
   wrongGuesses: GtlWrongGuess[];
   finalRound: boolean;
   gameOver: boolean;
-  /** Deprecated legacy fields kept so older screens still type-check. */
-  category?: string;
-  conceptWordCount?: number;
-  hintsDealt?: number;
-  totalPlayers?: number;
-  responsesReady?: boolean;
-  guessesSubmitted: string[];
-  guessSeconds?: number;
-  concept?: string | null;
-  correctPlayerIds?: string[];
 }
 
 export type MafiaRole = 'mafia' | 'detective' | 'doctor' | 'townsperson';
@@ -932,15 +904,6 @@ export interface PhaseResultsData {
   avoidEliminations?: AvoidEliminationRound[];
   avoidRoundsPlayed?: number;
   avoidAnchorNames?: string[];
-  // Guess the Link-specific
-  gtlConcept?: string;
-  gtlCategory?: string;
-  gtlGuesses?: GtlGuessResult[];
-  gtlHints?: GtlHintShare[];
-  gtlCorrectPlayerIds?: string[];
-  gtlGiveawayName?: string;
-  gtlGiveawayResponse?: string;
-  gtlGiveawayNote?: string;
   // Mafia-specific
   mafiaWinningSide?: MafiaSide;
   mafiaLog?: string[];
@@ -1017,9 +980,6 @@ export interface RoomPublicState {
    * theme field when it can actually be used.
    */
   aiContentAvailable: boolean;
-  /** True while a host-authored concept is queued for the next GTL round.
-   *  Never carries the concept itself — only that a custom round is loaded. */
-  gtlCustomReady?: boolean;
 }
 
 export interface PlayerPrivateState {
@@ -1076,19 +1036,7 @@ export interface PlayerPrivateState {
   mafiaReadyToVote?: boolean;
   mafiaVoteSubmitted?: boolean;
   mafiaVoteTargetName?: string | null;
-  // Guess the Link
-  gtlHint?: string;             // this player's own angle on the hidden concept
-  gtlHintIndex?: number;        // 1-based position of their hint in the round's deal
-  gtlHintCount?: number;        // how many distinct hint angles exist
-  gtlCategory?: string;
-  gtlConcept?: string;          // only present for the owner once results land
-  gtlResponseSubmitted?: boolean;
-  gtlResponseText?: string;
-  gtlGuessSubmitted?: boolean;
-  gtlGuessText?: string;
-  gtlGuessCorrect?: boolean;
-  gtlPointsAwarded?: number;
-  /** New image engine: this row's (player or team) remaining attempts + verdicts. */
+  // Guess the Link: this row's (player or team) remaining attempts + verdicts.
   gtlAttemptsLeft?: number;
   gtlAttemptsUsed?: number;
   gtlVerdicts?: boolean[];

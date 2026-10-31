@@ -109,11 +109,11 @@ export function VoteScreen({ room, myPlayer, privateState, onVote, onHostSkip }:
               type="button"
               disabled={hasVoted}
               onClick={() => setSelectedId(SKIP_VOTE)}
-              className={`w-full p-3 rounded-2xl border-2 flex items-center gap-2.5 text-left transition-all ${
+              className={`w-full p-3 rounded-2xl border-[2.5px] border-[var(--border-neo)] flex items-center gap-2.5 text-left transition-all ${
                 selectedId === SKIP_VOTE
-                  ? 'border-neutral-800 dark:border-neutral-200 bg-neutral-100 dark:bg-neutral-800/70'
-                  : 'border-[var(--border-subtle)] bg-[var(--surface-card-subtle)]'
-              } ${hasVoted ? 'cursor-default opacity-70' : 'cursor-pointer active:scale-[0.99]'}`}
+                  ? 'bg-[#FEF08A] shadow-[4px_4px_0px_var(--border-neo)] translate-x-[-1px] translate-y-[-1px]'
+                  : 'bg-[var(--surface-card-subtle)] shadow-[2px_2px_0px_var(--border-neo)]'
+              } ${hasVoted ? 'cursor-default opacity-70' : 'cursor-pointer active:translate-x-[2px] active:translate-y-[2px] active:shadow-none'}`}
             >
               <MinusCircle className="w-5 h-5 text-neutral-400 shrink-0" />
               <span className="min-w-0">

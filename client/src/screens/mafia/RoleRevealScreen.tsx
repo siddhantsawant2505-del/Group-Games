@@ -96,10 +96,9 @@ export function RoleRevealScreen({ room, myPlayer, privateState }: RoleRevealScr
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.94 }}
               transition={{ type: 'spring', stiffness: 340, damping: 24 }}
-              className="p-6 rounded-3xl text-center border shadow-lg select-none"
+              className="p-6 rounded-3xl text-center border-[2.5px] border-[var(--border-neo)] shadow-[6px_6px_0px_var(--border-neo)] select-none"
               style={{
                 backgroundColor: style.background,
-                borderColor: style.onDark ? `${style.accent}66` : 'var(--border-subtle)',
                 color: style.onDark ? '#F2F2F0' : 'var(--text-primary)',
               }}
             >

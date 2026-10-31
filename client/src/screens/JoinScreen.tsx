@@ -31,7 +31,6 @@ export function JoinScreen({
   const [playerName, setPlayerName] = useState(savedSession?.playerName || '');
   const [isQrJoin, setIsQrJoin] = useState(false);
 
-  // Auto-detect room code from URL query parameter (e.g. ?room=ABCD from QR code scan)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
@@ -61,22 +60,21 @@ export function JoinScreen({
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-between p-5 max-w-md mx-auto w-full">
-      {/* Top Banner / Genre identity */}
+    <div className="flex-1 flex flex-col justify-between p-4 max-w-md mx-auto w-full">
+      {/* Top Banner */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center pt-4 pb-2"
+        className="text-center pt-3 pb-2"
       >
-        {/* Playful Player Color Dots Showcase */}
-        <div className="flex items-center justify-center gap-2 mb-4">
+        <div className="flex items-center justify-center gap-2 mb-3">
           {PLAYER_COLORS.map((col, i) => (
             <motion.div
               key={col.hex}
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              transition={{ delay: i * 0.06, type: 'spring' }}
-              className="w-4 h-4 rounded-full shadow-xs"
+              transition={{ delay: i * 0.05, type: 'spring' }}
+              className="w-4 h-4 rounded-full border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)]"
               style={{ backgroundColor: col.hex }}
             />
           ))}
@@ -85,8 +83,8 @@ export function JoinScreen({
         <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-none text-[var(--text-primary)]">
           Party Games
         </h1>
-        <p className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 mt-2 flex items-center justify-center gap-1.5">
-          <Smartphone className="w-4 h-4 text-emerald-500" />
+        <p className="text-xs font-bold opacity-60 mt-2 flex items-center justify-center gap-1.5">
+          <Smartphone className="w-4 h-4 text-emerald-600" />
           <span>Every player joins from their phone</span>
         </p>
       </motion.div>
@@ -96,16 +94,16 @@ export function JoinScreen({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="party-card p-6 rounded-3xl my-auto"
+        className="p-6 rounded-3xl my-auto bg-[var(--surface-card)] border-[2.5px] border-[var(--border-neo)] shadow-[6px_6px_0px_var(--border-neo)] space-y-5"
       >
-        {/* Reconnect Banner if previous room exists */}
+        {/* Reconnect Banner */}
         {hasActiveSavedSession && (
-          <div className="mb-5 p-3.5 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-[var(--border-subtle)] flex items-center justify-between gap-2">
+          <div className="p-3.5 rounded-2xl bg-[#FEF08A] border-2 border-[var(--border-neo)] shadow-[3px_3px_0px_var(--border-neo)] flex items-center justify-between gap-2">
             <div className="text-left">
-              <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 block uppercase tracking-wider">
+              <span className="text-[10px] font-black uppercase tracking-wider opacity-75 block">
                 Previous Session Found
               </span>
-              <span className="text-sm font-extrabold text-[var(--text-primary)]">
+              <span className="text-sm font-black font-mono text-[#18181B]">
                 Room {savedSession!.roomCode}
               </span>
             </div>
@@ -118,7 +116,7 @@ export function JoinScreen({
                 )
               }
               disabled={loading}
-              className="px-3.5 py-2 rounded-xl bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-bold flex items-center gap-1.5 cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-xs"
+              className="px-3.5 py-2 rounded-xl bg-[var(--surface-card)] text-[var(--text-primary)] text-xs font-black flex items-center gap-1.5 cursor-pointer border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] tactile-btn"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Rejoin</span>
@@ -126,15 +124,15 @@ export function JoinScreen({
           </div>
         )}
 
-        {/* Tab switch: Join Room vs Create Room */}
-        <div className="grid grid-cols-2 p-1 rounded-2xl bg-neutral-100 dark:bg-neutral-800 mb-5">
+        {/* Tab switch */}
+        <div className="grid grid-cols-2 p-1 rounded-2xl bg-[var(--surface-card-subtle)] border-2 border-[var(--border-neo)]">
           <button
             type="button"
             onClick={() => setMode('join')}
-            className={`py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+            className={`py-2.5 rounded-xl font-black text-sm transition-all cursor-pointer ${
               mode === 'join'
-                ? 'bg-[var(--surface-card)] text-[var(--text-primary)] shadow-xs'
-                : 'text-neutral-500 dark:text-neutral-400 hover:text-[var(--text-primary)]'
+                ? 'bg-[#FEF08A] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] -translate-y-0.5'
+                : 'opacity-65 hover:opacity-100'
             }`}
           >
             Join Room
@@ -142,10 +140,10 @@ export function JoinScreen({
           <button
             type="button"
             onClick={() => setMode('create')}
-            className={`py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+            className={`py-2.5 rounded-xl font-black text-sm transition-all cursor-pointer ${
               mode === 'create'
-                ? 'bg-[var(--surface-card)] text-[var(--text-primary)] shadow-xs'
-                : 'text-neutral-500 dark:text-neutral-400 hover:text-[var(--text-primary)]'
+                ? 'bg-[#FEF08A] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] -translate-y-0.5'
+                : 'opacity-65 hover:opacity-100'
             }`}
           >
             Create Room
@@ -157,11 +155,11 @@ export function JoinScreen({
           {mode === 'join' && (
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 text-left">
+                <label className="block text-xs font-black uppercase tracking-wider opacity-65 text-left">
                   4-Character Room Code
                 </label>
                 {isQrJoin && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-black text-[#18181B] bg-[#86EFAC] px-2 py-0.5 rounded-md border border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)]">
                     <QrCode className="w-3 h-3" />
                     <span>Auto-filled from QR</span>
                   </span>
@@ -176,14 +174,14 @@ export function JoinScreen({
                 autoCapitalize="characters"
                 autoCorrect="off"
                 spellCheck="false"
-                className="w-full text-center text-3xl font-black tracking-widest uppercase py-3.5 px-4 rounded-2xl border-2 border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 text-[var(--text-primary)] focus:border-neutral-900 dark:focus:border-neutral-100 focus:outline-none transition-colors"
+                className="w-full text-center text-3xl font-black font-mono tracking-[0.3em] uppercase py-3.5 px-4 rounded-2xl border-[2.5px] border-[var(--border-neo)] bg-[var(--surface-card-subtle)] text-[var(--text-primary)] focus:shadow-[4px_4px_0px_var(--border-neo)] focus:-translate-y-0.5 focus:outline-none transition-all"
                 required
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-1.5 text-left">
+            <label className="block text-xs font-black uppercase tracking-wider opacity-65 mb-1.5 text-left">
               Your Nickname
             </label>
             <input
@@ -193,7 +191,7 @@ export function JoinScreen({
               onChange={(e) => setPlayerName(e.target.value)}
               placeholder="e.g. Alex"
               autoComplete="name"
-              className="w-full py-3.5 px-4 rounded-2xl border border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 text-[var(--text-primary)] font-bold text-base focus:border-neutral-900 dark:focus:border-neutral-100 focus:outline-none transition-colors"
+              className="w-full py-3.5 px-4 rounded-2xl border-[2.5px] border-[var(--border-neo)] bg-[var(--surface-card-subtle)] text-[var(--text-primary)] font-black text-base focus:shadow-[4px_4px_0px_var(--border-neo)] focus:-translate-y-0.5 focus:outline-none transition-all"
               required
             />
           </div>
@@ -202,7 +200,7 @@ export function JoinScreen({
             <motion.div
               initial={{ opacity: 0, y: -5 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-300 text-xs font-semibold text-left"
+              className="p-3 rounded-xl bg-[#FDA4AF] border-2 border-[var(--border-neo)] text-[#18181B] text-xs font-black text-left shadow-[2px_2px_0px_var(--border-neo)]"
             >
               {errorMessage}
             </motion.div>
@@ -235,7 +233,7 @@ export function JoinScreen({
 
       {/* Footer info */}
       <div className="py-4 text-center">
-        <p className="text-xs text-neutral-400 dark:text-neutral-500 font-medium">
+        <p className="text-xs opacity-60 font-bold">
           No TV or shared monitor needed • Instant phone-to-phone sync
         </p>
       </div>

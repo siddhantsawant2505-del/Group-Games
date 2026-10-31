@@ -31,22 +31,20 @@ export function PostGameScreen({
         particleCount: 75,
         spread: 80,
         origin: { y: 0.5 },
-        colors: ['#FF5A5F', '#3AA0FF', '#FFC93C', '#4CD787', '#9B6DFF', '#FF6FB0'],
+        colors: ['#FDA4AF', '#93C5FD', '#FEF08A', '#86EFAC', '#C4B5FD', '#FDBA74'],
       });
     } catch {
       // ignore
     }
   }, []);
 
-  // Compute final ranked standings sorted by total cumulative score descending
   const rankedPlayers = [...room.players].sort((a, b) => b.score - a.score);
   const highestScore = rankedPlayers[0]?.score ?? 0;
   const winners = rankedPlayers.filter((p) => p.score === highestScore && highestScore > 0);
-  // Team mode shows the session's team totals above the individual board.
   const teamRows = room.playMode === 'team' ? teamRowsFromRoom(room) : [];
 
   return (
-    <div className="flex-1 flex flex-col justify-between p-5 max-w-md mx-auto w-full">
+    <div className="flex-1 flex flex-col justify-between p-4 max-w-md mx-auto w-full">
       {/* Header */}
       <div>
         <motion.div
@@ -54,15 +52,15 @@ export function PostGameScreen({
           animate={{ opacity: 1, scale: 1 }}
           className="text-center pt-2 mb-4"
         >
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-xs font-black text-amber-800 dark:text-amber-200 mb-2 shadow-xs">
-            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FEF08A] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black mb-2">
+            <Trophy className="w-4 h-4 text-[#18181B]" />
             <span>Session Concluded</span>
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] leading-tight">
             Final Standings
           </h2>
-          <p className="text-xs font-semibold text-neutral-400 mt-1">
+          <p className="text-xs font-bold opacity-60 mt-1">
             {teamRows.length > 0
               ? `🏆 Top team: ${
                   [...teamRows].sort((a, b) => b.total - a.total)[0].name
@@ -75,7 +73,7 @@ export function PostGameScreen({
           </p>
         </motion.div>
 
-        {/* Team mode: team totals first, then the individual leaderboard */}
+        {/* Team mode: team totals first */}
         {teamRows.length > 0 && (
           <TeamLeaderboard
             rows={teamRows}
@@ -89,13 +87,13 @@ export function PostGameScreen({
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="party-card p-5 rounded-3xl border border-[var(--border-subtle)] space-y-3 mb-4"
+          className="p-5 rounded-3xl bg-[var(--surface-card)] border-[2.5px] border-[var(--border-neo)] shadow-[6px_6px_0px_var(--border-neo)] space-y-3 mb-4"
         >
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
-            <span className="text-xs font-black uppercase tracking-wider text-neutral-400">
+          <div className="flex items-center justify-between pb-2 border-b-2 border-[var(--border-neo)]">
+            <span className="text-xs font-black uppercase tracking-wider opacity-60">
               Rank & Player
             </span>
-            <span className="text-xs font-black uppercase tracking-wider text-neutral-400">
+            <span className="text-xs font-black uppercase tracking-wider opacity-60">
               Total Score
             </span>
           </div>
@@ -111,23 +109,23 @@ export function PostGameScreen({
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.06 }}
-                  className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                  className={`flex items-center justify-between p-3 rounded-2xl border-2 border-[var(--border-neo)] transition-all ${
                     isWinner
-                      ? 'bg-amber-500/10 border-amber-500/30'
-                      : 'bg-neutral-50 dark:bg-neutral-900/60 border-[var(--border-subtle)]'
-                  } ${isYou ? 'ring-2 ring-neutral-900 dark:ring-neutral-100' : ''}`}
+                      ? 'bg-[#FEF08A] shadow-[4px_4px_0px_var(--border-neo)] -translate-y-0.5'
+                      : 'bg-[var(--surface-card-subtle)] shadow-[2px_2px_0px_var(--border-neo)]'
+                  }`}
                 >
                   <div className="flex items-center gap-3">
                     {/* Rank Badge */}
                     <div
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                      className={`w-7 h-7 rounded-lg border border-[var(--border-neo)] flex items-center justify-center text-xs font-black shrink-0 ${
                         index === 0
-                          ? 'bg-amber-400 text-neutral-900 shadow-xs'
+                          ? 'bg-[#FEF08A] text-[#18181B]'
                           : index === 1
-                          ? 'bg-neutral-300 dark:bg-neutral-600 text-neutral-900 dark:text-neutral-100'
+                          ? 'bg-[#93C5FD] text-[#18181B]'
                           : index === 2
-                          ? 'bg-amber-700/60 text-white'
-                          : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-500'
+                          ? 'bg-[#FDA4AF] text-[#18181B]'
+                          : 'bg-[var(--surface-card)] text-[var(--text-primary)]'
                       }`}
                     >
                       {index + 1}
@@ -146,7 +144,7 @@ export function PostGameScreen({
                           {player.name}
                         </span>
                         {isYou && (
-                          <span className="text-[10px] font-bold text-neutral-400">
+                          <span className="text-[10px] font-bold opacity-60">
                             (You)
                           </span>
                         )}
@@ -156,7 +154,7 @@ export function PostGameScreen({
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] font-bold text-neutral-400 block">
+                      <span className="text-[10px] font-bold opacity-60 block">
                         {player.colorName}
                       </span>
                     </div>
@@ -164,16 +162,10 @@ export function PostGameScreen({
 
                   {/* Score */}
                   <div className="flex items-center gap-1.5">
-                    <span
-                      className={`text-base font-black ${
-                        isWinner
-                          ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-[var(--text-primary)]'
-                      }`}
-                    >
+                    <span className="text-base font-black font-mono text-[var(--text-primary)]">
                       {player.score}
                     </span>
-                    <span className="text-xs font-bold text-neutral-400">
+                    <span className="text-xs font-bold opacity-60">
                       {player.score === 1 ? 'pt' : 'pts'}
                     </span>
                   </div>
@@ -207,9 +199,9 @@ export function PostGameScreen({
             </ActionButton>
           </>
         ) : (
-          <div className="party-card p-3.5 rounded-2xl text-center mb-1">
-            <p className="text-xs font-bold text-neutral-400 flex items-center justify-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+          <div className="p-4 rounded-2xl text-center bg-[var(--surface-card)] border-[2.5px] border-[var(--border-neo)] shadow-[4px_4px_0px_var(--border-neo)] mb-1">
+            <p className="text-xs font-bold opacity-75 flex items-center justify-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-amber-500" />
               <span>Waiting for host to choose next action...</span>
             </p>
           </div>
@@ -218,7 +210,7 @@ export function PostGameScreen({
         <ActionButton
           variant="subtle"
           onClick={onLeaveRoom}
-          icon={<LogOut className="w-4 h-4 text-red-500" />}
+          icon={<LogOut className="w-4 h-4 text-[#FDA4AF]" />}
         >
           Leave Room
         </ActionButton>

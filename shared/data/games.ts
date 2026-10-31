@@ -71,7 +71,6 @@ export const PARTY_GAMES: GameMetadata[] = [
       'The highest total after the last round wins.',
     ],
     teamSupport: 'native',
-    comingSoon: true,
   },
   {
     id: 'top-100',

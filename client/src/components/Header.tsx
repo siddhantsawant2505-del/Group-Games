@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Moon, Sun, Copy, Check, LogOut, Volume2, VolumeX } from 'lucide-react';
+import { Wifi, WifiOff, Copy, Check, LogOut, Volume2, VolumeX } from 'lucide-react';
 import { Player } from '@shared/types';
 import { getPlayerColor } from '@shared/theme/tokens';
 import { isSoundEnabled, toggleSound, subscribeSoundChange } from '../services/sound';
@@ -19,7 +19,6 @@ export function Header({
   onLeaveRoom,
 }: HeaderProps) {
   const [copied, setCopied] = useState(false);
-  const [isDark, setIsDark] = useState(false);
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
 
   useEffect(() => {
@@ -29,19 +28,6 @@ export function Header({
     });
     return unsubscribe;
   }, []);
-
-  useEffect(() => {
-    // Check current theme
-    const theme = document.documentElement.getAttribute('data-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDark(theme === 'dark' || (!theme && prefersDark));
-  }, []);
-
-  const toggleTheme = () => {
-    const nextTheme = isDark ? 'light' : 'dark';
-    setIsDark(!isDark);
-    document.documentElement.setAttribute('data-theme', nextTheme);
-  };
 
   const handleToggleSound = () => {
     const newState = toggleSound();
@@ -64,32 +50,41 @@ export function Header({
   const playerColor = myPlayer ? getPlayerColor(myPlayer.colorIndex) : null;
 
   return (
-    <header className="w-full px-4 py-3 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-card)] sticky top-0 z-30 select-none">
-      {/* Left: Brand or Room Code */}
+    <header className="w-full px-4 py-2.5 flex items-center justify-between border-b-[2.5px] border-[var(--border-neo)] bg-[var(--surface-card)] shadow-[0px_4px_0px_var(--border-neo)] sticky top-0 z-30 select-none">
+      {/* Left: Brand or Room Code Pill */}
       <div className="flex items-center gap-2">
         {roomCode ? (
-          <button
-            type="button"
-            onClick={copyCode}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-xs font-bold tracking-wider cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-            title="Tap to copy room code"
-          >
-            <span className="text-neutral-500 dark:text-neutral-400 font-medium">
-              ROOM
-            </span>
-            <span className="text-base font-extrabold tracking-widest text-[var(--text-primary)]">
-              {roomCode}
-            </span>
-            {copied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-500" />
-            ) : (
-              <Copy className="w-3.5 h-3.5 text-neutral-400" />
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={copyCode}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--surface-card-subtle)] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black tracking-wider cursor-pointer tactile-btn"
+              title="Tap to copy room code"
+            >
+              <span className="text-[10px] font-bold opacity-75">
+                PIN:
+              </span>
+              <span className="text-base font-extrabold tracking-widest font-mono text-[var(--text-primary)]">
+                {roomCode}
+              </span>
+              {copied ? (
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 opacity-60" />
+              )}
+            </button>
+            {copied && (
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#FEF08A] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] animate-bounce">
+                COPIED!
+              </span>
             )}
-          </button>
+          </div>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-[#FF5A5F]" />
-            <span className="font-extrabold text-lg tracking-tight">Party Games</span>
+            <span className="w-3.5 h-3.5 rounded-full bg-[#86EFAC] border-2 border-[var(--border-neo)] animate-pulse" />
+            <span className="font-extrabold text-lg tracking-tight text-[var(--text-primary)]">
+              Party Games
+            </span>
           </div>
         )}
       </div>
@@ -99,16 +94,16 @@ export function Header({
         {/* Connection status indicator */}
         <span
           title={connected ? 'Real-time sync active' : 'Disconnected'}
-          className={`flex items-center justify-center p-1.5 rounded-lg ${
+          className={`flex items-center justify-center p-1.5 rounded-xl border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] ${
             connected
-              ? 'text-emerald-500'
-              : 'text-red-500 bg-red-50 dark:bg-red-950/40'
+              ? 'bg-[#86EFAC] text-[#18181B]'
+              : 'bg-[#FDA4AF] text-[#18181B] animate-pulse'
           }`}
         >
           {connected ? (
-            <Wifi className="w-4 h-4" />
+            <Wifi className="w-3.5 h-3.5" />
           ) : (
-            <WifiOff className="w-4 h-4 animate-pulse" />
+            <WifiOff className="w-3.5 h-3.5" />
           )}
         </span>
 
@@ -116,10 +111,10 @@ export function Header({
         <button
           type="button"
           onClick={handleToggleSound}
-          className={`p-2 rounded-xl transition-colors cursor-pointer ${
+          className={`p-1.5 rounded-xl border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] tactile-btn cursor-pointer ${
             soundOn
-              ? 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-              : 'text-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50'
+              ? 'bg-[var(--surface-card)] text-[var(--text-primary)]'
+              : 'bg-[#FDA4AF] text-[#18181B]'
           }`}
           title={
             soundOn
@@ -139,25 +134,13 @@ export function Header({
           )}
         </button>
 
-        {/* Theme toggle */}
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="p-2 rounded-xl text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-          title="Toggle color theme"
-          aria-label="Toggle theme"
-        >
-          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-
         {/* Current Player badge if in a room */}
         {myPlayer && playerColor && (
           <div
-            className="flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full text-xs font-bold"
+            className="flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-xl text-xs font-black border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)]"
             style={{
-              backgroundColor: `${playerColor.hex}22`,
-              border: `1.5px solid ${playerColor.hex}`,
-              color: 'var(--text-primary)',
+              backgroundColor: playerColor.hex,
+              color: playerColor.contrastText,
             }}
           >
             <PlayerAvatar
@@ -175,7 +158,7 @@ export function Header({
           <button
             type="button"
             onClick={onLeaveRoom}
-            className="p-2 rounded-xl text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] bg-[#FDA4AF] text-[#18181B] tactile-btn cursor-pointer"
             title="Leave room"
             aria-label="Leave room"
           >

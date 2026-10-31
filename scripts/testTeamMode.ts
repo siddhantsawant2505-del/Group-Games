@@ -498,9 +498,9 @@ async function main(): Promise<void> {
       PARTY_GAMES.find((game) => game.id === 'mafia')?.teamSupport === 'aggregate'
   );
   check(
-    'five games are playable — only Guess the Link is marked Coming Soon',
+    'all six games are playable',
     PARTY_GAMES.filter((game) => !game.comingSoon).map((game) => game.id).join(',') ===
-      'impostor,avoid-the-word,mafia,top-100,reverse-categories'
+      'impostor,avoid-the-word,mafia,guess-the-link,top-100,reverse-categories'
   );
 
   // ------------------------------------------------------------------- cleanup

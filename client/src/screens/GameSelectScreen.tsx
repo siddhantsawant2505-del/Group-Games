@@ -7,6 +7,7 @@ import {
   AvoidSettings,
   Top100Settings,
   MafiaSettings,
+  GtlSettings,
   DIFFICULTY_LABELS,
   IMPOSTOR_MODE_LABELS,
   TOP100_TEAM_MIN_GUESS_SECONDS,
@@ -23,6 +24,7 @@ const IMPOSTOR_GAME_ID = 'impostor';
 const AVOID_THE_WORD_GAME_ID = 'avoid-the-word';
 const TOP_100_GAME_ID = 'top-100';
 const MAFIA_GAME_ID = 'mafia';
+const GUESS_THE_LINK_GAME_ID = 'guess-the-link';
 
 /** One-line summary of the settings a game card is currently running. */
 function settingsSummaryFor(game: GameMetadata, room: RoomPublicState): string | undefined {
@@ -50,6 +52,11 @@ function settingsSummaryFor(game: GameMetadata, room: RoomPublicState): string |
     return `${deal.breakdown.mafia} Mafia · ${mafia.nightSeconds}s night · ${mafia.discussionSeconds}s day`;
   }
 
+  if (game.id === GUESS_THE_LINK_GAME_ID) {
+    const gtl = room.gameSettings.guessTheLink;
+    return `${gtl.roundCount} rounds · ${gtl.roundSeconds}s · ${gtl.difficulty}`;
+  }
+
   if (game.id !== IMPOSTOR_GAME_ID) return undefined;
   const settings = room.gameSettings.impostor;
   return settings.mode === 'question'
@@ -64,18 +71,14 @@ interface GameSelectScreenProps {
   myPlayer: Player;
   onSelectGame: (gameId: string) => void;
   onConfirmAndStart: () => void;
-  /** Guess the Link only: host saves a custom concept (blank payload clears it). */
-  onSaveGtlPrompt?: (
-    input: { concept: string; category?: string; hints?: string[] },
-    callback: (res: { success: boolean; error?: string; prompt?: { concept: string; category: string; hints: string[] } | null }) => void
-  ) => void;
-  /** Impostor / Avoid the Word: host updates the public round settings. */
+  /** Host updates the public round settings for the selected game. */
   onSaveGameSettings?: (
     patch: {
       impostor?: Partial<ImpostorSettings>;
       avoidTheWord?: Partial<AvoidSettings>;
       top100?: Partial<Top100Settings>;
       mafia?: Partial<MafiaSettings>;
+      guessTheLink?: Partial<GtlSettings>;
     },
     callback: (res: { success: boolean; error?: string }) => void
   ) => void;
@@ -86,7 +89,6 @@ export function GameSelectScreen({
   myPlayer,
   onSelectGame,
   onConfirmAndStart,
-  onSaveGtlPrompt,
   onSaveGameSettings,
 }: GameSelectScreenProps) {
   const isHost = myPlayer.isHost;
@@ -131,8 +133,8 @@ export function GameSelectScreen({
           so its tap target can never be covered by it on short screens. */}
       <div className="pb-28">
         <div className="mb-4 text-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-xs font-bold text-neutral-600 dark:text-neutral-400 mb-2">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FEF08A] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black mb-2.5">
+            <Sparkles className="w-4 h-4 text-[#18181B]" />
             <span>Party Game Collection</span>
           </div>
           <h2 className="text-2xl font-black tracking-tight text-[var(--text-primary)]">
@@ -184,11 +186,11 @@ export function GameSelectScreen({
             {launchError ? 'Cannot Start Yet' : 'Launch Round'}
           </ActionButton>
         ) : (
-          <div className="party-card p-4 rounded-2xl text-center">
-            <span className="text-sm font-bold text-neutral-600 dark:text-neutral-300">
-              Host selected: <strong className="text-[var(--text-primary)]">{selectedGame.title}</strong>
+          <div className="p-4 rounded-2xl text-center bg-[var(--surface-card)] border-[2.5px] border-[var(--border-neo)] shadow-[4px_4px_0px_var(--border-neo)]">
+            <span className="text-sm font-black text-[var(--text-primary)]">
+              Host selected: <strong className="text-[#18181B] bg-[#FEF08A] px-2 py-0.5 rounded border border-[var(--border-neo)]">{selectedGame.title}</strong>
             </span>
-            <p className="text-xs text-neutral-400 mt-0.5">
+            <p className="text-xs font-bold opacity-65 mt-1">
               Get your phone ready for the secret reveal!
             </p>
           </div>
@@ -203,7 +205,6 @@ export function GameSelectScreen({
         myPlayer={myPlayer}
         onClose={() => setSettingsGameId(null)}
         onSaveGameSettings={onSaveGameSettings}
-        onSaveGtlPrompt={onSaveGtlPrompt}
       />
     </div>
   );
