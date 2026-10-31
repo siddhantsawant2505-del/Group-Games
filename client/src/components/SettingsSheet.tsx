@@ -53,22 +53,22 @@ export function SettingsSheet({ open, title, subtitle, onClose, children }: Sett
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-            className="relative w-full sm:max-w-md max-h-[88vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[var(--surface-card)] border-[2.5px] border-[var(--border-neo)] shadow-[0px_-6px_0px_var(--border-neo)] sm:shadow-[6px_6px_0px_var(--border-neo)] p-5 pb-8"
+            className="relative w-full sm:max-w-md max-h-[88vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[#FAF8F5] border-[2.5px] border-[var(--border-neo)] shadow-[0px_-6px_0px_var(--border-neo)] sm:shadow-[6px_6px_0px_var(--border-neo)] p-5 pb-8"
           >
             {/* Drawer Grab Handle for mobile thumb gestures */}
             <div className="w-12 h-1.5 bg-[var(--border-neo)] rounded-full mx-auto mb-3 sm:hidden" />
 
-            <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b-2 border-[var(--border-neo)]">
+            <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b-[2.5px] border-[var(--border-neo)]">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-[#FEF08A] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] flex items-center justify-center shrink-0 font-black">
-                  <Settings2 className="w-4.5 h-4.5" />
+                <div className="w-10 h-10 rounded-2xl bg-[#FEF08A] text-[#18181B] border-[2.5px] border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] flex items-center justify-center shrink-0 font-black">
+                  <Settings2 className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-base font-black text-[var(--text-primary)] leading-tight truncate">
+                  <h2 className="text-lg font-black text-[var(--text-primary)] leading-tight truncate">
                     {title}
                   </h2>
                   {subtitle && (
-                    <p className="text-[11px] font-bold opacity-60 truncate">
+                    <p className="text-xs font-bold text-[#52525B] truncate mt-0.5">
                       {subtitle}
                     </p>
                   )}
@@ -79,7 +79,7 @@ export function SettingsSheet({ open, title, subtitle, onClose, children }: Sett
                 type="button"
                 onClick={onClose}
                 aria-label="Close settings"
-                className="w-8 h-8 rounded-xl bg-[var(--surface-card-subtle)] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] flex items-center justify-center cursor-pointer tactile-btn text-[var(--text-primary)] font-black text-sm"
+                className="w-8 h-8 rounded-xl bg-[#FDA4AF] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] flex items-center justify-center cursor-pointer tactile-btn text-[#18181B] font-black text-sm"
               >
                 <X className="w-4 h-4 stroke-[3]" />
               </button>

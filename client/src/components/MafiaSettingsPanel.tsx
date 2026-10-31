@@ -42,11 +42,6 @@ const TIMERS = [
   },
 ];
 
-/**
- * Mafia settings: public strategy only. The panel shows the exact deal the
- * server will make, and the same validity check the server enforces, so the
- * host sees why Start is blocked before tapping it.
- */
 export function MafiaSettingsPanel({
   room,
   myPlayer,
@@ -71,17 +66,17 @@ export function MafiaSettingsPanel({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="party-card p-4 rounded-2xl space-y-3"
+      className="bg-white border-[2.5px] border-[var(--border-neo)] shadow-[5px_5px_0px_var(--border-neo)] p-5 rounded-3xl space-y-4"
     >
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center shrink-0">
-          <Settings2 className="w-4 h-4" />
+      <div className="flex items-center gap-2.5 pb-2 border-b-2 border-[#18181B]/10">
+        <div className="w-10 h-10 rounded-2xl bg-[#C4B5FD] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] flex items-center justify-center shrink-0 font-black">
+          <Settings2 className="w-5 h-5" />
         </div>
         <div className="min-w-0">
-          <span className="text-sm font-black text-[var(--text-primary)] block leading-tight">
+          <span className="text-base font-black text-[var(--text-primary)] block leading-tight">
             Mafia Settings
           </span>
-          <p className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
+          <p className="text-xs font-bold text-[#52525B]">
             {isHost ? 'Applied to the next game' : 'Chosen by the host'}
           </p>
         </div>
@@ -92,15 +87,17 @@ export function MafiaSettingsPanel({
         const value = settings[timer.key];
         return (
           <div key={timer.key}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
-                <Timer className="w-3 h-3" />
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-black uppercase tracking-wider text-[#18181B] flex items-center gap-1.5">
+                <Timer className="w-3.5 h-3.5 text-[#18181B]" />
                 <span>{timer.label}</span>
               </span>
-              <span className="text-xs font-black text-[var(--text-primary)]">{value}s</span>
+              <span className="px-2.5 py-0.5 rounded-lg bg-[#FAF8F5] border border-[var(--border-neo)] text-xs font-black text-[var(--text-primary)] font-mono">
+                {value}s
+              </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 disabled={!isHost || value <= timer.limits.min}
@@ -108,14 +105,14 @@ export function MafiaSettingsPanel({
                   emit({ [timer.key]: Math.max(timer.limits.min, value - timer.step) })
                 }
                 aria-label={`Decrease ${timer.label} time`}
-                className="w-10 h-10 rounded-xl border-2 border-[var(--border-subtle)] font-black text-lg text-[var(--text-primary)] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                className="w-10 h-10 rounded-xl border-[2.5px] border-[var(--border-neo)] bg-[#FEF08A] hover:bg-[#FDE047] text-[#18181B] font-black text-xl shadow-[2px_2px_0px_var(--border-neo)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-35 disabled:bg-[#F3EFEA] disabled:shadow-none cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
               >
                 −
               </button>
 
-              <div className="flex-1 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+              <div className="flex-1 h-3 rounded-full bg-[#F3EFEA] border-2 border-[var(--border-neo)] overflow-hidden p-0.5">
                 <div
-                  className="h-full rounded-full bg-rose-500 transition-all"
+                  className="h-full rounded-full bg-[#C4B5FD] border border-[var(--border-neo)] transition-all"
                   style={{
                     width: `${
                       ((value - timer.limits.min) / (timer.limits.max - timer.limits.min)) * 100
@@ -131,13 +128,13 @@ export function MafiaSettingsPanel({
                   emit({ [timer.key]: Math.min(timer.limits.max, value + timer.step) })
                 }
                 aria-label={`Increase ${timer.label} time`}
-                className="w-10 h-10 rounded-xl border-2 border-[var(--border-subtle)] font-black text-lg text-[var(--text-primary)] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                className="w-10 h-10 rounded-xl border-[2.5px] border-[var(--border-neo)] bg-[#FEF08A] hover:bg-[#FDE047] text-[#18181B] font-black text-xl shadow-[2px_2px_0px_var(--border-neo)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-35 disabled:bg-[#F3EFEA] disabled:shadow-none cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
               >
                 +
               </button>
             </div>
 
-            <p className="text-[10px] font-semibold text-neutral-400 mt-1">
+            <p className="text-[11px] font-bold text-[#52525B] mt-1">
               {timer.help} ({timer.limits.min}–{timer.limits.max}s)
             </p>
           </div>
@@ -145,26 +142,26 @@ export function MafiaSettingsPanel({
       })}
 
       {/* Mafia count */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
-            <Skull className="w-3 h-3" />
-            <span>Mafia in the deal</span>
+      <div className="pt-2 border-t-2 border-[#18181B]/10">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-black uppercase tracking-wider text-[#18181B] flex items-center gap-1.5">
+            <Skull className="w-3.5 h-3.5 text-[#18181B]" />
+            <span>Mafia in the Deal</span>
           </span>
-          <span className="text-xs font-black text-[var(--text-primary)]">
+          <span className="px-2.5 py-0.5 rounded-lg bg-[#FAF8F5] border border-[var(--border-neo)] text-xs font-black text-[var(--text-primary)] font-mono">
             {isAuto ? `Auto · ${mafiaCount}` : mafiaCount}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             disabled={!isHost || isAuto}
             onClick={() => emit({ mafiaCount: 'auto' })}
-            className={`px-3 h-10 rounded-xl border-2 text-[11px] font-black transition-all ${
+            className={`px-3.5 h-10 rounded-xl text-xs font-black transition-all ${
               isAuto
-                ? 'border-rose-500 bg-rose-500/10 text-[var(--text-primary)]'
-                : 'border-[var(--border-subtle)] text-neutral-500 dark:text-neutral-400'
+                ? 'border-[2.5px] border-[var(--border-neo)] bg-[#FDA4AF] text-[#18181B] shadow-[2px_2px_0px_var(--border-neo)] -translate-x-0.5 -translate-y-0.5'
+                : 'border-2 border-[var(--border-neo)]/40 bg-[#FAF8F5] text-[#52525B]'
             } ${isHost ? 'cursor-pointer' : 'cursor-default'}`}
           >
             Auto
@@ -177,14 +174,14 @@ export function MafiaSettingsPanel({
               emit({ mafiaCount: Math.max(1, (isAuto ? mafiaCount : mafiaCount) - 1) })
             }
             aria-label="Fewer Mafia"
-            className="w-10 h-10 rounded-xl border-2 border-[var(--border-subtle)] font-black text-lg text-[var(--text-primary)] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+            className="w-10 h-10 rounded-xl border-[2.5px] border-[var(--border-neo)] bg-[#FEF08A] hover:bg-[#FDE047] text-[#18181B] font-black text-xl shadow-[2px_2px_0px_var(--border-neo)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-35 disabled:bg-[#F3EFEA] disabled:shadow-none cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
           >
             −
           </button>
 
-          <div className="flex-1 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+          <div className="flex-1 h-3 rounded-full bg-[#F3EFEA] border-2 border-[var(--border-neo)] overflow-hidden p-0.5">
             <div
-              className="h-full rounded-full bg-rose-500 transition-all"
+              className="h-full rounded-full bg-[#FDA4AF] border border-[var(--border-neo)] transition-all"
               style={{ width: `${(mafiaCount / countCeiling) * 100}%` }}
             />
           </div>
@@ -196,21 +193,21 @@ export function MafiaSettingsPanel({
               emit({ mafiaCount: Math.min(countCeiling, (isAuto ? mafiaCount : mafiaCount) + 1) })
             }
             aria-label="More Mafia"
-            className="w-10 h-10 rounded-xl border-2 border-[var(--border-subtle)] font-black text-lg text-[var(--text-primary)] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+            className="w-10 h-10 rounded-xl border-[2.5px] border-[var(--border-neo)] bg-[#FEF08A] hover:bg-[#FDE047] text-[#18181B] font-black text-xl shadow-[2px_2px_0px_var(--border-neo)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-35 disabled:bg-[#F3EFEA] disabled:shadow-none cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
           >
             +
           </button>
         </div>
 
-        <p className="text-[10px] font-semibold text-neutral-400 mt-1">
+        <p className="text-[11px] font-bold text-[#52525B] mt-1">
           Auto deals one Mafia per four players, always fewer than half the table.
         </p>
       </div>
 
       {/* Role toggles */}
-      <div className="space-y-2">
+      <div className="pt-2 border-t-2 border-[#18181B]/10 space-y-2.5">
         <ToggleRow
-          icon={<Search className="w-3.5 h-3.5" />}
+          icon={<Search className="w-4 h-4 text-[#18181B]" />}
           label="Detective"
           detail={
             playerCount >= 4
@@ -222,7 +219,7 @@ export function MafiaSettingsPanel({
           onChange={(value) => emit({ detective: value })}
         />
         <ToggleRow
-          icon={<HeartPulse className="w-3.5 h-3.5" />}
+          icon={<HeartPulse className="w-4 h-4 text-[#18181B]" />}
           label="Doctor"
           detail={
             playerCount >= 6
@@ -234,8 +231,8 @@ export function MafiaSettingsPanel({
           onChange={(value) => emit({ doctor: value })}
         />
         <ToggleRow
-          icon={<Eye className="w-3.5 h-3.5" />}
-          label="Reveal role on death"
+          icon={<Eye className="w-4 h-4 text-[#18181B]" />}
+          label="Reveal Role on Death"
           detail="Announce the role of players who are killed or exiled."
           checked={settings.revealRoleOnDeath}
           disabled={!isHost}
@@ -244,15 +241,15 @@ export function MafiaSettingsPanel({
       </div>
 
       {/* The deal the server will make */}
-      <div className="p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-[var(--border-subtle)]">
-        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 flex items-center gap-1.5 mb-1.5">
-          <Users className="w-3 h-3" />
+      <div className="p-4 rounded-2xl bg-[#FAF8F5] border-[2.5px] border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)]">
+        <span className="text-xs font-black uppercase tracking-wider text-[#18181B] flex items-center gap-1.5 mb-2">
+          <Users className="w-3.5 h-3.5 text-[#18181B]" />
           <span>
-            This deal · {playerCount} {playerCount === 1 ? 'player' : 'players'}
+            This Deal · {playerCount} {playerCount === 1 ? 'player' : 'players'}
           </span>
         </span>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           <DealPill label={`${breakdown.mafia} Mafia`} tone="mafia" />
           <DealPill
             label={breakdown.detective ? '1 Detective' : 'No Detective'}
@@ -266,14 +263,14 @@ export function MafiaSettingsPanel({
         </div>
 
         {!validation.valid && (
-          <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-2">
+          <div className="p-2.5 rounded-xl bg-[#FDA4AF] border-2 border-[var(--border-neo)] text-xs font-black text-[#18181B] mt-2.5">
             {validation.error}
-          </p>
+          </div>
         )}
       </div>
 
       {!isHost && (
-        <p className="text-[10px] font-semibold text-neutral-400">
+        <p className="text-[11px] font-bold text-[#52525B]">
           The host can change these between games.
         </p>
       )}
@@ -303,37 +300,37 @@ function ToggleRow({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl border-2 text-left transition-all ${
-        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
+      className={`w-full flex items-center gap-3 p-3 rounded-2xl border-2 transition-all ${
+        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:translate-x-[1px] active:translate-y-[1px]'
       } ${
         checked
-          ? 'border-rose-500/70 bg-rose-500/5'
-          : 'border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60'
+          ? 'border-[2.5px] border-[var(--border-neo)] bg-[#FEF08A]/40 shadow-[2px_2px_0px_var(--border-neo)]'
+          : 'border-2 border-[var(--border-neo)]/40 bg-[#FAF8F5]'
       }`}
     >
       <span
-        className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center ${
-          checked ? 'bg-rose-500/15 text-rose-500' : 'bg-neutral-500/10 text-neutral-400'
+        className={`shrink-0 w-8 h-8 rounded-xl border border-[var(--border-neo)] flex items-center justify-center ${
+          checked ? 'bg-[#C4B5FD] shadow-[1px_1px_0px_var(--border-neo)]' : 'bg-white'
         }`}
       >
         {icon}
       </span>
-      <span className="min-w-0 flex-1">
+      <span className="min-w-0 flex-1 text-left">
         <span className="text-xs font-black text-[var(--text-primary)] block leading-tight">
           {label}
         </span>
-        <span className="text-[10px] font-semibold text-neutral-400 block leading-snug">
+        <span className="text-[11px] font-bold text-[#52525B] block leading-snug">
           {detail}
         </span>
       </span>
       <span
-        className={`shrink-0 w-9 h-5 rounded-full p-0.5 transition-colors ${
-          checked ? 'bg-rose-500' : 'bg-neutral-300 dark:bg-neutral-700'
+        className={`shrink-0 w-11 h-6 rounded-full p-0.5 transition-colors border-2 border-[var(--border-neo)] ${
+          checked ? 'bg-[#86EFAC]' : 'bg-[#E4E4E7]'
         }`}
       >
         <span
-          className={`block w-4 h-4 rounded-full bg-white shadow transition-transform ${
-            checked ? 'translate-x-4' : ''
+          className={`block w-4.5 h-4.5 rounded-full bg-white border border-[var(--border-neo)] shadow transition-transform ${
+            checked ? 'translate-x-5' : 'translate-x-0'
           }`}
         />
       </span>
@@ -343,13 +340,13 @@ function ToggleRow({
 
 function DealPill({ label, tone }: { label: string; tone: 'mafia' | 'special' | 'town' | 'muted' }) {
   const styles: Record<typeof tone, string> = {
-    mafia: 'bg-rose-500/15 text-rose-600 dark:text-rose-300 border-rose-500/30',
-    special: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border-indigo-500/30',
-    town: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
-    muted: 'bg-neutral-500/10 text-neutral-500 dark:text-neutral-400 border-neutral-500/20',
+    mafia: 'bg-[#FDA4AF] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[1.5px_1.5px_0px_var(--border-neo)]',
+    special: 'bg-[#93C5FD] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[1.5px_1.5px_0px_var(--border-neo)]',
+    town: 'bg-[#86EFAC] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[1.5px_1.5px_0px_var(--border-neo)]',
+    muted: 'bg-[#F3EFEA] text-[#71717A] border-2 border-[var(--border-neo)]/40',
   };
   return (
-    <span className={`px-2 py-1 rounded-lg border text-[11px] font-black ${styles[tone]}`}>
+    <span className={`px-2.5 py-1 rounded-xl text-xs font-black ${styles[tone]}`}>
       {label}
     </span>
   );

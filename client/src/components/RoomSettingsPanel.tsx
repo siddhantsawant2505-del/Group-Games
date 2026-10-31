@@ -26,11 +26,6 @@ interface RoomSettingsPanelProps {
   onSetRoundCount: (rounds: number) => void;
 }
 
-/**
- * Room-wide settings, opened from the gear in the lobby. The play mode and the
- * team list are what every other screen reads, so they live here rather than on
- * a game card.
- */
 export function RoomSettingsPanel({
   room,
   myPlayer,
@@ -66,15 +61,16 @@ export function RoomSettingsPanel({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="bg-white border-[2.5px] border-[var(--border-neo)] shadow-[5px_5px_0px_var(--border-neo)] p-5 rounded-3xl space-y-4">
       {/* Play mode */}
       <div>
-        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block mb-1">
-          Play mode
+        <span className="text-xs font-black uppercase tracking-wider text-[#18181B] block mb-1.5">
+          Play Mode
         </span>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           {(['solo', 'team'] as const).map((mode) => {
             const active = room.playMode === mode;
+            const activeBg = mode === 'solo' ? 'bg-[#FEF08A]' : 'bg-[#93C5FD]';
             return (
               <button
                 key={mode}
@@ -82,12 +78,12 @@ export function RoomSettingsPanel({
                 disabled={!editable}
                 onClick={() => onSetPlayMode(mode)}
                 aria-pressed={active}
-                className={`px-3 py-2.5 rounded-xl border-2 text-xs font-black transition-all ${
-                  editable ? 'cursor-pointer active:scale-[0.98]' : 'cursor-default'
+                className={`px-3 py-2.5 rounded-2xl text-xs font-black transition-all ${
+                  editable ? 'cursor-pointer active:translate-x-[1px] active:translate-y-[1px]' : 'cursor-default'
                 } ${
                   active
-                    ? 'border-neutral-900 dark:border-neutral-100 bg-neutral-900/5 dark:bg-neutral-100/10 text-[var(--text-primary)]'
-                    : 'border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 text-neutral-500 dark:text-neutral-400'
+                    ? `border-[2.5px] border-[var(--border-neo)] ${activeBg} text-[#18181B] shadow-[2.5px_2.5px_0px_var(--border-neo)] -translate-x-0.5 -translate-y-0.5`
+                    : 'border-2 border-[var(--border-neo)]/40 bg-[#FAF8F5] text-[#52525B] hover:border-[var(--border-neo)] hover:bg-white'
                 }`}
               >
                 {PLAY_MODE_LABELS[mode]}
@@ -95,29 +91,29 @@ export function RoomSettingsPanel({
             );
           })}
         </div>
-        <p className="text-[10px] font-semibold text-neutral-400 mt-1">
+        <p className="text-[11px] font-bold text-[#52525B] mt-1.5">
           {room.playMode === 'solo'
-            ? 'Everyone plays for themselves — exactly as before.'
+            ? 'Everyone plays for themselves — individual score leaderboard.'
             : 'Individual scores stay, and each team also collects its members’ points.'}
         </p>
       </div>
 
       {/* Rounds */}
-      <div>
-        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block mb-1">
-          Rounds per session
+      <div className="pt-2 border-t-2 border-[#18181B]/10">
+        <span className="text-xs font-black uppercase tracking-wider text-[#18181B] block mb-1.5">
+          Rounds Per Session
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             disabled={!editable || room.totalRounds <= MIN_ROUNDS}
             onClick={() => onSetRoundCount(room.totalRounds - 1)}
             aria-label="One round fewer"
-            className="w-10 h-10 rounded-xl border-2 border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 font-black text-lg text-[var(--text-primary)] disabled:opacity-40 cursor-pointer disabled:cursor-default"
+            className="w-10 h-10 rounded-xl border-[2.5px] border-[var(--border-neo)] bg-[#FEF08A] hover:bg-[#FDE047] text-[#18181B] font-black text-xl shadow-[2px_2px_0px_var(--border-neo)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-35 disabled:bg-[#F3EFEA] disabled:shadow-none cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
           >
             −
           </button>
-          <span className="w-12 text-center font-black text-xl text-[var(--text-primary)]">
+          <span className="w-12 text-center font-black text-2xl text-[var(--text-primary)] font-mono">
             {room.totalRounds}
           </span>
           <button
@@ -125,11 +121,11 @@ export function RoomSettingsPanel({
             disabled={!editable || room.totalRounds >= MAX_ROUNDS}
             onClick={() => onSetRoundCount(room.totalRounds + 1)}
             aria-label="One round more"
-            className="w-10 h-10 rounded-xl border-2 border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 font-black text-lg text-[var(--text-primary)] disabled:opacity-40 cursor-pointer disabled:cursor-default"
+            className="w-10 h-10 rounded-xl border-[2.5px] border-[var(--border-neo)] bg-[#FEF08A] hover:bg-[#FDE047] text-[#18181B] font-black text-xl shadow-[2px_2px_0px_var(--border-neo)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-35 disabled:bg-[#F3EFEA] disabled:shadow-none cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
           >
             +
           </button>
-          <span className="text-[10px] font-semibold text-neutral-400">
+          <span className="text-xs font-bold text-[#52525B]">
             Round {Math.min(room.roundNumber, room.totalRounds)} of {room.totalRounds}
           </span>
         </div>
@@ -137,10 +133,10 @@ export function RoomSettingsPanel({
 
       {/* Teams */}
       {room.playMode === 'team' && (
-        <div className="pt-1 border-t border-[var(--border-subtle)]">
-          <div className="flex items-center justify-between mt-3 mb-1.5">
-            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
-              <Users2 className="w-3.5 h-3.5" />
+        <div className="pt-2 border-t-2 border-[#18181B]/10">
+          <div className="flex items-center justify-between mt-2 mb-2">
+            <span className="text-xs font-black uppercase tracking-wider text-[#18181B] flex items-center gap-1.5">
+              <Users2 className="w-4 h-4 text-[#18181B]" />
               Teams
             </span>
             <div className="flex items-center gap-1.5">
@@ -153,12 +149,12 @@ export function RoomSettingsPanel({
                     onClick={() => onSetTeamCount(count)}
                     aria-pressed={room.teams.length === count}
                     aria-label={`${count} teams`}
-                    className={`w-7 h-7 rounded-lg border-2 text-xs font-black transition-all ${
+                    className={`w-8 h-8 rounded-xl text-xs font-black transition-all ${
                       editable ? 'cursor-pointer' : 'cursor-default'
                     } ${
                       room.teams.length === count
-                        ? 'border-neutral-900 dark:border-neutral-100 text-[var(--text-primary)]'
-                        : 'border-[var(--border-subtle)] text-neutral-400'
+                        ? 'border-[2.5px] border-[var(--border-neo)] bg-[#86EFAC] text-[#18181B] shadow-[2px_2px_0px_var(--border-neo)]'
+                        : 'border-2 border-[var(--border-neo)]/40 bg-[#FAF8F5] text-[#52525B]'
                     }`}
                   >
                     {count}
@@ -168,7 +164,7 @@ export function RoomSettingsPanel({
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {room.teams.map((team) => {
               const accent = getTeamAccent(team.accentIndex);
               const isMine = myPlayer.teamId === team.id;
@@ -176,10 +172,9 @@ export function RoomSettingsPanel({
               return (
                 <div
                   key={team.id}
-                  className="rounded-2xl border-2 p-3"
+                  className="rounded-2xl border-[2.5px] border-[var(--border-neo)] shadow-[3px_3px_0px_var(--border-neo)] p-3.5"
                   style={{
-                    borderColor: isMine ? accent.hex : 'var(--border-subtle)',
-                    backgroundColor: isMine ? `${accent.hex}14` : 'var(--surface-card-subtle)',
+                    backgroundColor: isMine ? `${accent.hex}22` : '#FAF8F5',
                   }}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -196,26 +191,26 @@ export function RoomSettingsPanel({
                             if (event.key === 'Escape') setRenamingId(null);
                           }}
                           aria-label={`Rename ${team.name}`}
-                          className="flex-1 min-w-0 px-2.5 py-1.5 rounded-xl border-2 border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 font-bold text-xs text-[var(--text-primary)] focus:outline-none"
+                          className="flex-1 min-w-0 px-2.5 py-1.5 rounded-xl border-2 border-[var(--border-neo)] bg-white font-black text-xs text-[var(--text-primary)] focus:outline-none"
                         />
                         <button
                           type="button"
                           onClick={commitRename}
                           aria-label="Save team name"
-                          className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 cursor-pointer"
+                          className="p-2 rounded-xl bg-[#86EFAC] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] cursor-pointer"
                         >
                           <Check className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-lg leading-none" aria-hidden="true">
+                        <span className="text-xl leading-none" aria-hidden="true">
                           {team.icon}
                         </span>
                         <span className="font-black text-sm text-[var(--text-primary)] truncate">
                           {team.name}
                         </span>
-                        <span className="text-[10px] font-bold text-neutral-400">
+                        <span className="px-2 py-0.5 rounded-lg bg-white border border-[var(--border-neo)] text-[10px] font-black text-[#18181B]">
                           {team.score} pts
                         </span>
                         {editable && (
@@ -223,9 +218,9 @@ export function RoomSettingsPanel({
                             type="button"
                             onClick={() => startRename(team)}
                             aria-label={`Rename ${team.name}`}
-                            className="p-1 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 cursor-pointer"
+                            className="p-1 rounded-lg text-[#52525B] hover:text-[#18181B] cursor-pointer"
                           >
-                            <Pencil className="w-3 h-3" />
+                            <Pencil className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
@@ -235,21 +230,21 @@ export function RoomSettingsPanel({
                       type="button"
                       disabled={locked || isMine}
                       onClick={() => onJoinTeam(team.id)}
-                      className={`shrink-0 px-2.5 py-1.5 rounded-xl text-[11px] font-black transition-colors ${
+                      className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-black border-2 border-[var(--border-neo)] transition-all ${
                         isMine
-                          ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 cursor-default'
+                          ? 'bg-[#FEF08A] text-[#18181B] shadow-[1px_1px_0px_var(--border-neo)] cursor-default'
                           : locked
-                          ? 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 cursor-default'
-                          : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 cursor-pointer'
+                          ? 'bg-[#F3EFEA] text-neutral-400 cursor-default opacity-50'
+                          : 'bg-[#86EFAC] hover:bg-[#4ADE80] text-[#18181B] shadow-[2px_2px_0px_var(--border-neo)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer'
                       }`}
                     >
                       {isMine ? 'Your team' : 'Join'}
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
                     {members.length === 0 ? (
-                      <span className="text-[11px] font-semibold text-neutral-400">
+                      <span className="text-xs font-bold text-[#71717A] italic">
                         No players yet
                       </span>
                     ) : (
@@ -276,50 +271,50 @@ export function RoomSettingsPanel({
               <button
                 type="button"
                 onClick={() => onBalanceTeams(false)}
-                className="px-3 py-2.5 rounded-xl border-2 border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 text-xs font-black text-[var(--text-primary)] flex items-center justify-center gap-1.5 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                className="px-3 py-2.5 rounded-xl border-2 border-[var(--border-neo)] bg-[#93C5FD] hover:bg-[#60A5FA] text-xs font-black text-[#18181B] shadow-[2px_2px_0px_var(--border-neo)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none flex items-center justify-center gap-1.5 cursor-pointer transition-all"
               >
-                <Scale className="w-3.5 h-3.5" />
+                <Scale className="w-4 h-4" />
                 Auto-balance
               </button>
               <button
                 type="button"
                 onClick={() => onBalanceTeams(true)}
-                className="px-3 py-2.5 rounded-xl border-2 border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 text-xs font-black text-[var(--text-primary)] flex items-center justify-center gap-1.5 cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                className="px-3 py-2.5 rounded-xl border-2 border-[var(--border-neo)] bg-[#FDBA74] hover:bg-[#FB923C] text-xs font-black text-[#18181B] shadow-[2px_2px_0px_var(--border-neo)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none flex items-center justify-center gap-1.5 cursor-pointer transition-all"
               >
-                <Shuffle className="w-3.5 h-3.5" />
+                <Shuffle className="w-4 h-4" />
                 Shuffle teams
               </button>
             </div>
           )}
 
-          {/* Start readiness, mirroring the lobby's start gate */}
-          <div className="mt-3 space-y-1">
+          {/* Start readiness */}
+          <div className="mt-3 space-y-1.5">
             {readiness.message && (
-              <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300" role="status">
+              <div className="p-3 rounded-2xl bg-[#FEF08A] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black text-[#18181B]" role="status">
                 {readiness.message}
-              </p>
+              </div>
             )}
             {readiness.sizeWarning && (
-              <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400" role="status">
+              <div className="p-3 rounded-2xl bg-[#FDBA74] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black text-[#18181B]" role="status">
                 {readiness.sizeWarning}
-              </p>
+              </div>
             )}
             {!locked && readiness.ready && (
-              <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                Team split looks good — the host can start.
-              </p>
+              <div className="p-3 rounded-2xl bg-[#86EFAC] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black text-[#18181B]">
+                Team split looks good — ready to start!
+              </div>
             )}
           </div>
         </div>
       )}
 
       {locked && (
-        <p className="text-[10px] font-semibold text-neutral-400">
+        <p className="text-[11px] font-bold text-[#52525B]">
           These settings lock once a round starts and unlock back in the lobby.
         </p>
       )}
       {!isHost && !locked && (
-        <p className="text-[10px] font-semibold text-neutral-400">
+        <p className="text-[11px] font-bold text-[#52525B]">
           The host controls these — tap a team to join it.
         </p>
       )}

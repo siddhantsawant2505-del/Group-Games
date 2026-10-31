@@ -21,10 +21,6 @@ interface GameSettingsPanelProps {
   room: RoomPublicState;
   myPlayer: Player;
   onSaveGameSettings?: (patch: SettingsPatch, callback: SaveCallback) => void;
-  /**
-   * Question mode ships behind this flag: while it is false the panel only
-   * offers what the server can actually play today.
-   */
   questionModeAvailable?: boolean;
 }
 
@@ -32,6 +28,12 @@ const DIFFICULTY_HELP: Record<ContentDifficultySetting, string> = {
   easy: 'Everyday words everyone knows',
   medium: 'Less common words',
   any: 'The whole word pool',
+};
+
+const DIFFICULTY_COLORS: Record<ContentDifficultySetting, string> = {
+  easy: 'bg-[#86EFAC]',
+  medium: 'bg-[#93C5FD]',
+  any: 'bg-[#C4B5FD]',
 };
 
 export function GameSettingsPanel({
@@ -103,17 +105,17 @@ export function GameSettingsPanel({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="party-card p-4 rounded-2xl mb-4"
+      className="bg-white border-[2.5px] border-[var(--border-neo)] shadow-[5px_5px_0px_var(--border-neo)] p-5 rounded-3xl mb-4 space-y-4"
     >
-      <div className="flex items-center gap-2.5 mb-3">
-        <div className="w-8 h-8 rounded-full bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
-          <Settings2 className="w-4 h-4" />
+      <div className="flex items-center gap-2.5 pb-2 border-b-2 border-[#18181B]/10">
+        <div className="w-10 h-10 rounded-2xl bg-[#FDA4AF] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] flex items-center justify-center shrink-0 font-black">
+          <Settings2 className="w-5 h-5" />
         </div>
         <div className="min-w-0">
-          <span className="text-sm font-black text-[var(--text-primary)] block leading-tight">
+          <span className="text-base font-black text-[var(--text-primary)] block leading-tight">
             Impostor Settings
           </span>
-          <p className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400">
+          <p className="text-xs font-bold text-[#52525B]">
             {isHost ? 'Applied to the next round' : 'Chosen by the host'}
           </p>
         </div>
@@ -121,11 +123,11 @@ export function GameSettingsPanel({
 
       {/* Mode */}
       {questionModeAvailable ? (
-        <div className="mb-3">
-          <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block mb-1">
-            Mode
+        <div>
+          <span className="text-xs font-black uppercase tracking-wider text-[#18181B] block mb-1.5">
+            Game Mode
           </span>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             {(['word', 'question'] as const).map((mode) => {
               const active = settings.mode === mode;
               return (
@@ -134,12 +136,12 @@ export function GameSettingsPanel({
                   type="button"
                   disabled={!isHost}
                   onClick={() => handleMode(mode)}
-                  className={`px-3 py-2 rounded-xl border-2 text-xs font-black transition-all ${
-                    isHost ? 'cursor-pointer active:scale-[0.98]' : 'cursor-default'
+                  className={`px-3 py-2.5 rounded-2xl text-xs font-black transition-all ${
+                    isHost ? 'cursor-pointer active:translate-x-[1px] active:translate-y-[1px]' : 'cursor-default'
                   } ${
                     active
-                      ? 'border-amber-500 bg-amber-500/10 text-[var(--text-primary)]'
-                      : 'border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 text-neutral-500 dark:text-neutral-400'
+                      ? 'border-[2.5px] border-[var(--border-neo)] bg-[#FEF08A] text-[#18181B] shadow-[2.5px_2.5px_0px_var(--border-neo)] -translate-x-0.5 -translate-y-0.5'
+                      : 'border-2 border-[var(--border-neo)]/40 bg-[#FAF8F5] text-[#52525B] hover:border-[var(--border-neo)] hover:bg-white'
                   }`}
                 >
                   {IMPOSTOR_MODE_LABELS[mode]}
@@ -147,79 +149,81 @@ export function GameSettingsPanel({
               );
             })}
           </div>
-          <p className="text-[10px] font-semibold text-neutral-400 mt-1">
+          <p className="text-[11px] font-bold text-[#52525B] mt-1.5">
             {settings.mode === 'word'
               ? 'Everyone hunts a secret word; the impostor bluffs a clue.'
               : 'The table answers questions — one player was asked a different one.'}
           </p>
         </div>
       ) : (
-        <div className="mb-3">
-          <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block mb-1">
-            Mode
+        <div>
+          <span className="text-xs font-black uppercase tracking-wider text-[#18181B] block mb-1">
+            Game Mode
           </span>
-          <p className="text-xs font-bold text-[var(--text-primary)]">
+          <p className="text-xs font-black text-[var(--text-primary)]">
             {IMPOSTOR_MODE_LABELS[settings.mode]}
-            <span className="font-semibold text-neutral-400"> · secret word round</span>
+            <span className="font-bold text-[#52525B]"> · secret word round</span>
           </p>
         </div>
       )}
 
-      {/* Difficulty is a word-mode setting; question mode uses tone instead. */}
+      {/* Difficulty */}
       {settings.mode === 'word' && (
-      <div className="mb-3">
-        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block mb-1">
-          Difficulty
-        </span>
-        <div className="grid grid-cols-3 gap-2">
-          {(['easy', 'medium', 'any'] as const).map((difficulty) => {
-            const active = settings.difficulty === difficulty;
-            return (
-              <button
-                key={difficulty}
-                type="button"
-                disabled={!isHost}
-                onClick={() => handleDifficulty(difficulty)}
-                className={`px-2 py-2 rounded-xl border-2 text-xs font-black transition-all ${
-                  isHost ? 'cursor-pointer active:scale-[0.98]' : 'cursor-default'
-                } ${
-                  active
-                    ? 'border-amber-500 bg-amber-500/10 text-[var(--text-primary)]'
-                    : 'border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 text-neutral-500 dark:text-neutral-400'
-                }`}
-              >
-                {DIFFICULTY_LABELS[difficulty]}
-              </button>
-            );
-          })}
+        <div>
+          <span className="text-xs font-black uppercase tracking-wider text-[#18181B] block mb-1.5">
+            Word Difficulty
+          </span>
+          <div className="grid grid-cols-3 gap-2">
+            {(['easy', 'medium', 'any'] as const).map((difficulty) => {
+              const active = settings.difficulty === difficulty;
+              const colorBg = DIFFICULTY_COLORS[difficulty];
+              return (
+                <button
+                  key={difficulty}
+                  type="button"
+                  disabled={!isHost}
+                  onClick={() => handleDifficulty(difficulty)}
+                  className={`px-2 py-2.5 rounded-2xl text-xs font-black transition-all ${
+                    isHost ? 'cursor-pointer active:translate-x-[1px] active:translate-y-[1px]' : 'cursor-default'
+                  } ${
+                    active
+                      ? `border-[2.5px] border-[var(--border-neo)] ${colorBg} text-[#18181B] shadow-[2.5px_2.5px_0px_var(--border-neo)] -translate-x-0.5 -translate-y-0.5`
+                      : 'border-2 border-[var(--border-neo)]/40 bg-[#FAF8F5] text-[#52525B] hover:border-[var(--border-neo)] hover:bg-white'
+                  }`}
+                >
+                  {DIFFICULTY_LABELS[difficulty]}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] font-bold text-[#52525B] mt-1.5">
+            {DIFFICULTY_HELP[settings.difficulty]}
+          </p>
         </div>
-        <p className="text-[10px] font-semibold text-neutral-400 mt-1">
-          {DIFFICULTY_HELP[settings.difficulty]}
-        </p>
-      </div>
       )}
 
-      {/* Tone (question mode only) */}
+      {/* Tone */}
       {questionModeAvailable && settings.mode === 'question' && (
-        <div className="mb-3">
-          <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block mb-1">
-            Tone
+        <div>
+          <span className="text-xs font-black uppercase tracking-wider text-[#18181B] block mb-1.5">
+            Question Tone
           </span>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             {(['clean', 'spicy'] as const).map((tone) => {
               const active = settings.tone === tone;
+              const colorBg = tone === 'clean' ? 'bg-[#86EFAC]' : 'bg-[#FDA4AF]';
               return (
                 <button
                   key={tone}
                   type="button"
                   disabled={!isHost}
                   onClick={() => handleTone(tone)}
-                  className={`px-3 py-2 rounded-xl border-2 text-xs font-black transition-all ${
-                    isHost ? 'cursor-pointer active:scale-[0.98]' : 'cursor-default'
+                  className={`px-3 py-2.5 rounded-2xl text-xs font-black transition-all ${
+                    isHost ? 'cursor-pointer active:translate-x-[1px] active:translate-y-[1px]' : 'cursor-default'
                   } ${
                     active
-                      ? 'border-amber-500 bg-amber-500/10 text-[var(--text-primary)]'
-                      : 'border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 text-neutral-500 dark:text-neutral-400'
+                      ? `border-[2.5px] border-[var(--border-neo)] ${colorBg} text-[#18181B] shadow-[2.5px_2.5px_0px_var(--border-neo)] -translate-x-0.5 -translate-y-0.5`
+                      : 'border-2 border-[var(--border-neo)]/40 bg-[#FAF8F5] text-[#52525B] hover:border-[var(--border-neo)] hover:bg-white'
                   }`}
                 >
                   {TONE_LABELS[tone]}
@@ -227,20 +231,20 @@ export function GameSettingsPanel({
               );
             })}
           </div>
-          <p className="text-[10px] font-semibold text-neutral-400 mt-1">
+          <p className="text-[11px] font-bold text-[#52525B] mt-1.5">
             Spicy stays mild — cheekier questions, never rude ones.
           </p>
         </div>
       )}
 
-      {/* Custom theme: only offered when the server has a working AI provider */}
+      {/* Custom theme */}
       {room.aiContentAvailable && settings.mode === 'word' && (
-        <div className="mb-3">
-          <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block mb-1">
-            Custom theme {isHost ? '(optional)' : ''}
+        <div>
+          <span className="text-xs font-black uppercase tracking-wider text-[#18181B] block mb-1.5">
+            Custom Theme {isHost ? '(optional)' : ''}
           </span>
           {isHost ? (
-            <>
+            <div className="space-y-2">
               <input
                 type="text"
                 maxLength={THEME_MAX_CHARS}
@@ -251,17 +255,17 @@ export function GameSettingsPanel({
                 }}
                 placeholder="e.g. Space station, Bakery, Jungle"
                 aria-label="Custom word theme"
-                className="w-full px-3 py-2.5 rounded-xl border-2 border-[var(--border-subtle)] bg-neutral-50 dark:bg-neutral-900/60 font-bold text-sm text-[var(--text-primary)] focus:border-neutral-900 dark:focus:border-neutral-100 focus:outline-none transition-colors"
+                className="w-full px-3.5 py-3 rounded-2xl border-[2.5px] border-[var(--border-neo)] bg-white font-black text-sm text-[var(--text-primary)] shadow-[2.5px_2.5px_0px_var(--border-neo)] focus:outline-none focus:translate-x-[1px] focus:translate-y-[1px] focus:shadow-none transition-all placeholder:text-neutral-400"
               />
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[10px] font-semibold text-neutral-400">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-bold text-[#52525B]">
                   A topic, not an instruction — words are checked before use
                 </span>
-                <span className="text-[10px] text-neutral-400 font-bold">
+                <span className="text-[10px] text-[#18181B] font-black">
                   {themeDraft.length}/{THEME_MAX_CHARS}
                 </span>
               </div>
-              <div className="mt-2">
+              <div>
                 <ActionButton
                   variant="personal"
                   playerColorIndex={myPlayer.colorIndex}
@@ -279,38 +283,39 @@ export function GameSettingsPanel({
                   Save Theme
                 </ActionButton>
               </div>
-            </>
+            </div>
           ) : (
-            <p className="text-xs font-bold text-[var(--text-primary)]">
+            <div className="p-3 rounded-2xl bg-[#F3EFEA] border-2 border-[var(--border-neo)] font-black text-xs text-[var(--text-primary)]">
               {settings.theme ? `“${settings.theme}”` : 'All-purpose everyday words'}
-            </p>
+            </div>
           )}
         </div>
       )}
 
       {!room.aiContentAvailable && (
-        <p className="text-[10px] font-semibold text-neutral-400 flex items-center gap-1.5">
-          <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
-          Custom themes and AI-written extras need a GEMINI_API_KEY on the server — the bundled
-          word pool is being used.
-        </p>
+        <div className="p-3 rounded-2xl bg-[#FEF08A] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-[11px] font-black text-[#18181B] flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-[#18181B] shrink-0" />
+          <span>
+            Custom themes and AI-written extras need a GEMINI_API_KEY — using bundled word pool.
+          </span>
+        </div>
       )}
 
       {!isHost && (
-        <p className="text-[10px] font-semibold text-neutral-400 mt-2">
+        <p className="text-[11px] font-bold text-[#52525B]">
           The host can change these between rounds.
         </p>
       )}
 
       {status && (
-        <p
+        <div
           role="status"
-          className={`text-xs font-bold text-center mt-2 ${
-            status.kind === 'saved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
+          className={`p-3 rounded-2xl border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black text-[#18181B] ${
+            status.kind === 'saved' ? 'bg-[#86EFAC]' : 'bg-[#FDA4AF]'
           }`}
         >
           {status.message}
-        </p>
+        </div>
       )}
     </motion.div>
   );
