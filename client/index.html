@@ -11,8 +11,8 @@
     <meta name="twitter:card" content="summary_large_image" />
 
     <!-- DNS prefetch & preconnect for faster handshake -->
-    <link rel="dns-prefetch" href="https://group-games.onrender.com" />
-    <link rel="preconnect" href="https://group-games.onrender.com" crossorigin />
+    <link rel="dns-prefetch" href="https://group-games-1.onrender.com" />
+    <link rel="preconnect" href="https://group-games-1.onrender.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Nunito:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
@@ -22,7 +22,7 @@
       (function() {
         try {
           var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-          var backend = isLocal ? '' : 'https://group-games.onrender.com';
+          var backend = isLocal ? '' : 'https://group-games-1.onrender.com';
           var url = (backend ? backend : '') + '/api/health';
           fetch(url, { mode: 'cors', cache: 'no-store' }).catch(function() {});
         } catch (e) {}

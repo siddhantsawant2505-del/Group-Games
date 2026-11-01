@@ -44,7 +44,7 @@ class ServerWarmupManager {
       (typeof window !== 'undefined' &&
       window.location.hostname !== 'localhost' &&
       window.location.hostname !== '127.0.0.1'
-        ? 'https://group-games.onrender.com'
+        ? 'https://group-games-1.onrender.com'
         : '');
 
     const healthEndpoint = serverUrl ? `${serverUrl}/api/health` : '/api/health';
