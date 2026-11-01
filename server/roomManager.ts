@@ -408,7 +408,7 @@ export class RoomManager {
 
     const host: InternalPlayer = {
       id: hostId,
-      name: hostName.trim() || 'Host',
+      name: (hostName || '').trim() || 'Host',
       colorIndex,
       colorHex: colorToken.hex,
       colorName: colorToken.label,

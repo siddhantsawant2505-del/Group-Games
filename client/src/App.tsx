@@ -223,7 +223,20 @@ export default function App() {
       setErrorMessage(null);
       const socket = getSocket();
 
+      let timedOut = false;
+      const timeoutId = setTimeout(() => {
+        timedOut = true;
+        setLoading(false);
+        setErrorMessage(
+          socket.connected
+            ? 'Server took too long to create room. Please try again.'
+            : 'Unable to connect to game server. Please ensure the server is running.'
+        );
+      }, 8000);
+
       socket.emit('create-room', { hostName, colorIndex }, (res: any) => {
+        if (timedOut) return;
+        clearTimeout(timeoutId);
         setLoading(false);
         if (res?.success) {
           setRoom(res.room);
@@ -250,6 +263,17 @@ export default function App() {
       setErrorMessage(null);
       const socket = getSocket();
 
+      let timedOut = false;
+      const timeoutId = setTimeout(() => {
+        timedOut = true;
+        setLoading(false);
+        setErrorMessage(
+          socket.connected
+            ? 'Server took too long to join room. Please try again.'
+            : 'Unable to connect to game server. Please ensure the server is running.'
+        );
+      }, 8000);
+
       socket.emit(
         'join-room',
         {
@@ -259,6 +283,8 @@ export default function App() {
           colorIndex,
         },
         (res: any) => {
+          if (timedOut) return;
+          clearTimeout(timeoutId);
           setLoading(false);
           if (res?.success) {
             setRoom(res.room);
@@ -757,6 +783,9 @@ export default function App() {
             onReconnect={handleReconnect}
             savedSession={savedSession}
             loading={loading}
+            errorMessage={errorMessage}
+            onClearError={() => setErrorMessage(null)}
+            connected={connected}
           />
         )
       ) : room.phase === 'lobby' ? (

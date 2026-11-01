@@ -4,11 +4,9 @@ let socket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
-    // In browser, connect to VITE_SERVER_URL if configured, fallback to Render URL in prod, or local origin in dev
-    const serverUrl =
-      import.meta.env.VITE_SERVER_URL ||
-      (import.meta.env.DEV ? undefined : 'https://group-games.onrender.com');
-    socket = io(serverUrl || undefined, {
+    // In browser, connect to VITE_SERVER_URL if configured, otherwise connect to same origin
+    const serverUrl = import.meta.env.VITE_SERVER_URL || undefined;
+    socket = io(serverUrl, {
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 10,

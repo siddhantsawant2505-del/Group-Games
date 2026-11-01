@@ -31,6 +31,9 @@ interface HomeScreenProps {
     playerName: string | null;
   } | null;
   loading?: boolean;
+  errorMessage?: string | null;
+  onClearError?: () => void;
+  connected?: boolean;
 }
 
 export function HomeScreen({
@@ -42,6 +45,9 @@ export function HomeScreen({
   onReconnect,
   savedSession,
   loading = false,
+  errorMessage,
+  onClearError,
+  connected = true,
 }: HomeScreenProps) {
   const [previewGame, setPreviewGame] = useState<GameMetadata | null>(null);
 
@@ -126,6 +132,39 @@ export function HomeScreen({
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Rejoin Room</span>
             </button>
+          </motion.div>
+        )}
+
+        {/* Error State Banner */}
+        {errorMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-3.5 rounded-2xl bg-[#FDA4AF] border-2 border-[var(--border-neo)] shadow-[3px_3px_0px_var(--border-neo)] text-[#18181B] text-xs font-black flex items-center justify-between gap-2"
+          >
+            <span>{errorMessage}</span>
+            {onClearError && (
+              <button
+                type="button"
+                onClick={onClearError}
+                className="p-1 hover:bg-black/10 rounded-lg cursor-pointer transition-colors"
+                title="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </motion.div>
+        )}
+
+        {/* Server Disconnected or Connecting Banner */}
+        {!connected && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-2.5 rounded-xl bg-[#FEF08A] border-2 border-[var(--border-neo)] text-[#18181B] text-xs font-bold text-center flex items-center justify-center gap-2"
+          >
+            <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            <span>Connecting to game server...</span>
           </motion.div>
         )}
 

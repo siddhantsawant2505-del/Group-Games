@@ -105,15 +105,11 @@ async function startServer() {
     socket.on(
       'create-room',
       (
-        { hostName, colorIndex }: { hostName: string; colorIndex?: number },
+        payload: { hostName?: string; colorIndex?: number } | undefined,
         callback
       ) => {
         try {
-          const { room, host } = roomManager.createRoom(
-            hostName,
-            socket.id,
-            colorIndex
-          );
+          const { room, host } = roomManager.createRoom(payload?.hostName ?? "Host", socket.id, payload?.colorIndex);
           socket.join(room.code);
 
           const publicState = roomManager.getPublicRoomState(room);
