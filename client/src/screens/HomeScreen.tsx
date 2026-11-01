@@ -34,6 +34,8 @@ interface HomeScreenProps {
   errorMessage?: string | null;
   onClearError?: () => void;
   connected?: boolean;
+  warmupStatus?: "idle" | "waking" | "ready" | "error";
+  warmupElapsed?: number;
 }
 
 export function HomeScreen({
@@ -48,6 +50,8 @@ export function HomeScreen({
   errorMessage,
   onClearError,
   connected = true,
+  warmupStatus = "ready",
+  warmupElapsed = 0,
 }: HomeScreenProps) {
   const [previewGame, setPreviewGame] = useState<GameMetadata | null>(null);
 

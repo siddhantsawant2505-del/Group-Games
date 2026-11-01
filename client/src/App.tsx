@@ -32,6 +32,7 @@ import { NameEntryScreen } from './screens/NameEntryScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { JoinRoomScreen } from './screens/JoinRoomScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
+import { serverWarmup, WarmupStatus } from './services/serverWarmup';
 import type { MafiaTeamPick } from './screens/mafia/NightScreen';
 import type { RevealAnswersCopy } from './screens/RevealAnswersScreen';
 import type { VoteCopy } from './screens/VotePhaseScreen';
@@ -121,6 +122,16 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [warmupStatus, setWarmupStatus] = useState<WarmupStatus>(() => serverWarmup.getStatus().status);
+  const [warmupElapsed, setWarmupElapsed] = useState<number>(() => serverWarmup.getStatus().elapsedSeconds);
+
+  useEffect(() => {
+    return serverWarmup.subscribe((status, elapsed) => {
+      setWarmupStatus(status);
+      setWarmupElapsed(elapsed);
+    });
+  }, []);
+
   const [savedSession, setSavedSession] = useState<{
     roomCode: string | null;
     playerId: string | null;
@@ -786,6 +797,8 @@ export default function App() {
             errorMessage={errorMessage}
             onClearError={() => setErrorMessage(null)}
             connected={connected}
+            warmupStatus={warmupStatus}
+            warmupElapsed={warmupElapsed}
           />
         )
       ) : room.phase === 'lobby' ? (

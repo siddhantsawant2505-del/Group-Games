@@ -9,9 +9,25 @@
     <meta property="og:description" content="Mobile-first real-time party and social deduction game engine with phone-as-controller lobby, live room synchronization, and extensible round-phase architecture." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- DNS prefetch & preconnect for faster handshake -->
+    <link rel="dns-prefetch" href="https://group-games.onrender.com" />
+    <link rel="preconnect" href="https://group-games.onrender.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Nunito:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- Instant backend wake-up ping on the very first byte of HTML loading -->
+    <script>
+      (function() {
+        try {
+          var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+          var backend = isLocal ? '' : 'https://group-games.onrender.com';
+          var url = (backend ? backend : '') + '/api/health';
+          fetch(url, { mode: 'cors', cache: 'no-store' }).catch(function() {});
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
