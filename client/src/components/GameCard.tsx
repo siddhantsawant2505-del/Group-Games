@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Users, Check, Settings2, Clock3 } from 'lucide-react';
 import { GameMetadata } from '@shared/types';
+import { getGameThemeColor } from '@shared/theme/tokens';
 import { GameIcon } from './GameIcon';
 import { TeamSupportBadge } from './TeamSupportBadge';
 
@@ -24,6 +25,7 @@ export function GameCard({
   settingsSummary,
 }: GameCardProps) {
   const comingSoon = Boolean(game.comingSoon);
+  const themeColor = getGameThemeColor(game.id);
 
   return (
     <motion.div
@@ -39,20 +41,20 @@ export function GameCard({
           ? 'cursor-not-allowed opacity-70 bg-[var(--surface-card)]'
           : `cursor-pointer ${
               selected
-                ? 'shadow-[6px_6px_0px_var(--border-neo)] bg-[#FEF08A] -translate-y-1'
+                ? 'shadow-[6px_6px_0px_var(--border-neo)] -translate-y-1'
                 : 'shadow-[4px_4px_0px_var(--border-neo)] bg-[var(--surface-card)] active:shadow-[1px_1px_0px_var(--border-neo)]'
             }`
       }`}
       style={{
         backgroundColor: selected
-          ? '#FEF08A'
+          ? themeColor.bg
           : 'var(--surface-card)',
       }}
     >
       <div>
         <div className="flex items-start justify-between gap-2 mb-2">
           {/* Icon bubble */}
-          <div className="w-12 h-12 rounded-xl bg-[var(--surface-card-subtle)] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-[var(--text-primary)] flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-white border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-[var(--text-primary)] flex items-center justify-center shrink-0">
             <GameIcon icon={game.icon} size={24} />
           </div>
 
@@ -64,7 +66,7 @@ export function GameCard({
               </span>
             )}
 
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-[var(--surface-card-subtle)] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] text-[var(--text-primary)]">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-white border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] text-[var(--text-primary)]">
               <Users className="w-3 h-3" />
               <span>
                 {game.minPlayers}-{game.maxPlayers}
@@ -80,14 +82,14 @@ export function GameCard({
                 }}
                 title={`${game.title} settings`}
                 aria-label={`${game.title} settings`}
-                className="w-7 h-7 rounded-lg bg-[var(--surface-card-subtle)] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] text-[var(--text-primary)] flex items-center justify-center cursor-pointer tactile-btn"
+                className="w-7 h-7 rounded-lg bg-white border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] text-[var(--text-primary)] flex items-center justify-center cursor-pointer tactile-btn"
               >
                 <Settings2 className="w-3.5 h-3.5" />
               </button>
             )}
 
             {selected && (
-              <span className="w-7 h-7 rounded-lg bg-[#86EFAC] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] flex items-center justify-center font-black">
+              <span className="w-7 h-7 rounded-lg bg-white text-[#18181B] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] flex items-center justify-center font-black">
                 <Check className="w-4 h-4 stroke-[3]" />
               </span>
             )}

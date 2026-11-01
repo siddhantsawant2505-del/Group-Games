@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Sparkles } from 'lucide-react';
+import { Play, Sparkles, ArrowLeft } from 'lucide-react';
 import {
   RoomPublicState,
   Player,
@@ -16,6 +16,7 @@ import {
 } from '@shared/types';
 import { DEFAULT_GAME, PARTY_GAMES } from '@shared/data/games';
 import { validateMafiaSettings } from '@shared/data/mafiaSetup';
+import { getGameThemeColor } from '@shared/theme/tokens';
 import { GameCard } from '../components/GameCard';
 import { ActionButton } from '../components/ActionButton';
 import { GameSettingsSheet } from '../components/GameSettingsSheet';
@@ -71,6 +72,7 @@ interface GameSelectScreenProps {
   myPlayer: Player;
   onSelectGame: (gameId: string) => void;
   onConfirmAndStart: () => void;
+  onBackToLobby?: () => void;
   /** Host updates the public round settings for the selected game. */
   onSaveGameSettings?: (
     patch: {
@@ -89,6 +91,7 @@ export function GameSelectScreen({
   myPlayer,
   onSelectGame,
   onConfirmAndStart,
+  onBackToLobby,
   onSaveGameSettings,
 }: GameSelectScreenProps) {
   const isHost = myPlayer.isHost;
@@ -117,6 +120,7 @@ export function GameSelectScreen({
         g.id === (isHost ? localSelectedId : currentSelectedId) && !g.comingSoon
     ) || DEFAULT_GAME;
   const settingsGame = PARTY_GAMES.find((g) => g.id === settingsGameId) || null;
+  const selectedGameColor = getGameThemeColor(selectedGame.id);
 
   // Mafia validates the deal against the current table, so Start is blocked with
   // the exact reason instead of failing when the reveal begins.
@@ -132,11 +136,32 @@ export function GameSelectScreen({
       {/* pb keeps the last controls scrollable clear of the sticky Launch bar,
           so its tap target can never be covered by it on short screens. */}
       <div className="pb-28">
-        <div className="mb-4 text-center">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FEF08A] text-[#18181B] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black mb-2.5">
+        {/* Navigation row with Lobby back button */}
+        <div className="flex items-center justify-between mb-3">
+          {onBackToLobby ? (
+            <button
+              type="button"
+              onClick={onBackToLobby}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--surface-card)] text-[var(--text-primary)] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black tactile-btn cursor-pointer"
+              title="Return to lobby"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Lobby</span>
+            </button>
+          ) : (
+            <div />
+          )}
+
+          <div
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[#18181B] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black transition-colors"
+            style={{ backgroundColor: selectedGameColor.bg }}
+          >
             <Sparkles className="w-4 h-4 text-[#18181B]" />
-            <span>Party Game Collection</span>
+            <span>Selected: {selectedGame.title}</span>
           </div>
+        </div>
+
+        <div className="mb-4 text-center">
           <h2 className="text-2xl font-black tracking-tight text-[var(--text-primary)]">
             Select Game
           </h2>
@@ -176,21 +201,41 @@ export function GameSelectScreen({
       {/* Bottom controls */}
       <div className="pt-4 sticky bottom-0 bg-gradient-to-t from-[var(--bg-app)] via-[var(--bg-app)] to-transparent pb-2">
         {isHost ? (
-          <ActionButton
-            variant="shared"
-            onClick={onConfirmAndStart}
-            disabled={Boolean(launchError)}
-            icon={<Play className="w-5 h-5 fill-current" />}
-            subtext={launchError || `Launch round with ${selectedGame.title}`}
-          >
-            {launchError ? 'Cannot Start Yet' : 'Launch Round'}
-          </ActionButton>
+          <div className="space-y-2">
+            <ActionButton
+              variant="shared"
+              customBg={selectedGameColor.bg}
+              onClick={onConfirmAndStart}
+              disabled={Boolean(launchError)}
+              icon={<Play className="w-5 h-5 fill-current" />}
+              subtext={launchError || `Launch round with ${selectedGame.title}`}
+            >
+              {launchError ? 'Cannot Start Yet' : 'Launch Round'}
+            </ActionButton>
+
+            {onBackToLobby && (
+              <button
+                type="button"
+                onClick={onBackToLobby}
+                className="w-full py-2.5 rounded-xl bg-[var(--surface-card)] text-[var(--text-primary)] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] text-xs font-black tactile-btn cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Back to Lobby</span>
+              </button>
+            )}
+          </div>
         ) : (
           <div className="p-4 rounded-2xl text-center bg-[var(--surface-card)] border-[2.5px] border-[var(--border-neo)] shadow-[4px_4px_0px_var(--border-neo)]">
-            <span className="text-sm font-black text-[var(--text-primary)]">
-              Host selected: <strong className="text-[#18181B] bg-[#FEF08A] px-2 py-0.5 rounded border border-[var(--border-neo)]">{selectedGame.title}</strong>
+            <span className="text-sm font-black text-[var(--text-primary)] flex items-center justify-center flex-wrap gap-1">
+              <span>Host selected:</span>
+              <strong
+                className="text-[#18181B] px-2.5 py-1 rounded-xl border-2 border-[var(--border-neo)] shadow-[1.5px_1.5px_0px_var(--border-neo)] inline-block transition-colors"
+                style={{ backgroundColor: selectedGameColor.bg }}
+              >
+                {selectedGame.title}
+              </strong>
             </span>
-            <p className="text-xs font-bold opacity-65 mt-1">
+            <p className="text-xs font-bold opacity-65 mt-1.5">
               Get your phone ready for the secret reveal!
             </p>
           </div>

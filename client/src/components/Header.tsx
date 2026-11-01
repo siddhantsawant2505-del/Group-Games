@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Copy, Check, LogOut, Volume2, VolumeX } from 'lucide-react';
+import { Wifi, WifiOff, Copy, Check, LogOut, Volume2, VolumeX, Home } from 'lucide-react';
 import { Player } from '@shared/types';
 import { getPlayerColor } from '@shared/theme/tokens';
 import { isSoundEnabled, toggleSound, subscribeSoundChange } from '../services/sound';
@@ -7,16 +7,20 @@ import { PlayerAvatar } from './PlayerAvatar';
 
 interface HeaderProps {
   roomCode?: string;
+  roomPhase?: string;
   myPlayer?: Player | null;
   connected: boolean;
   onLeaveRoom?: () => void;
+  onReturnToLobby?: () => void;
 }
 
 export function Header({
   roomCode,
+  roomPhase,
   myPlayer,
   connected,
   onLeaveRoom,
+  onReturnToLobby,
 }: HeaderProps) {
   const [copied, setCopied] = useState(false);
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
@@ -151,6 +155,20 @@ export function Header({
             />
             <span className="max-w-[70px] truncate">{myPlayer.name}</span>
           </div>
+        )}
+
+        {/* Return to lobby (available to the host whenever not already in the lobby) */}
+        {myPlayer?.isHost && onReturnToLobby && roomPhase && roomPhase !== 'lobby' && (
+          <button
+            type="button"
+            onClick={onReturnToLobby}
+            className="p-1.5 px-2.5 rounded-xl border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] bg-[#FEF08A] text-[#18181B] text-xs font-black tactile-btn cursor-pointer flex items-center gap-1"
+            title="Return room to lobby"
+            aria-label="Return to lobby"
+          >
+            <Home className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span className="hidden sm:inline">Lobby</span>
+          </button>
         )}
 
         {/* Leave room */}

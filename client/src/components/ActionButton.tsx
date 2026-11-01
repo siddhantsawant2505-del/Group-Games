@@ -7,6 +7,8 @@ interface ActionButtonProps {
   children: React.ReactNode;
   variant?: 'personal' | 'shared' | 'danger' | 'subtle';
   playerColorIndex?: number;
+  customBg?: string;
+  customTextColor?: string;
   onClick?: () => void;
   disabled?: boolean;
   loading?: boolean;
@@ -21,6 +23,8 @@ export function ActionButton({
   children,
   variant = 'shared',
   playerColorIndex = 0,
+  customBg,
+  customTextColor,
   onClick,
   disabled = false,
   loading = false,
@@ -35,7 +39,10 @@ export function ActionButton({
   let bgStyle = 'var(--color-success, #86EFAC)';
   let textStyle = '#18181B';
 
-  if (variant === 'personal') {
+  if (customBg) {
+    bgStyle = customBg;
+    textStyle = customTextColor || '#18181B';
+  } else if (variant === 'personal') {
     bgStyle = playerColor.hex;
     textStyle = playerColor.contrastText;
   } else if (variant === 'shared') {

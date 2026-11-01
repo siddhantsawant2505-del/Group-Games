@@ -123,6 +123,67 @@ export function getPlayerColor(colorIndex: number): PlayerColorToken {
 }
 
 /**
+ * Distinct signature pastel color mapping for each game mode.
+ */
+export interface GameThemeColor {
+  bg: string;
+  border: string;
+  text: string;
+  name: string;
+}
+
+export const GAME_THEME_COLORS: Record<string, GameThemeColor> = {
+  'impostor': {
+    bg: '#FDA4AF', // Rose Pop / Bubblegum Coral
+    border: '#18181B',
+    text: '#18181B',
+    name: 'Rose Pop',
+  },
+  'avoid-the-word': {
+    bg: '#FDBA74', // Creamsicle Orange
+    border: '#18181B',
+    text: '#18181B',
+    name: 'Creamsicle Orange',
+  },
+  'mafia': {
+    bg: '#C4B5FD', // Lavender Grape
+    border: '#18181B',
+    text: '#18181B',
+    name: 'Lavender Grape',
+  },
+  'guess-the-link': {
+    bg: '#93C5FD', // Sky Pastel
+    border: '#18181B',
+    text: '#18181B',
+    name: 'Sky Pastel',
+  },
+  'top-100': {
+    bg: '#FEF08A', // Butter Yellow
+    border: '#18181B',
+    text: '#18181B',
+    name: 'Butter Yellow',
+  },
+  'reverse-categories': {
+    bg: '#86EFAC', // Pistachio Mint
+    border: '#18181B',
+    text: '#18181B',
+    name: 'Pistachio Mint',
+  },
+};
+
+export function getGameThemeColor(gameId?: string): GameThemeColor {
+  if (gameId && GAME_THEME_COLORS[gameId]) {
+    return GAME_THEME_COLORS[gameId];
+  }
+  return {
+    bg: '#FEF08A',
+    border: '#18181B',
+    text: '#18181B',
+    name: 'Butter Yellow',
+  };
+}
+
+/**
  * Returns accessible text color for a given player hex
  */
 export function getPlayerTextColor(colorIndex: number): string {

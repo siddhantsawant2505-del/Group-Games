@@ -714,9 +714,11 @@ export default function App() {
       {room && myPlayer && (
         <Header
           roomCode={room.roomCode}
+          roomPhase={room.phase}
           myPlayer={myPlayer}
           connected={connected}
           onLeaveRoom={handleLeaveRoom}
+          onReturnToLobby={handleReturnToLobby}
         />
       )}
 
@@ -772,6 +774,7 @@ export default function App() {
           onSelectGame={handleSelectGame}
           onConfirmAndStart={handleConfirmAndStartRound}
           onSaveGameSettings={handleSaveGameSettings}
+          onBackToLobby={handleReturnToLobby}
         />
       ) : room.phase === 'reveal' ? (
         isAvoidTheWord ? (

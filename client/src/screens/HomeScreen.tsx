@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { PARTY_GAMES, PLAYABLE_GAMES } from '@shared/data/games';
 import { GameMetadata } from '@shared/types';
-import { PLAYER_COLORS } from '@shared/theme/tokens';
+import { PLAYER_COLORS, getGameThemeColor } from '@shared/theme/tokens';
 import { ActionButton } from '../components/ActionButton';
 import { GameIcon } from '../components/GameIcon';
 import { PlayerAvatar } from '../components/PlayerAvatar';
@@ -250,7 +250,10 @@ export function HomeScreen({
               </button>
 
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-2xl bg-[#93C5FD] border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] flex items-center justify-center shrink-0">
+                <div
+                  className="w-12 h-12 rounded-2xl border-2 border-[var(--border-neo)] shadow-[2px_2px_0px_var(--border-neo)] flex items-center justify-center shrink-0 transition-colors"
+                  style={{ backgroundColor: getGameThemeColor(previewGame.id).bg }}
+                >
                   <GameIcon icon={previewGame.icon} size={24} />
                 </div>
                 <div>
@@ -301,7 +304,8 @@ export function HomeScreen({
               <button
                 type="button"
                 onClick={() => setPreviewGame(null)}
-                className="w-full py-3.5 rounded-2xl bg-[#FEF08A] text-[#18181B] font-black text-sm cursor-pointer border-2 border-[var(--border-neo)] shadow-[4px_4px_0px_var(--border-neo)] tactile-btn"
+                className="w-full py-3.5 rounded-2xl text-[#18181B] font-black text-sm cursor-pointer border-2 border-[var(--border-neo)] shadow-[4px_4px_0px_var(--border-neo)] tactile-btn transition-colors"
+                style={{ backgroundColor: getGameThemeColor(previewGame.id).bg }}
               >
                 GOT IT, LET'S PLAY!
               </button>
