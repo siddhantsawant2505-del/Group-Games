@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { Trophy, RotateCcw, LogOut, Sparkles, Grid } from 'lucide-react';
+import { Trophy, RotateCcw, LogOut, Sparkles, Grid, Crown } from 'lucide-react';
 import { RoomPublicState, Player } from '@shared/types';
 import { ActionButton } from '../components/ActionButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';
@@ -94,7 +94,7 @@ export function PostGameScreen({
               Rank & Player
             </span>
             <span className="text-xs font-black uppercase tracking-wider opacity-60">
-              Total Score
+              Game Pts · Room Wins
             </span>
           </div>
 
@@ -160,14 +160,21 @@ export function PostGameScreen({
                     </div>
                   </div>
 
-                  {/* Score */}
+                  {/* Dual Scores */}
                   <div className="flex items-center gap-1.5">
-                    <span className="text-base font-black font-mono text-[var(--text-primary)]">
-                      {player.score}
-                    </span>
-                    <span className="text-xs font-bold opacity-60">
-                      {player.score === 1 ? 'pt' : 'pts'}
-                    </span>
+                    <div
+                      className="px-2 py-0.5 rounded-lg bg-[#93C5FD] text-[#18181B] border border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] text-xs font-black font-mono"
+                      title="Game Points"
+                    >
+                      {player.gameScore ?? player.score} pts
+                    </div>
+                    <div
+                      className="px-2 py-0.5 rounded-lg bg-[#FEF08A] text-[#18181B] border border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] text-xs font-black font-mono flex items-center gap-1"
+                      title="Main Room Wins"
+                    >
+                      <Crown className="w-3 h-3 text-[#EAB308]" />
+                      <span>{player.roomScore ?? 0}</span>
+                    </div>
                   </div>
                 </motion.div>
               );

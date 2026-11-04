@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { Trophy, ArrowRight, RotateCcw, Award } from 'lucide-react';
+import { Trophy, ArrowRight, RotateCcw, Award, Crown } from 'lucide-react';
 import { RoomPublicState, Player } from '@shared/types';
 import { ActionButton } from '../components/ActionButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';
@@ -268,15 +268,37 @@ export function ResultsPhaseScreen({
           </div>
         )}
 
-        {/* Score Standings Leaderboard */}
+        {/* Winner of the round: +1 Room Score Announcement Banner */}
+        {results?.roomScoreWinners && results.roomScoreWinners.length > 0 && (
+          <div className="p-3.5 rounded-2xl bg-[#FEF08A] border-2 border-[var(--border-neo)] shadow-[3px_3px_0px_var(--border-neo)] mb-4 flex items-center justify-between gap-3 text-[#18181B]">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="text-2xl shrink-0" aria-hidden="true">👑</span>
+              <div className="min-w-0">
+                <span className="text-xs font-black block leading-tight truncate">
+                  {results.roomScoreWinners.length === 1
+                    ? `${results.roomScoreWinners[0]} won this round!`
+                    : `${results.roomScoreWinners.join(' & ')} tied for the round win!`}
+                </span>
+                <span className="text-[10px] font-bold opacity-80 block truncate">
+                  Top score earned +1 Point on the Main Room Scoreboard!
+                </span>
+              </div>
+            </div>
+            <span className="text-xs font-black px-2 py-0.5 rounded-lg bg-white border border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] font-mono shrink-0">
+              +1 Room Win
+            </span>
+          </div>
+        )}
+
+        {/* Dual Score Standings Leaderboard */}
         {results?.standings && (
           <div className="p-5 rounded-3xl mb-4 bg-[var(--surface-card)] border-[2.5px] border-[var(--border-neo)] shadow-[4px_4px_0px_var(--border-neo)]">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-black uppercase tracking-wider opacity-60 flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5 text-amber-500" />
-                <span>Running Scoreboard</span>
+                <span>Round & Room Standings</span>
               </span>
-              <span className="text-xs opacity-60 font-bold">Total Points</span>
+              <span className="text-[11px] opacity-70 font-black">Round · Game · Room</span>
             </div>
 
             <div className="space-y-2">
@@ -284,10 +306,12 @@ export function ResultsPhaseScreen({
                 return (
                   <div
                     key={st.playerId}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--surface-card-subtle)] border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)]"
+                    className={`flex items-center justify-between p-2.5 rounded-xl border-2 border-[var(--border-neo)] shadow-[1px_1px_0px_var(--border-neo)] ${
+                      st.isRoundWinner ? 'bg-[#FEF08A]/30' : 'bg-[var(--surface-card-subtle)]'
+                    }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-6 h-6 rounded-lg bg-[#FEF08A] border border-[var(--border-neo)] flex items-center justify-center text-xs font-black text-[#18181B]">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-6 h-6 rounded-lg bg-[#FEF08A] border border-[var(--border-neo)] flex items-center justify-center text-xs font-black text-[#18181B] shrink-0">
                         #{idx + 1}
                       </span>
                       <PlayerAvatar
@@ -295,23 +319,39 @@ export function ResultsPhaseScreen({
                         colorIndex={st.colorIndex}
                         size="xs"
                       />
-                      <span className="font-black text-sm text-[var(--text-primary)]">
-                        {st.playerName}
-                      </span>
+                      <div className="flex items-center gap-1 min-w-0">
+                        <span className="font-black text-sm text-[var(--text-primary)] truncate">
+                          {st.playerName}
+                        </span>
+                        {st.isRoundWinner && (
+                          <span className="text-xs shrink-0" title="Round Winner (+1 Room Point)">
+                            👑
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Round Points Added */}
                       {st.pointsAdded > 0 ? (
-                        <span className="text-xs font-black text-[#18181B] px-2 py-0.5 rounded-md bg-[#86EFAC] border border-[var(--border-neo)]">
-                          +{st.pointsAdded} pt
+                        <span className="text-xs font-black text-[#18181B] px-1.5 py-0.5 rounded-md bg-[#86EFAC] border border-[var(--border-neo)] font-mono" title="Round points">
+                          +{st.pointsAdded}
                         </span>
                       ) : (
-                        <span className="text-xs font-semibold opacity-60">
+                        <span className="text-xs font-semibold opacity-60 font-mono px-1">
                           +0
                         </span>
                       )}
-                      <span className="font-black text-sm font-mono text-[var(--text-primary)]">
-                        {st.totalScore} {st.totalScore === 1 ? 'pt' : 'pts'}
+
+                      {/* Game Total Points */}
+                      <span className="font-mono text-xs font-black px-2 py-0.5 rounded-md bg-[#93C5FD] text-[#18181B] border border-[var(--border-neo)] shadow-[0.5px_0.5px_0px_var(--border-neo)]" title="Game Points">
+                        {st.gameScore ?? st.totalScore}p
+                      </span>
+
+                      {/* Main Room Score (Wins) */}
+                      <span className="font-mono text-xs font-black px-2 py-0.5 rounded-md bg-[#FEF08A] text-[#18181B] border border-[var(--border-neo)] shadow-[0.5px_0.5px_0px_var(--border-neo)] flex items-center gap-0.5" title="Main Room Wins">
+                        <Crown className="w-2.5 h-2.5 text-[#EAB308]" />
+                        <span>{st.roomScore ?? 0}w</span>
                       </span>
                     </div>
                   </div>

@@ -19,6 +19,7 @@
     "test:top100": "tsx scripts/testTop100.ts",
     "test:mafia": "tsx scripts/testMafia.ts",
     "test:link": "tsx scripts/testGuessTheLink.ts",
+    "test:scoreboards": "tsx scripts/testScoreboardsAndPlayerRemoval.ts",
     "seed:link": "tsx scripts/seedLinkLibrary.ts"
   },
   "dependencies": {

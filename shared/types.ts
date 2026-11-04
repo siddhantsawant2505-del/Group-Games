@@ -11,11 +11,14 @@ export interface Player {
   isHost: boolean;
   connected: boolean;
   score: number;
+  gameScore: number;
+  roomScore: number;
   sessionToken: string;
   joinedAt: number;
   /** Team-mode only: the team this player plays for. Keyed by sessionToken,
    *  so reconnecting restores it. */
   teamId?: string;
+  isBot?: boolean;
 }
 
 export type GamePhase =
@@ -85,6 +88,8 @@ export interface Team {
   accentIndex: number;
   /** Member scores plus `bonusPoints` (see below). Derived, never set directly. */
   score: number;
+  gameScore: number;
+  roomScore: number;
   memberIds: string[];
   /**
    * Team-only awards: points a game hands to the team rather than to one member
@@ -101,6 +106,8 @@ export interface TeamStandingMember {
   colorIndex: number;
   pointsAdded: number;
   totalScore: number;
+  gameScore?: number;
+  roomScore?: number;
 }
 
 /** Public team leaderboard entry, built server-side when a round resolves. */
@@ -110,8 +117,11 @@ export interface TeamStanding {
   icon: string;
   accentIndex: number;
   total: number;
+  gameScore?: number;
+  roomScore?: number;
   members: TeamStandingMember[];
   rank: number;
+  isRoundWinner?: boolean;
 }
 
 export const MIN_TEAMS = 2;
@@ -241,9 +251,12 @@ export interface PlayerResultStanding {
   colorIndex: number;
   pointsAdded: number;
   totalScore: number;
+  gameScore?: number;
+  roomScore?: number;
   badge?: string;
   /** 1-based placement; ties share a rank (Top 100 final standings). */
   rank?: number;
+  isRoundWinner?: boolean;
 }
 
 export interface RoleRevealInfo {
@@ -943,6 +956,8 @@ export interface PhaseResultsData {
   revCatWinningVotes?: number;
   revCatPointsBest?: number;
   revCatPointsVoter?: number;
+  /** Winners of this round who received +1 Room Score */
+  roomScoreWinners?: string[];
 }
 
 export interface RoomPublicState {

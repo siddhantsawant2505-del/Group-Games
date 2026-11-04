@@ -208,11 +208,21 @@ export default function App() {
       setMafiaTeamPicks(payload?.picks ?? null);
     };
 
+    const handlePlayerKicked = (payload: { reason?: string }) => {
+      setRoom(null);
+      setMyPlayer(null);
+      setPrivateState({});
+      setErrorMessage(payload?.reason || 'You were removed from the room by the host.');
+      playNotificationSound('timer-warning');
+      triggerHaptic('heavy');
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('room:update', handleRoomUpdate);
     socket.on('player:private-state', handlePrivateState);
     socket.on('mafia:team-update', handleMafiaTeamUpdate);
+    socket.on('player:kicked', handlePlayerKicked);
 
     if (socket.connected) {
       setConnected(true);
@@ -224,6 +234,7 @@ export default function App() {
       socket.off('room:update', handleRoomUpdate);
       socket.off('player:private-state', handlePrivateState);
       socket.off('mafia:team-update', handleMafiaTeamUpdate);
+      socket.off('player:kicked', handlePlayerKicked);
     };
   }, [room]);
 
@@ -351,6 +362,20 @@ export default function App() {
     const socket = getSocket();
     socket.emit('add-bot', { roomCode: room.roomCode });
   }, [room]);
+
+  // Host removes a player from the room
+  const handleRemovePlayer = useCallback(
+    (targetPlayerId: string) => {
+      if (!room || !myPlayer?.isHost) return;
+      const socket = getSocket();
+      socket.emit('remove-player', {
+        roomCode: room.roomCode,
+        targetPlayerId,
+      });
+      playNotificationSound('submit-lock');
+    },
+    [room, myPlayer]
+  );
 
   // Host selects game
   const handleSelectGame = useCallback((gameId: string) => {
@@ -1072,6 +1097,7 @@ export default function App() {
           myPlayer={myPlayer}
           onStartGame={handleGoToGameSelect}
           onAddBot={handleAddBot}
+          onRemovePlayer={handleRemovePlayer}
           roomSettings={roomSettingsActions}
         />
       )}
@@ -1079,7 +1105,7 @@ export default function App() {
 
       {/* Persistent Bottom Score Board during room sessions */}
       {room && myPlayer && (
-        <BottomScoreBoard room={room} myPlayer={myPlayer} />
+        <BottomScoreBoard room={room} myPlayer={myPlayer} onRemovePlayer={handleRemovePlayer} />
       )}
     </div>
   );

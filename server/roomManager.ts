@@ -30,7 +30,13 @@ import {
   DEFAULT_TEAM_COUNT,
   sanitizeTeamName,
 } from '../shared/data/teams';
-import { awardPoints, recomputeTeamScores as recomputeTeamScoreTotals, ScoreLogEntry } from './scoring';
+import {
+  awardPoints,
+  awardRoomPoint,
+  awardTeamRoomPoint,
+  recomputeTeamScores as recomputeTeamScoreTotals,
+  ScoreLogEntry,
+} from './scoring';
 import { PLAYER_COLORS } from '../shared/theme/tokens';
 import { DEFAULT_GAME, PARTY_GAMES } from '../shared/data/games';
 import {
@@ -357,6 +363,7 @@ export interface InternalRoom {
   teams: Team[];
   /** Bounded audit trail of every awardPoints() call this room made. */
   scoreLog: ScoreLogEntry[];
+  lastAwardedRoomScoreRound?: string;
   botTimeouts: NodeJS.Timeout[]; // pending simulated-bot actions
   createdAt: number;
   lastActivityAt: number;
@@ -415,6 +422,8 @@ export class RoomManager {
       isHost: true,
       connected: true,
       score: 0,
+      gameScore: 0,
+      roomScore: 0,
       sessionToken,
       joinedAt: Date.now(),
       socketId,
@@ -551,6 +560,8 @@ export class RoomManager {
       isHost: room.players.length === 0,
       connected: true,
       score: 0,
+      gameScore: 0,
+      roomScore: 0,
       sessionToken: newSessionToken,
       joinedAt: Date.now(),
       socketId,
@@ -592,6 +603,8 @@ export class RoomManager {
       isHost: false,
       connected: true,
       score: 0,
+      gameScore: 0,
+      roomScore: 0,
       sessionToken: `bot_token_${botId}`,
       joinedAt: Date.now(),
       socketId: null,
@@ -1090,13 +1103,18 @@ export class RoomManager {
       const members = team.memberIds
         .map((id) => byId.get(id))
         .filter((entry): entry is PlayerResultStanding => Boolean(entry))
-        .map((entry) => ({
-          playerId: entry.playerId,
-          playerName: entry.playerName,
-          colorIndex: entry.colorIndex,
-          pointsAdded: entry.pointsAdded,
-          totalScore: entry.totalScore,
-        }))
+        .map((entry) => {
+          const pl = room.players.find((p) => p.id === entry.playerId);
+          return {
+            playerId: entry.playerId,
+            playerName: entry.playerName,
+            colorIndex: entry.colorIndex,
+            pointsAdded: entry.pointsAdded,
+            totalScore: entry.totalScore,
+            gameScore: pl?.gameScore ?? entry.totalScore,
+            roomScore: pl?.roomScore ?? 0,
+          };
+        })
         .sort((a, b) => b.totalScore - a.totalScore);
       return {
         teamId: team.id,
@@ -1104,6 +1122,8 @@ export class RoomManager {
         icon: team.icon,
         accentIndex: team.accentIndex,
         total: team.score,
+        gameScore: team.gameScore ?? team.score,
+        roomScore: team.roomScore ?? 0,
         members,
         rank: 0,
       };
@@ -1236,6 +1256,7 @@ export class RoomManager {
 
     switch (newPhase) {
       case 'lobby': {
+        this.resetGameScores(room);
         room.phasePrompt = 'Lobby';
         room.phaseSubprompt = 'Invite friends to join with room code';
         room.hasSubmittedInput.clear();
@@ -1262,6 +1283,8 @@ export class RoomManager {
       }
 
       case 'game-select': {
+        this.resetGameScores(room);
+        room.roundNumber = 1;
         room.phasePrompt = 'Choose a Game';
         room.phaseSubprompt = 'Host picks the game collection for this round';
         // A room created before the catalogue changed may still point at a
@@ -1706,6 +1729,7 @@ export class RoomManager {
             room.playMode === 'team'
               ? this.buildTeamStandings(room, room.results.standings)
               : undefined;
+          this.applyRoomScoreForRoundWinner(room);
         }
         if (room.selectedGame?.id === GUESS_THE_LINK_GAME_ID) {
           room.phasePrompt = 'The Link Revealed';
@@ -2772,6 +2796,155 @@ export class RoomManager {
   }
 
   /**
+   * Resets scores for the current game session, leaving the overall roomScore intact.
+   */
+  public resetGameScores(room: InternalRoom): void {
+    for (const player of room.players) {
+      player.score = 0;
+      player.gameScore = 0;
+    }
+    for (const team of room.teams) {
+      team.score = 0;
+      team.gameScore = 0;
+      team.bonusPoints = 0;
+    }
+    room.lastAwardedRoomScoreRound = undefined;
+  }
+
+  /**
+   * Evaluates the scoreboard for the completed round/game, finds the winner(s)
+   * (highest score in this game/round's scoreboard), and awards +1 point to their
+   * main Room Scoreboard.
+   */
+  private applyRoomScoreForRoundWinner(room: InternalRoom): void {
+    if (!room.results) return;
+
+    const roundKey = `${room.selectedGame?.id ?? 'game'}_round_${room.roundNumber}`;
+    if (room.lastAwardedRoomScoreRound === roundKey) return;
+    room.lastAwardedRoomScoreRound = roundKey;
+
+    const isTeamMode = room.playMode === 'team' && (room.results.teamStandings?.length ?? 0) > 0;
+    const winnerNames: string[] = [];
+
+    if (isTeamMode && room.results.teamStandings) {
+      // Team mode: winning team has the highest team score in this round
+      const maxTeamScore = Math.max(...room.results.teamStandings.map((t) => t.total), 0);
+      if (maxTeamScore > 0) {
+        const winningTeams = room.results.teamStandings.filter((t) => t.total === maxTeamScore);
+        for (const winTeam of winningTeams) {
+          winTeam.isRoundWinner = true;
+          winnerNames.push(winTeam.name);
+          const team = room.teams.find((t) => t.id === winTeam.teamId);
+          if (team) {
+            team.roomScore = (team.roomScore ?? 0) + 1;
+            winTeam.roomScore = team.roomScore;
+          }
+          // Members of winning team also get +1 room score
+          for (const member of winTeam.members) {
+            const player = room.players.find((p) => p.id === member.playerId);
+            if (player) {
+              player.roomScore = (player.roomScore ?? 0) + 1;
+              member.roomScore = player.roomScore;
+            }
+          }
+        }
+      }
+    } else if (room.results.standings && room.results.standings.length > 0) {
+      // Solo mode: player with the highest game score (totalScore) wins
+      const maxScore = Math.max(...room.results.standings.map((s) => s.totalScore), 0);
+      if (maxScore > 0) {
+        const winningPlayers = room.results.standings.filter((s) => s.totalScore === maxScore);
+        for (const winPlayer of winningPlayers) {
+          winPlayer.isRoundWinner = true;
+          winnerNames.push(winPlayer.playerName);
+          const player = room.players.find((p) => p.id === winPlayer.playerId);
+          if (player) {
+            player.roomScore = (player.roomScore ?? 0) + 1;
+            winPlayer.roomScore = player.roomScore;
+          }
+        }
+      }
+    }
+
+    // Ensure all standings rows are populated with up-to-date gameScore and roomScore
+    for (const st of room.results.standings || []) {
+      const player = room.players.find((p) => p.id === st.playerId);
+      st.gameScore = player?.gameScore ?? player?.score ?? 0;
+      st.roomScore = player?.roomScore ?? 0;
+    }
+
+    if (room.results.teamStandings) {
+      for (const ts of room.results.teamStandings) {
+        const team = room.teams.find((t) => t.id === ts.teamId);
+        ts.gameScore = team?.gameScore ?? team?.score ?? 0;
+        ts.roomScore = team?.roomScore ?? 0;
+        for (const m of ts.members) {
+          const p = room.players.find((pl) => pl.id === m.playerId);
+          m.gameScore = p?.gameScore ?? p?.score ?? 0;
+          m.roomScore = p?.roomScore ?? 0;
+        }
+      }
+    }
+
+    room.results.roomScoreWinners = winnerNames;
+  }
+
+  /**
+   * Allows the host to remove (kick) a player or bot from the room.
+   */
+  public removePlayer(
+    code: string,
+    requesterId: string,
+    targetPlayerId: string
+  ): { success: boolean; error?: string; removedPlayer?: InternalPlayer } {
+    const room = this.getRoom(code);
+    if (!room) return { success: false, error: 'Room not found.' };
+
+    const requester = room.players.find((p) => p.id === requesterId);
+    if (!requester || !requester.isHost) {
+      return { success: false, error: 'Only the host can remove players.' };
+    }
+
+    if (targetPlayerId === room.hostId || targetPlayerId === requesterId) {
+      return { success: false, error: 'The host cannot be removed.' };
+    }
+
+    const targetIdx = room.players.findIndex((p) => p.id === targetPlayerId);
+    if (targetIdx < 0) {
+      return { success: false, error: 'Player not found in room.' };
+    }
+
+    const targetPlayer = room.players[targetIdx];
+    room.players.splice(targetIdx, 1);
+
+    // Remove from team if applicable
+    if (targetPlayer.teamId && room.teams) {
+      for (const team of room.teams) {
+        team.memberIds = team.memberIds.filter((id) => id !== targetPlayerId);
+      }
+      this.recomputeTeamScores(room);
+    }
+
+    // Clean up in-flight submission and votes
+    room.hasSubmittedInput.delete(targetPlayerId);
+    room.hasVoted.delete(targetPlayerId);
+    delete room.playerVotes[targetPlayerId];
+    delete room.privateData[targetPlayerId];
+
+    // Clean up vote tallies
+    if (room.voteTallies[targetPlayerId]) {
+      delete room.voteTallies[targetPlayerId];
+    }
+
+    // Avoid the Word / Mafia mid-game disconnect handling if applicable
+    this.resolveAvoidDisconnect(room, targetPlayerId);
+    this.resolveMafiaDisconnect(room, targetPlayerId);
+
+    room.lastActivityAt = Date.now();
+    return { success: true, removedPlayer: targetPlayer };
+  }
+
+  /**
    * Returns clean public state safe to broadcast to everyone in the room
    */
   public getPublicRoomState(room: InternalRoom): RoomPublicState {
@@ -2790,8 +2963,11 @@ export class RoomManager {
         isHost: p.isHost,
         connected: p.connected,
         score: p.score,
+        gameScore: p.gameScore ?? p.score,
+        roomScore: p.roomScore ?? 0,
         sessionToken: p.sessionToken,
         joinedAt: p.joinedAt,
+        isBot: p.isBot,
         ...(p.teamId ? { teamId: p.teamId } : {}),
       })),
       phase: room.phase,
@@ -2814,7 +2990,12 @@ export class RoomManager {
       impostorQuestionState: room.impostorQuestionState,
       gameSettings: room.gameSettings,
       playMode: room.playMode,
-      teams: room.teams,
+      teams: room.teams.map((t) => ({
+        ...t,
+        score: t.score,
+        gameScore: t.gameScore ?? t.score,
+        roomScore: t.roomScore ?? 0,
+      })),
       aiContentAvailable: isAiAvailable(),
     };
   }

@@ -269,6 +269,51 @@ async function startServer() {
       }
     });
 
+    // 3b. Host removes a player or bot
+    socket.on(
+      'remove-player',
+      (
+        { roomCode, targetPlayerId }: { roomCode: string; targetPlayerId: string },
+        callback
+      ) => {
+        const upperCode = (roomCode || '').toUpperCase().trim();
+        const room = roomManager.getRoom(upperCode);
+        if (!room) {
+          if (typeof callback === 'function') callback({ success: false, error: 'Room not found' });
+          return;
+        }
+
+        const requester = room.players.find((p) => p.socketId === socket.id);
+        if (!requester || !requester.isHost) {
+          if (typeof callback === 'function') {
+            callback({ success: false, error: 'Only the host can remove players' });
+          }
+          return;
+        }
+
+        const target = room.players.find((p) => p.id === targetPlayerId);
+        if (!target) {
+          if (typeof callback === 'function') callback({ success: false, error: 'Player not found' });
+          return;
+        }
+
+        const res = roomManager.removePlayer(upperCode, requester.id, targetPlayerId);
+        if (res.success) {
+          if (target.socketId) {
+            io.to(target.socketId).emit('player:kicked', {
+              reason: 'You have been removed from the room by the host.',
+            });
+            const targetSocket = io.sockets.sockets.get(target.socketId);
+            targetSocket?.leave(upperCode);
+          }
+          broadcastRoom(upperCode);
+        }
+        if (typeof callback === 'function') {
+          callback(res);
+        }
+      }
+    );
+
     // 4. Select game in game-select phase
     socket.on(
       'select-game',

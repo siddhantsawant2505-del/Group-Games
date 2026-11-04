@@ -35,6 +35,7 @@ interface LobbyScreenProps {
   myPlayer: Player;
   onStartGame: () => void;
   onAddBot: () => void;
+  onRemovePlayer?: (playerId: string) => void;
   roomSettings: RoomSettingsActions;
 }
 
@@ -43,6 +44,7 @@ export function LobbyScreen({
   myPlayer,
   onStartGame,
   onAddBot,
+  onRemovePlayer,
   roomSettings,
 }: LobbyScreenProps) {
   const [copied, setCopied] = useState(false);
@@ -259,6 +261,11 @@ export function LobbyScreen({
                     connected={p.connected}
                     size="md"
                     badge={team ? `${team.icon} ${team.name}` : undefined}
+                    onRemove={
+                      isHost && p.id !== myPlayer.id && onRemovePlayer
+                        ? () => onRemovePlayer(p.id)
+                        : undefined
+                    }
                   />
                 );
               })}

@@ -13,6 +13,8 @@ import { PlayMode } from '../shared/types';
 export interface ScorablePlayer {
   id: string;
   score: number;
+  gameScore?: number;
+  roomScore?: number;
   teamId?: string;
 }
 
@@ -36,6 +38,8 @@ export interface ScoreLogEntry {
 export interface ScorableTeam {
   id: string;
   score: number;
+  gameScore?: number;
+  roomScore?: number;
   memberIds: string[];
   bonusPoints?: number;
 }
@@ -57,10 +61,16 @@ export function awardPoints(
 
   const amount = Number.isFinite(points) ? Math.round(points) : 0;
   player.score += amount;
+  player.gameScore = (player.gameScore ?? 0) + amount;
+  if (player.roomScore === undefined) player.roomScore = 0;
 
   if (room.playMode === 'team' && player.teamId && room.teams) {
     const team = room.teams.find((t) => t.id === player.teamId);
-    if (team) team.score += amount;
+    if (team) {
+      team.score += amount;
+      team.gameScore = (team.gameScore ?? 0) + amount;
+      if (team.roomScore === undefined) team.roomScore = 0;
+    }
   }
 
   logScore(room, player.id, (player as { name?: string }).name || player.id, amount, reason);
@@ -95,6 +105,8 @@ export function awardTeamPoints(
   const bonus = (team.bonusPoints ?? 0) + amount;
   team.bonusPoints = bonus;
   team.score = memberScoreSum(room, team) + bonus;
+  team.gameScore = team.score;
+  if (team.roomScore === undefined) team.roomScore = 0;
 
   logScore(room, team.id, (team as { name?: string }).name || team.id, amount, reason);
   return team.score;
@@ -107,7 +119,41 @@ export function awardTeamPoints(
 export function recomputeTeamScores(room: ScorableRoom): void {
   room.teams?.forEach((team) => {
     team.score = memberScoreSum(room, team) + (team.bonusPoints ?? 0);
+    team.gameScore = team.score;
+    if (team.roomScore === undefined) team.roomScore = 0;
   });
+}
+
+/**
+ * Awards 1 (or `amount`) point to a player's ROOM score (match/round wins).
+ */
+export function awardRoomPoint(
+  room: ScorableRoom,
+  playerId: string,
+  amount: number = 1,
+  reason?: string
+): number {
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player) return 0;
+  player.roomScore = (player.roomScore ?? 0) + amount;
+  logScore(room, player.id, (player as { name?: string }).name || player.id, amount, reason || 'room_win');
+  return player.roomScore;
+}
+
+/**
+ * Awards 1 (or `amount`) point to a team's ROOM score (match/round wins).
+ */
+export function awardTeamRoomPoint(
+  room: ScorableRoom,
+  teamId: string,
+  amount: number = 1,
+  reason?: string
+): number {
+  const team = room.teams?.find((candidate) => candidate.id === teamId);
+  if (!team) return 0;
+  team.roomScore = (team.roomScore ?? 0) + amount;
+  logScore(room, team.id, (team as { name?: string }).name || team.id, amount, reason || 'team_room_win');
+  return team.roomScore;
 }
 
 function logScore(

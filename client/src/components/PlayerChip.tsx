@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Check } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { getPlayerColor } from '@shared/theme/tokens';
 import { PlayerAvatar } from './PlayerAvatar';
 
@@ -20,6 +20,7 @@ interface PlayerChipProps {
   selected?: boolean;
   selectable?: boolean;
   onClick?: () => void;
+  onRemove?: () => void;
 }
 
 export function PlayerChip({
@@ -39,6 +40,7 @@ export function PlayerChip({
   selected = false,
   selectable = false,
   onClick,
+  onRemove,
 }: PlayerChipProps) {
   // Dynamically resolve player assigned color
   let activeColorHex = '#FDA4AF';
@@ -127,6 +129,28 @@ export function PlayerChip({
       {badge && (
         <span className="shrink-0 px-2 py-0.5 rounded-lg text-[11px] font-black bg-[#C4B5FD] text-[#18181B] border border-[var(--border-neo)] ml-auto">
           {badge}
+        </span>
+      )}
+
+      {/* Host Remove Player Button */}
+      {onRemove && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation();
+              onRemove();
+            }
+          }}
+          title="Remove player"
+          className="shrink-0 w-5 h-5 rounded-md bg-[#FDA4AF] hover:bg-rose-400 text-[#18181B] border border-[var(--border-neo)] flex items-center justify-center ml-1.5 transition-colors cursor-pointer"
+        >
+          <X className="w-3.5 h-3.5 stroke-[3]" />
         </span>
       )}
     </motion.button>

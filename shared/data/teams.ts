@@ -54,6 +54,8 @@ export function buildTeams(count: number): Team[] {
     icon: template.icon,
     accentIndex: index,
     score: 0,
+    gameScore: 0,
+    roomScore: 0,
     memberIds: [],
   }));
 }
