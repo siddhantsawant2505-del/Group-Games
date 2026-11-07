@@ -1,7 +1,7 @@
 /**
  * Reverse Categories — Item Pool
- * 66 original items (three per theme) that the server draws from to build a
- * deliberately unrelated triplet every round.
+ * 126 original items (three per theme across 42 themes) that the server draws from
+ * to build a deliberately unrelated triplet every round.
  *
  * The `theme` tag is what guarantees "unrelated": the randomizer refuses to
  * pick two items that share a theme, so a round never hands out three birds or
@@ -102,6 +102,86 @@ export const REVERSE_CATEGORIES_ITEMS: ReverseCategoriesItem[] = [
   { item: 'protractor', theme: 'measuring' },
   { item: 'abacus', theme: 'measuring' },
   { item: 'tape measure', theme: 'measuring' },
+  // Beach
+  { item: 'surfboard', theme: 'beach' },
+  { item: 'seashell', theme: 'beach' },
+  { item: 'sunscreen', theme: 'beach' },
+  // Garden
+  { item: 'watering can', theme: 'garden' },
+  { item: 'lawnmower', theme: 'garden' },
+  { item: 'scarecrow', theme: 'garden' },
+  // School
+  { item: 'chalkboard', theme: 'school' },
+  { item: 'pencil sharpener', theme: 'school' },
+  { item: 'lunchbox', theme: 'school' },
+  // Bakery
+  { item: 'croissant', theme: 'bakery' },
+  { item: 'rolling pin', theme: 'bakery' },
+  { item: 'sourdough loaf', theme: 'bakery' },
+  // Night sky
+  { item: 'constellation', theme: 'night_sky' },
+  { item: 'shooting star', theme: 'night_sky' },
+  { item: 'telescope', theme: 'night_sky' },
+  // Workshop
+  { item: 'wrench', theme: 'workshop' },
+  { item: 'sandpaper', theme: 'workshop' },
+  { item: 'toolbox', theme: 'workshop' },
+  // Forest
+  { item: 'pinecone', theme: 'forest' },
+  { item: 'acorn', theme: 'forest' },
+  { item: 'campfire', theme: 'forest' },
+  // Cinema
+  { item: 'popcorn bucket', theme: 'cinema' },
+  { item: 'clapperboard', theme: 'cinema' },
+  { item: 'film reel', theme: 'cinema' },
+  // Winter
+  { item: 'snowman', theme: 'winter' },
+  { item: 'icicle', theme: 'winter' },
+  { item: 'earmuffs', theme: 'winter' },
+  // Magic
+  { item: 'top hat', theme: 'magic' },
+  { item: 'magic wand', theme: 'magic' },
+  { item: 'deck of cards', theme: 'magic' },
+  // Farm
+  { item: 'tractor', theme: 'farm' },
+  { item: 'haystack', theme: 'farm' },
+  { item: 'windmill', theme: 'farm' },
+  // Travel
+  { item: 'passport', theme: 'travel' },
+  { item: 'luggage carousel', theme: 'travel' },
+  { item: 'boarding pass', theme: 'travel' },
+  // Gym
+  { item: 'dumbbell', theme: 'gym' },
+  { item: 'treadmill', theme: 'gym' },
+  { item: 'yoga mat', theme: 'gym' },
+  // Pets
+  { item: 'scratching post', theme: 'pets' },
+  { item: 'chew toy', theme: 'pets' },
+  { item: 'fish bowl', theme: 'pets' },
+  // Medical
+  { item: 'stethoscope', theme: 'medical' },
+  { item: 'thermometer', theme: 'medical' },
+  { item: 'bandage', theme: 'medical' },
+  // Amusement park
+  { item: 'roller coaster', theme: 'fairground' },
+  { item: 'cotton candy', theme: 'fairground' },
+  { item: 'ferris wheel', theme: 'fairground' },
+  // Photography
+  { item: 'tripod', theme: 'photography' },
+  { item: 'camera lens', theme: 'photography' },
+  { item: 'polaroid', theme: 'photography' },
+  // Chores
+  { item: 'clothes peg', theme: 'chores' },
+  { item: 'ironing board', theme: 'chores' },
+  { item: 'feather duster', theme: 'chores' },
+  // Art
+  { item: 'easel', theme: 'art' },
+  { item: 'paintbrush', theme: 'art' },
+  { item: 'palette', theme: 'art' },
+  // Sleep
+  { item: 'pillowcase', theme: 'sleep' },
+  { item: 'alarm clock', theme: 'sleep' },
+  { item: 'sleep mask', theme: 'sleep' },
 ];
 
 /** Fisher-Yates shuffle on a copy of the array. */
